@@ -1,0 +1,1 @@
+export { PhotoCaptureView } from "./PhotoCaptureView";

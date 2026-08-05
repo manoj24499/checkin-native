@@ -1,0 +1,260 @@
+import { useState } from "react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Screen, Card, Button, LoadingView, ErrorView, StatusBadge } from "@/components/ui";
+import { DistancePill } from "@/components/attendance";
+import { PhotoCaptureView } from "@/components/camera";
+import { SlideToConfirmTrack, PinKeypad } from "@/components/checkin";
+import {
+  useAuth,
+  useAttendanceStatus,
+  useResolvedGeofenceTarget,
+  useGeofence,
+  useCheckInOut,
+} from "@/hooks";
+import { useCheckInDraftStore } from "@/store/checkInDraftStore";
+import { getErrorMessage } from "@/utils/errors";
+import { colors, radius, spacing, typography } from "@/theme";
+
+export function CheckInOutScreen() {
+  const { user } = useAuth();
+  const statusQuery = useAttendanceStatus(user?.employeeCode);
+  const checkInOut = useCheckInOut();
+
+  const [pin, setPin] = useState("");
+  const photoDataUrl = useCheckInDraftStore((s) => s.photoDataUrl);
+  const setPhotoDataUrl = useCheckInDraftStore((s) => s.setPhotoDataUrl);
+  const [cameraOpen, setCameraOpen] = useState(false);
+
+  const target = useResolvedGeofenceTarget();
+  const geofence = useGeofence(target);
+
+  if (statusQuery.isLoading) return <LoadingView label="Checking today's status…" />;
+  if (statusQuery.isError) {
+    return <ErrorView message={getErrorMessage(statusQuery.error)} onRetry={() => statusQuery.refetch()} />;
+  }
+
+  const status = statusQuery.data;
+  const checkedIn = status?.exists ? status.checkedIn : false;
+  const checkedOut = status?.exists ? status.checkedOut : false;
+
+  if (checkedIn && checkedOut) {
+    return (
+      <Screen>
+        <Card>
+          <Text style={styles.title}>All done for today</Text>
+          <Text style={styles.meta}>You've already checked in and out today.</Text>
+        </Card>
+      </Screen>
+    );
+  }
+
+  const action = checkedIn ? "CHECK_OUT" : "CHECK_IN";
+  const isPaused = status?.exists ? status.isPaused : false;
+  const checkOutPhotoRequired = status?.exists ? status.checkOutPhotoRequired : false;
+  const requiresPhoto = action === "CHECK_IN" || (action === "CHECK_OUT" && checkOutPhotoRequired);
+  const requiresGeofence = action === "CHECK_IN" && !!target;
+
+  const canSubmit =
+    pin.length >= 4 &&
+    (!requiresPhoto || !!photoDataUrl) &&
+    (!requiresGeofence || geofence.withinRadius === true);
+
+  const handleSubmit = async () => {
+    if (!user) return;
+    try {
+      await checkInOut.mutateAsync({
+        employeeCode: user.employeeCode,
+        pin,
+        action,
+        photo: photoDataUrl ?? undefined,
+        latitude: geofence.coords?.latitude,
+        longitude: geofence.coords?.longitude,
+        mocked: geofence.mocked,
+      });
+      setPin("");
+      setPhotoDataUrl(null);
+    } catch {
+      // Surfaced below via checkInOut.error.
+    }
+  };
+
+  if (cameraOpen) {
+    return (
+      <PhotoCaptureView
+        onCapture={(base64) => {
+          setPhotoDataUrl(`data:image/jpeg;base64,${base64}`);
+          setCameraOpen(false);
+        }}
+        onCancel={() => setCameraOpen(false)}
+      />
+    );
+  }
+
+  const ringKicker = checkInOut.isPending
+    ? "PROCESSING"
+    : canSubmit
+      ? "SLIDE TO CONFIRM"
+      : "BLOCKED";
+  const ringTitle = checkInOut.isPending
+    ? "Confirming…"
+    : action === "CHECK_IN"
+      ? "Slide to check in"
+      : "Slide to check out";
+  const ringHelp = canSubmit
+    ? "The server re-checks your PIN, photo and distance before it counts."
+    : requiresPhoto && !photoDataUrl
+      ? "Take the presence photo and enter your PIN to unlock."
+      : "Enter your PIN to unlock.";
+
+  return (
+    <Screen scroll>
+      <Text style={styles.kicker}>{action === "CHECK_IN" ? "STEP 1 OF 1" : "CONFIRM"}</Text>
+      <Text style={styles.title}>{action === "CHECK_IN" ? "Check in" : "Check out"}</Text>
+      <Text style={styles.subtitle}>
+        {user?.employeeCode} · {user?.name}
+      </Text>
+
+      {isPaused ? (
+        <View style={styles.pausedBadgeWrap}>
+          <StatusBadge label="Paused — outside your work area" tone="warning" />
+        </View>
+      ) : null}
+
+      {requiresGeofence && requiresPhoto ? (
+        <View style={styles.row}>
+          <Card style={styles.geofenceCard}>
+            <Text style={styles.cardLabel}>GEOFENCE</Text>
+            {geofence.isLoading ? (
+              <Text style={styles.meta}>Getting your location…</Text>
+            ) : geofence.error ? (
+              <Text style={styles.errorText}>{geofence.error}</Text>
+            ) : (
+              <DistancePill distanceMeters={geofence.distanceMeters} withinRadius={geofence.withinRadius} />
+            )}
+            <Pressable onPress={geofence.refresh}>
+              <Text style={styles.refreshLink}>Refresh</Text>
+            </Pressable>
+          </Card>
+          <Pressable
+            onPress={() => setCameraOpen(true)}
+            style={[styles.photoTile, photoDataUrl && styles.photoTileReady]}
+          >
+            {photoDataUrl ? (
+              <>
+                <Image source={{ uri: photoDataUrl }} style={styles.photoTileImage} />
+                <View style={styles.photoTileBadge}>
+                  <Text style={styles.photoGlyphReady}>✓</Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.photoGlyphWrap}>
+                <Text style={styles.photoGlyph}>⌾</Text>
+              </View>
+            )}
+            <Text style={styles.photoTileLabel}>{photoDataUrl ? "PHOTO READY" : "PRESENCE PHOTO"}</Text>
+          </Pressable>
+        </View>
+      ) : requiresPhoto ? (
+        <Card style={styles.card}>
+          <Text style={styles.cardLabel}>PRESENCE PHOTO</Text>
+          {photoDataUrl ? (
+            <Image source={{ uri: photoDataUrl }} style={styles.photoPreview} />
+          ) : (
+            <Text style={styles.meta}>
+              A photo is required to {action === "CHECK_IN" ? "check in" : "check out"}.
+            </Text>
+          )}
+          <Button
+            label={photoDataUrl ? "Retake photo" : "Take photo"}
+            variant="secondary"
+            onPress={() => setCameraOpen(true)}
+            style={styles.retakeButton}
+          />
+        </Card>
+      ) : null}
+
+      <View style={styles.pinSection}>
+        <View style={styles.pinHeaderRow}>
+          <Text style={styles.cardLabel}>PIN</Text>
+          <Text style={styles.pinHint}>{pin.length ? `${pin.length} of 4+ digits` : "4 to 6 digits"}</Text>
+        </View>
+        <PinKeypad value={pin} onChange={setPin} />
+      </View>
+
+      {checkInOut.isError ? <Text style={styles.errorText}>{getErrorMessage(checkInOut.error)}</Text> : null}
+
+      <View style={styles.confirmWrap}>
+        <SlideToConfirmTrack
+          kicker={ringKicker}
+          title={ringTitle}
+          helpText={ringHelp}
+          disabled={!canSubmit || checkInOut.isPending}
+          onConfirm={handleSubmit}
+        />
+      </View>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  pausedBadgeWrap: { marginBottom: spacing.md },
+  kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary },
+  title: { ...typography.h1, color: colors.textPrimary, marginTop: spacing.xs },
+  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 4, marginBottom: spacing.lg },
+  row: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
+  card: { marginBottom: spacing.md },
+  geofenceCard: { flex: 1, gap: spacing.xs },
+  cardLabel: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
+  meta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  errorText: { ...typography.caption, color: colors.danger, marginBottom: spacing.sm },
+  refreshLink: { ...typography.bodyStrong, color: colors.primary, marginTop: spacing.xs, fontSize: 13 },
+  photoTile: {
+    width: 96,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(134,119,111,0.55)",
+    borderRadius: 14,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    overflow: "hidden",
+  },
+  photoTileReady: { borderStyle: "solid", borderColor: colors.success },
+  photoTileImage: { width: 56, height: 56, borderRadius: 99 },
+  photoTileBadge: {
+    position: "absolute",
+    top: spacing.sm,
+    right: (96 - 56) / 2,
+    width: 18,
+    height: 18,
+    borderRadius: 99,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoGlyphWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: "rgba(134,119,111,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoGlyph: { color: colors.textSecondary, fontSize: 13 },
+  photoGlyphReady: { color: colors.success, fontSize: 11, fontWeight: "700" },
+  photoTileLabel: {
+    fontSize: 9.5,
+    letterSpacing: 0.5,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+  retakeButton: { marginTop: spacing.sm, alignSelf: "flex-start" },
+  photoPreview: { width: "100%", height: 220, borderRadius: radius.lg, marginBottom: spacing.sm },
+  pinSection: { marginTop: spacing.xs },
+  pinHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  pinHint: { fontSize: 10, color: colors.textMuted },
+  confirmWrap: { marginTop: spacing.xl, marginBottom: spacing.md },
+});
