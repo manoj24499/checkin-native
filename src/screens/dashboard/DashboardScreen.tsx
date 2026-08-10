@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen, Button, LoadingView, ErrorView } from "@/components/ui";
-import { PresenceCard, WeeklyHoursChart } from "@/components/dashboard";
+import { PresenceCard, WeeklyHoursChart, LateNoticeCard } from "@/components/dashboard";
 import {
   useAuth,
   useAttendanceStatus,
@@ -13,6 +13,7 @@ import {
   useRecentAttendance,
 } from "@/hooks";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
+import { startLocationTracking } from "@/services/locationTracking";
 import { groupAttendanceByDay } from "@/utils/attendanceGrouping";
 import { getErrorMessage } from "@/utils/errors";
 import { formatDistance } from "@/utils/geo";
@@ -41,11 +42,25 @@ export function DashboardScreen() {
   const target = useResolvedGeofenceTarget();
   const geofence = useGeofence(target);
   const recentQuery = useRecentAttendance(14);
+  const [enablingSharing, setEnablingSharing] = useState(false);
 
   const daySummaries = useMemo(
     () => groupAttendanceByDay(recentQuery.data?.records ?? []),
     [recentQuery.data],
   );
+
+  // Today's open (not yet checked out) session, straight from the same
+  // bearer-authenticated history the weekly chart already uses — lets us
+  // (re)start tracking without needing the attendance id from anywhere else.
+  // Deliberately not sourced from /api/kiosk/status: that endpoint is
+  // PIN-less (keyed only by employee code) and the attendance id doubles as
+  // an unguessable capability token for location pings, so it must never be
+  // handed out unauthenticated.
+  const todayKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  })();
+  const activeCheckIn = daySummaries.find((d) => d.dateKey === todayKey && !d.checkOut)?.checkIn ?? null;
 
   if (statusQuery.isLoading) return <LoadingView label="Loading your status…" />;
   if (statusQuery.isError) {
@@ -62,6 +77,8 @@ export function DashboardScreen() {
   const checkedOut = status?.exists ? status.checkedOut : false;
   const checkInAt = status?.exists ? status.checkInAt : null;
   const isPaused = status?.exists ? status.isPaused : false;
+  const leaveType = status?.exists ? status.leaveType : "NONE";
+  const lateMinutes = status?.exists ? status.lateMinutes : null;
 
   const rangeLabel =
     user?.workMode === "FIELD"
@@ -72,6 +89,17 @@ export function DashboardScreen() {
 
   const goCheckInOut = () => {
     navigation.getParent<BottomTabNavigationProp<AppTabParamList>>()?.navigate("CheckIn");
+  };
+
+  // startLocationTracking never throws — every failure mode (permission
+  // denied, native task error) is surfaced via the store's trackingWarning
+  // instead, which PresenceCard already renders. `enablingSharing` here is
+  // purely for the button's own loading state.
+  const handleEnableSharing = async () => {
+    if (!activeCheckIn) return;
+    setEnablingSharing(true);
+    await startLocationTracking(activeCheckIn.id, activeCheckIn.timestamp);
+    setEnablingSharing(false);
   };
 
   const initials = (user?.name ?? "?")
@@ -105,6 +133,8 @@ export function DashboardScreen() {
         isPaused={checkedIn && !checkedOut ? isPaused : false}
         trackingWarning={trackingWarning}
         onViewMap={() => navigation.navigate("LiveMap")}
+        onEnableSharing={!isTracking && activeCheckIn ? handleEnableSharing : undefined}
+        enablingSharing={enablingSharing}
       />
 
       <View style={styles.statGrid}>
@@ -123,6 +153,8 @@ export function DashboardScreen() {
           </Text>
         </View>
       </View>
+
+      {leaveType !== "NONE" ? <LateNoticeCard leaveType={leaveType} lateMinutes={lateMinutes} /> : null}
 
       <View style={styles.weeklyCard}>
         <WeeklyHoursChart days={daySummaries} />

@@ -3,7 +3,7 @@ import { AppState, type AppStateStatus, StyleSheet, Text, View } from "react-nat
 import { useAuth } from "@/hooks";
 import { useSettingsStore } from "@/store/settingsStore";
 import { promptBiometricAuth, msSinceLastBiometricPrompt } from "@/services/biometrics";
-import { checkTrackingHealth } from "@/services/locationTracking";
+import { checkTrackingHealth, msSinceLocationTrackingStart } from "@/services/locationTracking";
 import { Screen, Button, LoadingView } from "@/components/ui";
 import { colors, spacing, typography } from "@/theme";
 import { AuthNavigator } from "./AuthNavigator";
@@ -21,6 +21,15 @@ const TRACKING_HEALTH_CHECK_MS = 45_000;
 // unlock immediately re-triggers the lock because the OS reports the app as
 // having "returned to foreground" the instant the fingerprint dialog closes.
 const REAUTH_GRACE_MS = 2000;
+
+// Absorbs the same class of transient blip, but caused by the location
+// foreground-service notification instead of the biometric dialog — some
+// Android OEM skins report the app as backgrounding/foregrounding the
+// instant that notification is posted at check-in. Without this, each blip
+// re-triggers the biometric lock overlay, which flashes the tab bar (and,
+// via the resulting window-inset churn, the system status bar) on and off
+// repeatedly right after checking in.
+const TRACKING_START_GRACE_MS = 5000;
 
 function BiometricLockScreen({ onRetry }: { onRetry: () => void }) {
   return (
@@ -74,6 +83,7 @@ export function RootNavigator() {
       // the prompt's dialog can cause this exact foreground transition on
       // its own, regardless of which screen opened it.
       const recentBiometricPrompt = msSinceLastBiometricPrompt() < REAUTH_GRACE_MS;
+      const recentTrackingStart = msSinceLocationTrackingStart() < TRACKING_START_GRACE_MS;
       const enabled = useSettingsStore.getState().biometricUnlockEnabled;
       if (
         wasBackground &&
@@ -81,6 +91,7 @@ export function RootNavigator() {
         status === "authenticated" &&
         enabled &&
         !recentBiometricPrompt &&
+        !recentTrackingStart &&
         !isPrompting.current
       ) {
         requestUnlock();

@@ -7,9 +7,12 @@ import { colors, spacing, typography } from "@/theme";
 interface PhotoCaptureViewProps {
   onCapture: (base64Jpeg: string) => void;
   onCancel: () => void;
+  /** "front" (default) for presence photos; "back" for photographing a
+   * place rather than yourself — see the Field Day visit-log card. */
+  facing?: "front" | "back";
 }
 
-export function PhotoCaptureView({ onCapture, onCancel }: PhotoCaptureViewProps) {
+export function PhotoCaptureView({ onCapture, onCancel, facing = "front" }: PhotoCaptureViewProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -46,7 +49,7 @@ export function PhotoCaptureView({ onCapture, onCancel }: PhotoCaptureViewProps)
 
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={styles.camera} facing="front" onCameraReady={() => setIsReady(true)} />
+      <CameraView ref={cameraRef} style={styles.camera} facing={facing} onCameraReady={() => setIsReady(true)} />
       <View style={styles.controls}>
         <Button label="Cancel" variant="secondary" onPress={onCancel} style={styles.controlButton} />
         <Button

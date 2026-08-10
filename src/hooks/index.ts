@@ -9,3 +9,5 @@ export { useRecentAttendance } from "./useRecentAttendance";
 export { useBiometricAuth } from "./useBiometricAuth";
 export { useActivityPattern } from "./useActivityPattern";
 export { useChangePin } from "./useChangePin";
+export { useFieldSummary } from "./useFieldSummary";
+export { useLogFieldVisit } from "./useLogFieldVisit";

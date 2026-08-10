@@ -1,0 +1,46 @@
+Resolved "development" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "development" environment on EAS.
+
+
+
+✔ Using remote Android credentials (Expo server)
+✔ Using Keystore from configuration: Build Credentials _rB8rDLqV8 (default)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+- Uploading to EAS Build (0 / 1.3 MB)
+✔ Uploaded to EAS 2s
+- Computing project fingerprint
+⌛️ Computing the project fingerprint is taking longer than expected...
+⏩ To skip this step, set the environment variable: EAS_SKIP_AUTO_FINGERPRINT=1
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/zoriah07/projects/checkin-app/builds/564eaf69-ef6c-44f2-9c44-40f9b3fc4ad6
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+- Waiting for build to complete.
+✔ Build finished
+
+  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  █ ▄▄▄▄▄ █▀▀ ██▄   █ ▄▀▄▄ ▀██  █ ▄▄▄▄▄ █
+  █ █   █ █▄▀██▀█▄▀▀▄▄▀██▄▄▄███▄█ █   █ █
+  █ █▄▄▄█ █ ▄ █  █ █▀▀▀█ ▀▄▀▄█  █ █▄▄▄█ █
+  █▄▄▄▄▄▄▄█ █ ▀▄█▄▀▄▀▄█ ▀▄█▄█ ▀ █▄▄▄▄▄▄▄█
+  █▄ ▀▄▀█▄ ▀██   ▀███ █▀ ██ ▄██ ▀ ▄▄▀ ▄▀█
+  █▀▀█▄█▀▄█▄▄▀    █▄█  ▄▀▀▀█▀█▀▄▀ ▀ ▀▄▀ █
+  █▀▄▀  ▀▄▀▀▀  █▄██▄▄▄▀█ ██ ▄▀▄▄  ▀████ █
+  █▄ █▀▄▄▄▀█ █ █ ▄▀█ ▀█▀▀▄ ▀▀██▄▄ ▄  █▀▄█
+  █████▀█▄█   █ █▄▄▄▄█▄▀  ▀ ▀██ ▄  ▀█ ▀ █
+  ██▀▀▄█▄▄█▀ ▀▄ █ ▀█▀▀█▀▀ ▀▄▄▄██▄▀▀█▄▀ ▄█
+  █▄▀▀██▀▄▀██ ▀▄ ▄▄▄▀██▄▄▄█ ▄▄▄ █ ▄▄███ █
+  ██▀▄▀▀▄▄ █  ▀ ▀ ██▄█▄█  ▀█▀███ ▄█ ▄█▄▄█
+  █▄  ▀█ ▄▀▄ ▀██▄ █▀   ▄ ▀█  █▄█  ▀█ █▄ █
+  █▄▀   ▄▄ ▄ ▀   ▀█ ▀██▄ ▄▄▀ ██▀▀▀███▄▀▄█
+  █▄▄██▄█▄▄▀ █▀ ▀▀█▀▄█▄█   ▄▀▀  ▄▄▄  ▄█▀█
+  █ ▄▄▄▄▄ █▄ ▄▀█▄█▀▄  █ ▀████▀  █▄█ █ ▄ █
+  █ █   █ █▀█▄▄  ▄███▄█▀▄█▄▀ ▄█ ▄▄  █▀  █
+  █ █▄▄▄█ █▀▀▀█ ▀▄▀▀█▀ ▄▀▀█ ▀▄█▀ █▀▄ ▄▄▄█
+  █▄▄▄▄▄▄▄█▄████▄▄██▄▄▄▄▄███▄█▄▄█▄▄███▄▄█
+
+
+🤖 Open this link on your Android devices (or scan the QR code) to install the app:
+https://expo.dev/accounts/zoriah07/projects/checkin-app/builds/564eaf69-ef6c-44f2-9c44-40f9b3fc4ad6

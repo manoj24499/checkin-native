@@ -6,6 +6,9 @@ export const endpoints = {
   meAttendancePhoto: (id: string) => `/api/mobile/me/attendance/${id}/photo`,
   changePin: "/api/mobile/change-pin",
   pushToken: "/api/mobile/me/push-token",
+  fieldSummary: "/api/mobile/me/field-summary",
+  fieldVisits: "/api/mobile/field-visits",
+  fieldVisitPhoto: (id: string) => `/api/mobile/field-visits/${id}/photo`,
 
   kioskScan: "/api/kiosk/scan",
   kioskStatus: "/api/kiosk/status",

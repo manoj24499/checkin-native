@@ -14,6 +14,7 @@ import {
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, radius, spacing, typography } from "@/theme";
+import type { CheckInMode } from "@/types";
 
 export function CheckInOutScreen() {
   const { user } = useAuth();
@@ -25,7 +26,13 @@ export function CheckInOutScreen() {
   const setPhotoDataUrl = useCheckInDraftStore((s) => s.setPhotoDataUrl);
   const [cameraOpen, setCameraOpen] = useState(false);
 
-  const target = useResolvedGeofenceTarget();
+  // Field-workMode employees pick Office/Field for the day right here,
+  // before checking in — defaults to Field (the only choice that existed
+  // before this picker). Irrelevant, and never read, for OFFICE/WFH.
+  const [fieldCheckInMode, setFieldCheckInMode] = useState<CheckInMode>("FIELD");
+  const isFieldEmployee = user?.workMode === "FIELD";
+
+  const target = useResolvedGeofenceTarget(isFieldEmployee ? fieldCheckInMode : undefined);
   const geofence = useGeofence(target);
 
   if (statusQuery.isLoading) return <LoadingView label="Checking today's status…" />;
@@ -51,6 +58,9 @@ export function CheckInOutScreen() {
   const action = checkedIn ? "CHECK_OUT" : "CHECK_IN";
   const isPaused = status?.exists ? status.isPaused : false;
   const checkOutPhotoRequired = status?.exists ? status.checkOutPhotoRequired : false;
+  // Only shown before check-in — once checked in, today's choice is locked
+  // in (see status.checkInMode) and re-showing the picker would be misleading.
+  const showFieldPicker = isFieldEmployee && action === "CHECK_IN";
   const requiresPhoto = action === "CHECK_IN" || (action === "CHECK_OUT" && checkOutPhotoRequired);
   const requiresGeofence = action === "CHECK_IN" && !!target;
 
@@ -70,6 +80,7 @@ export function CheckInOutScreen() {
         latitude: geofence.coords?.latitude,
         longitude: geofence.coords?.longitude,
         mocked: geofence.mocked,
+        checkInMode: isFieldEmployee ? fieldCheckInMode : undefined,
       });
       setPin("");
       setPhotoDataUrl(null);
@@ -113,6 +124,24 @@ export function CheckInOutScreen() {
       <Text style={styles.subtitle}>
         {user?.employeeCode} · {user?.name}
       </Text>
+
+      {showFieldPicker ? (
+        <View style={styles.modeRow}>
+          {(["OFFICE", "FIELD"] as const).map((mode) => (
+            <Pressable
+              key={mode}
+              onPress={() => setFieldCheckInMode(mode)}
+              style={[styles.modeButton, fieldCheckInMode === mode && styles.modeButtonActive]}
+            >
+              <Text
+                style={[styles.modeButtonLabel, fieldCheckInMode === mode && styles.modeButtonLabelActive]}
+              >
+                {mode === "OFFICE" ? "Office" : "Field work"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {isPaused ? (
         <View style={styles.pausedBadgeWrap}>
@@ -201,6 +230,18 @@ const styles = StyleSheet.create({
   kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary },
   title: { ...typography.h1, color: colors.textPrimary, marginTop: spacing.xs },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 4, marginBottom: spacing.lg },
+  modeRow: {
+    flexDirection: "row",
+    gap: 4,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    padding: 4,
+    marginBottom: spacing.md,
+  },
+  modeButton: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md - 2, alignItems: "center" },
+  modeButtonActive: { backgroundColor: colors.surface },
+  modeButtonLabel: { ...typography.bodyStrong, color: colors.textSecondary, fontSize: 13 },
+  modeButtonLabelActive: { color: colors.textPrimary },
   row: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
   card: { marginBottom: spacing.md },
   geofenceCard: { flex: 1, gap: spacing.xs },

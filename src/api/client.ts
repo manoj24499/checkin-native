@@ -14,7 +14,11 @@ declare module "axios" {
 // Only these paths carry a bearer session — everything else (kiosk/* check-in,
 // login) authenticates the *request payload* itself (PIN/QR/refresh token),
 // so a 401 from them is a business-logic rejection, not an expired session.
-const SESSION_PROTECTED_PREFIXES = ["/api/mobile/me", "/api/mobile/change-pin"];
+const SESSION_PROTECTED_PREFIXES = [
+  "/api/mobile/me",
+  "/api/mobile/change-pin",
+  "/api/mobile/field-visits",
+];
 
 /**
  * The transport layer never imports the auth store directly (that would be a
@@ -36,7 +40,13 @@ export function setApiAuthContext(ctx: ApiAuthContext) {
 export const apiClient = axios.create({
   baseURL: env.apiUrl,
   timeout: 15_000,
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    // Free-tier ngrok serves an HTML interstitial (with a 200 status) instead
+    // of forwarding to the local dev server unless this header is present.
+    // Harmless against non-ngrok backends — they simply ignore it.
+    "ngrok-skip-browser-warning": "true",
+  },
 });
 
 apiClient.interceptors.request.use((config) => {

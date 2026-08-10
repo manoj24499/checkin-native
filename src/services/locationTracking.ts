@@ -5,6 +5,18 @@ import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 
 export const LOCATION_TRACKING_TASK = "checkin-location-tracking";
 
+// Tracks the last time tracking was (re)started, so callers elsewhere (see
+// RootNavigator) can tell a genuine app background/foreground cycle apart
+// from the transient active/inactive blip some Android OEM skins fire the
+// instant the foreground-service notification for tracking is posted —
+// mirrors msSinceLastBiometricPrompt() in services/biometrics.ts, which
+// guards against the same class of blip from the biometric dialog itself.
+let lastTrackingStartAt = 0;
+
+export function msSinceLocationTrackingStart(): number {
+  return Date.now() - lastTrackingStartAt;
+}
+
 // The admin dashboard marks an employee "Offline" once their last ping is
 // older than LIVE_THRESHOLD_MS = 3 minutes (components/DashboardWorkspace.tsx
 // in the backend project). Pinging slower than that guarantees the employee
@@ -58,15 +70,34 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
   }
 });
 
+/**
+ * Only invokes the OS's *request* permission flow when permission isn't
+ * already granted — checked first via the passive get*PermissionsAsync
+ * calls. This function runs on every foreground transition (see App.tsx's
+ * reconcileLocationTrackingOnStartup wiring), which on a checked-in device
+ * is almost always the "already granted, nothing to do" case. Calling the
+ * active request*PermissionsAsync APIs unconditionally in that case is
+ * itself a known trigger for a transient background/active blip on some
+ * Android OEM skins (MIUI/HyperOS in particular) — which, left unguarded,
+ * re-triggers this very function on the next foreground event, becoming a
+ * self-sustaining flicker loop instead of a one-off check.
+ */
 export async function requestLocationPermissions(): Promise<{
   foreground: boolean;
   background: boolean;
 }> {
-  const foreground = await Location.requestForegroundPermissionsAsync();
+  let foreground = await Location.getForegroundPermissionsAsync();
+  if (foreground.status !== "granted") {
+    foreground = await Location.requestForegroundPermissionsAsync();
+  }
   if (foreground.status !== "granted") {
     return { foreground: false, background: false };
   }
-  const background = await Location.requestBackgroundPermissionsAsync();
+
+  let background = await Location.getBackgroundPermissionsAsync();
+  if (background.status !== "granted") {
+    background = await Location.requestBackgroundPermissionsAsync();
+  }
   return { foreground: true, background: background.status === "granted" };
 }
 
@@ -83,6 +114,7 @@ export async function requestLocationPermissions(): Promise<{
  * permissions must be explicitly requested first on every real device.
  */
 export async function startLocationTracking(attendanceId: string, checkedInAt: string) {
+  lastTrackingStartAt = Date.now();
   const { foreground, background } = await requestLocationPermissions();
   if (!foreground) {
     // Previously threw, caught by the caller and only console.warn'd — the

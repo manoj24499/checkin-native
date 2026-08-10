@@ -12,9 +12,22 @@ interface PresenceCardProps {
   isPaused?: boolean;
   trackingWarning?: string | null;
   onViewMap: () => void;
+  /** Present only when checked in but not currently tracking — lets the
+   * employee (re)start sharing without checking out (which would end
+   * today's attendance for good). */
+  onEnableSharing?: () => void;
+  enablingSharing?: boolean;
 }
 
-export function PresenceCard({ isTracking, checkInAt, isPaused, trackingWarning, onViewMap }: PresenceCardProps) {
+export function PresenceCard({
+  isTracking,
+  checkInAt,
+  isPaused,
+  trackingWarning,
+  onViewMap,
+  onEnableSharing,
+  enablingSharing,
+}: PresenceCardProps) {
   const [now, setNow] = useState(() => Date.now());
   const pings = useActivityPattern(isTracking);
 
@@ -60,6 +73,22 @@ export function PresenceCard({ isTracking, checkInAt, isPaused, trackingWarning,
         <View style={styles.warningBox}>
           <Text style={styles.warningText}>{trackingWarning}</Text>
         </View>
+      ) : null}
+
+      {onEnableSharing ? (
+        <Pressable
+          onPress={onEnableSharing}
+          disabled={enablingSharing}
+          style={({ pressed }) => [
+            styles.mapButton,
+            styles.enableButton,
+            pressed && styles.mapButtonPressed,
+          ]}
+        >
+          <Text style={styles.mapButtonLabel}>
+            {enablingSharing ? "Starting…" : "Turn on live sharing"}
+          </Text>
+        </Pressable>
       ) : null}
 
       <View style={styles.divider} />
@@ -111,6 +140,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   warningText: { ...typography.caption, color: colors.warning },
+  enableButton: { alignSelf: "flex-start", marginTop: spacing.sm },
   divider: {
     height: 1,
     backgroundColor: "rgba(247,243,239,0.16)",

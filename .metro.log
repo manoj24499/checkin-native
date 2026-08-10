@@ -1,0 +1,20 @@
+env: load .env
+env: export EXPO_PUBLIC_API_URL
+Starting project at D:\projects\Native\checkin-app
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android .\index.ts ░░░░░░░░░░░░░░░░  1.0% (1/1)
+Android .\index.ts ▓▓░░░░░░░░░░░░░░ 14.9% ( 79/208)
+Android .\index.ts ▓▓▓▓▓▓▓▓▓░░░░░░░ 61.6% (589/777)
+Android .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.2% ( 946/1169)
+Android .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 87.3% (1214/1314)
+Android .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1465/1465)
+Android Bundled 21976ms index.ts (1474 modules)
+Android .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android .\index.ts ▓▓▓▓▓▓▓░░░░░░░░░ 47.6% (628/910)
+Android .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 89.0% (1327/1416)
+Android Bundled 8815ms index.ts (1462 modules)
+ WARN  Push token registration failed: [Error: Make sure to complete the guide at https://docs.expo.dev/push-notifications/fcm-credentials/ : Default FirebaseApp is not initialized in this process com.anonymous.checkinapp. Make sure to call FirebaseApp.initializeApp(Context) first.]
