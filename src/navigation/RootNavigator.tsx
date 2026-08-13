@@ -109,7 +109,7 @@ export function RootNavigator() {
   }, [status]);
 
   if (status === "bootstrapping") {
-    return <LoadingView label="Signing you in…" />;
+    return <LoadingView label="Signing you in…" animated />;
   }
 
   if (status !== "authenticated") {

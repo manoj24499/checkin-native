@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { TextField, Button } from "@/components/ui";
 import { BarSpark } from "@/components/dashboard";
+import { LogoMark } from "@/components/branding/LogoMark";
 import { useAuth, useActivityPattern } from "@/hooks";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, spacing, typography } from "@/theme";
@@ -44,7 +45,9 @@ export function LoginScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
       <SafeAreaView edges={["top"]} style={styles.hero}>
-        <Text style={styles.kicker}>QUBE SPACE</Text>
+        <View style={styles.logoRow}>
+          <LogoMark animated size={28} barColor={colors.textOnDark} />
+        </View>
         <Text style={styles.headline}>Check-in Application.</Text>
         <Text style={styles.heroSubtitle}>
           Check in, share your dot while you work, check out. Nothing more.
@@ -125,12 +128,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
   },
-  kicker: {
-    ...typography.label,
-    letterSpacing: 2,
-    color: colors.primarySoftText,
-    marginTop: spacing.md,
-  },
+  logoRow: { marginTop: spacing.md },
   headline: {
     fontSize: 34,
     fontWeight: "300",
