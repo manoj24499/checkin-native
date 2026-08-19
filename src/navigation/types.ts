@@ -7,11 +7,14 @@ export type AuthStackParamList = {
 export type DashboardStackParamList = {
   DashboardHome: undefined;
   LiveMap: undefined;
+  RequestPermission: undefined;
 };
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   ChangePin: undefined;
+  Leave: undefined;
+  RequestLeave: undefined;
 };
 
 export type AppTabParamList = {

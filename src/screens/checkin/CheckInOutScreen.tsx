@@ -10,6 +10,7 @@ import {
   useResolvedGeofenceTarget,
   useGeofence,
   useCheckInOut,
+  useTimedPermissions,
 } from "@/hooks";
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
 import { getErrorMessage } from "@/utils/errors";
@@ -19,6 +20,12 @@ import type { CheckInMode } from "@/types";
 export function CheckInOutScreen() {
   const { user } = useAuth();
   const statusQuery = useAttendanceStatus(user?.employeeCode);
+  // See DashboardScreen's identical comment — must stay unconditional, so it
+  // can't wait for the loading/error guards below to compute `status` first.
+  const hasActiveSession = statusQuery.data?.exists
+    ? statusQuery.data.checkedIn && !statusQuery.data.checkedOut
+    : false;
+  const permissionsQuery = useTimedPermissions(hasActiveSession);
   const checkInOut = useCheckInOut();
 
   const [pin, setPin] = useState("");
@@ -57,6 +64,10 @@ export function CheckInOutScreen() {
 
   const action = checkedIn ? "CHECK_OUT" : "CHECK_IN";
   const isPaused = status?.exists ? status.isPaused : false;
+  const currentPermission = hasActiveSession
+    ? (permissionsQuery.data ?? []).find((p) => p.status !== "resolved") ?? null
+    : null;
+  const isPermissionPause = currentPermission?.status === "active";
   const checkOutPhotoRequired = status?.exists ? status.checkOutPhotoRequired : false;
   // Only shown before check-in — once checked in, today's choice is locked
   // in (see status.checkInMode) and re-showing the picker would be misleading.
@@ -145,7 +156,10 @@ export function CheckInOutScreen() {
 
       {isPaused ? (
         <View style={styles.pausedBadgeWrap}>
-          <StatusBadge label="Paused — outside your work area" tone="warning" />
+          <StatusBadge
+            label={isPermissionPause ? "Paused — on requested permission" : "Paused — outside your work area"}
+            tone="warning"
+          />
         </View>
       ) : null}
 

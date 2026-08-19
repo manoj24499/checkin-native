@@ -10,6 +10,12 @@ interface PresenceCardProps {
   isTracking: boolean;
   checkInAt: string | null;
   isPaused?: boolean;
+  /** Why the pause is open — a self-declared timed permission reads very
+   * differently from an auto-detected geofence departure, even though both
+   * are the same underlying `isPaused` flag. Ignored while `isPaused` is
+   * false. Defaults to "geofence" (the original, only reason before timed
+   * permissions existed). */
+  pauseReason?: "geofence" | "permission";
   trackingWarning?: string | null;
   onViewMap: () => void;
   /** Present only when checked in but not currently tracking — lets the
@@ -23,6 +29,7 @@ export function PresenceCard({
   isTracking,
   checkInAt,
   isPaused,
+  pauseReason = "geofence",
   trackingWarning,
   onViewMap,
   onEnableSharing,
@@ -49,7 +56,13 @@ export function PresenceCard({
         <View style={styles.statusRow}>
           <View style={[styles.dot, isPaused && styles.dotPaused]} />
           <Text style={[styles.statusLabel, isPaused && styles.statusLabelPaused]}>
-            {isPaused ? "PAUSED — OUTSIDE RANGE" : isTracking ? "SHARING LIVE" : "SHARING OFF"}
+            {isPaused
+              ? pauseReason === "permission"
+                ? "PAUSED — ON PERMISSION"
+                : "PAUSED — OUTSIDE RANGE"
+              : isTracking
+                ? "SHARING LIVE"
+                : "SHARING OFF"}
           </Text>
         </View>
         <Text style={styles.pingLabel}>
@@ -63,7 +76,9 @@ export function PresenceCard({
 
       <Text style={styles.whyLine}>
         {isPaused
-          ? "You're outside your assigned area — this time won't count until you're back in range."
+          ? pauseReason === "permission"
+            ? "This time won't count while your requested permission is active."
+            : "You're outside your assigned area — this time won't count until you're back in range."
           : isTracking
             ? "On because you're checked in. Your team sees a dot, not a trail — and it stops the moment you check out."
             : "Off until you check in."}

@@ -4,13 +4,14 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen, Button, LoadingView, ErrorView } from "@/components/ui";
-import { PresenceCard, WeeklyHoursChart, LateNoticeCard } from "@/components/dashboard";
+import { PresenceCard, WeeklyHoursChart, LateNoticeCard, PermissionStatusCard } from "@/components/dashboard";
 import {
   useAuth,
   useAttendanceStatus,
   useResolvedGeofenceTarget,
   useGeofence,
   useRecentAttendance,
+  useTimedPermissions,
 } from "@/hooks";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { startLocationTracking } from "@/services/locationTracking";
@@ -39,6 +40,13 @@ export function DashboardScreen() {
   const isTracking = useAttendanceSessionStore((s) => s.isTracking);
   const trackingWarning = useAttendanceSessionStore((s) => s.trackingWarning);
   const statusQuery = useAttendanceStatus(user?.employeeCode);
+  // Computed off statusQuery.data directly (not the `status` var below,
+  // which is only derived after the loading/error guards) — this hook call
+  // must stay unconditional, so it can't wait for those guards to pass.
+  const hasActiveSession = statusQuery.data?.exists
+    ? statusQuery.data.checkedIn && !statusQuery.data.checkedOut
+    : false;
+  const permissionsQuery = useTimedPermissions(hasActiveSession);
   const target = useResolvedGeofenceTarget();
   const geofence = useGeofence(target);
   const recentQuery = useRecentAttendance(14);
@@ -79,6 +87,20 @@ export function DashboardScreen() {
   const isPaused = status?.exists ? status.isPaused : false;
   const leaveType = status?.exists ? status.leaveType : "NONE";
   const lateMinutes = status?.exists ? status.lateMinutes : null;
+
+  // Whichever of today's timed-permission requests is currently relevant —
+  // for display, that's the most recent non-resolved one (a rejected one is
+  // still worth showing so the employee sees the decline). For deciding
+  // whether a *new* request can be started, REJECTED doesn't count either —
+  // same rule the backend itself enforces — so the button only stays hidden
+  // while one is genuinely pending/scheduled/active.
+  const permissions = hasActiveSession ? permissionsQuery.data ?? [] : [];
+  const currentPermission = permissions.find((p) => p.status !== "resolved") ?? null;
+  const hasOpenPermissionRequest =
+    currentPermission?.status === "pending" ||
+    currentPermission?.status === "scheduled" ||
+    currentPermission?.status === "active";
+  const pauseReason: "geofence" | "permission" = currentPermission?.status === "active" ? "permission" : "geofence";
 
   const rangeLabel =
     user?.workMode === "FIELD"
@@ -131,11 +153,16 @@ export function DashboardScreen() {
         isTracking={isTracking}
         checkInAt={checkedIn && !checkedOut ? checkInAt : null}
         isPaused={checkedIn && !checkedOut ? isPaused : false}
+        pauseReason={pauseReason}
         trackingWarning={trackingWarning}
         onViewMap={() => navigation.navigate("LiveMap")}
         onEnableSharing={!isTracking && activeCheckIn ? handleEnableSharing : undefined}
         enablingSharing={enablingSharing}
       />
+
+      {checkedIn && !checkedOut && currentPermission ? (
+        <PermissionStatusCard permission={currentPermission} />
+      ) : null}
 
       <View style={styles.statGrid}>
         <View style={styles.statCell}>
@@ -165,6 +192,15 @@ export function DashboardScreen() {
         onPress={goCheckInOut}
         style={styles.cta}
       />
+
+      {checkedIn && !checkedOut && !hasOpenPermissionRequest ? (
+        <Button
+          label="Request permission"
+          variant="secondary"
+          onPress={() => navigation.navigate("RequestPermission")}
+          style={styles.secondaryCta}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -206,4 +242,5 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   cta: { marginTop: spacing.lg },
+  secondaryCta: { marginTop: spacing.sm },
 });

@@ -1,6 +1,8 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
 import { ChangePinScreen } from "@/screens/profile/ChangePinScreen";
+import { LeaveScreen } from "@/screens/profile/LeaveScreen";
+import { RequestLeaveScreen } from "@/screens/profile/RequestLeaveScreen";
 import type { ProfileStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -10,6 +12,8 @@ export function ProfileNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="ChangePin" component={ChangePinScreen} options={{ presentation: "modal" }} />
+      <Stack.Screen name="Leave" component={LeaveScreen} />
+      <Stack.Screen name="RequestLeave" component={RequestLeaveScreen} options={{ presentation: "modal" }} />
     </Stack.Navigator>
   );
 }

@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { DashboardScreen } from "@/screens/dashboard/DashboardScreen";
 import { LiveMapScreen } from "@/screens/map/LiveMapScreen";
+import { RequestTimedPermissionScreen } from "@/screens/dashboard/RequestTimedPermissionScreen";
 import type { DashboardStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<DashboardStackParamList>();
@@ -10,6 +11,11 @@ export function DashboardNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="DashboardHome" component={DashboardScreen} />
       <Stack.Screen name="LiveMap" component={LiveMapScreen} options={{ presentation: "fullScreenModal" }} />
+      <Stack.Screen
+        name="RequestPermission"
+        component={RequestTimedPermissionScreen}
+        options={{ presentation: "modal" }}
+      />
     </Stack.Navigator>
   );
 }

@@ -124,10 +124,17 @@ export function ProfileScreen() {
         onValueChange={setLiveLocationEnabled}
       />
 
-      <Pressable style={styles.linkRow} onPress={() => navigation.navigate("ChangePin")}>
-        <Text style={styles.linkLabel}>Change PIN</Text>
-        <Text style={styles.linkChevron}>›</Text>
-      </Pressable>
+      <View style={styles.linkGroup}>
+        <Pressable style={styles.linkRow} onPress={() => navigation.navigate("Leave")}>
+          <Text style={styles.linkLabel}>Leave</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </Pressable>
+
+        <Pressable style={[styles.linkRow, styles.linkRowLast]} onPress={() => navigation.navigate("ChangePin")}>
+          <Text style={styles.linkLabel}>Change PIN</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </Pressable>
+      </View>
 
       <Button label="Log out" variant="danger" onPress={() => logout()} style={styles.logout} />
     </Screen>
@@ -163,15 +170,16 @@ const styles = StyleSheet.create({
   settingsLabel: { ...typography.bodyStrong, color: colors.textPrimary },
   settingsHelp: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
   errorText: { ...typography.caption, color: colors.danger, marginTop: -spacing.xs, marginBottom: spacing.sm },
+  linkGroup: { marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
   linkRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: spacing.sm + 4,
-    marginTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
+  linkRowLast: { borderBottomWidth: 0 },
   linkLabel: { ...typography.bodyStrong, color: colors.textPrimary },
   linkChevron: { ...typography.h3, color: colors.textMuted },
   logout: { marginTop: spacing.xl },
