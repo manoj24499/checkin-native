@@ -8,11 +8,14 @@ import type { CheckInMode } from "@/types";
  * geofenced against — shared by the Dashboard and CheckInOutScreen so the
  * mode → target mapping only lives in one place.
  *
- * `fieldOverrideMode` only matters for FIELD-workMode employees: passing
- * "OFFICE" (their day's choice on the check-in screen) geofences them
- * against the shared office location like a regular OFFICE employee for
- * that day; anything else (including omitting it) keeps them ungeofenced. */
-export function useResolvedGeofenceTarget(fieldOverrideMode?: CheckInMode | null): GeofenceTarget | null {
+ * `dayOverrideMode` is each profile's day-of choice from the check-in
+ * screen's picker, and only matters for FIELD and WFH employees: passing
+ * "OFFICE" geofences either of them against the shared office location like
+ * a regular OFFICE employee for that day (covers a WFH employee physically
+ * coming in — they'd otherwise stay geofenced against home and get
+ * rejected there); anything else (including omitting it) keeps FIELD
+ * ungeofenced and WFH geofenced against home, same as before this existed. */
+export function useResolvedGeofenceTarget(dayOverrideMode?: CheckInMode | null): GeofenceTarget | null {
   const { user } = useAuth();
   const officeQuery = useOfficeLocation();
 
@@ -20,7 +23,7 @@ export function useResolvedGeofenceTarget(fieldOverrideMode?: CheckInMode | null
     if (!user) return null;
 
     if (user.workMode === "FIELD") {
-      if (fieldOverrideMode !== "OFFICE" || !officeQuery.data) return null;
+      if (dayOverrideMode !== "OFFICE" || !officeQuery.data) return null;
       return {
         latitude: officeQuery.data.latitude,
         longitude: officeQuery.data.longitude,
@@ -29,6 +32,14 @@ export function useResolvedGeofenceTarget(fieldOverrideMode?: CheckInMode | null
     }
 
     if (user.workMode === "WFH") {
+      if (dayOverrideMode === "OFFICE") {
+        if (!officeQuery.data) return null;
+        return {
+          latitude: officeQuery.data.latitude,
+          longitude: officeQuery.data.longitude,
+          radiusMeters: officeQuery.data.radiusMeters,
+        };
+      }
       if (user.homeLatitude == null || user.homeLongitude == null) return null;
       return {
         latitude: user.homeLatitude,
@@ -45,5 +56,5 @@ export function useResolvedGeofenceTarget(fieldOverrideMode?: CheckInMode | null
       };
     }
     return null;
-  }, [user, officeQuery.data, fieldOverrideMode]);
+  }, [user, officeQuery.data, dayOverrideMode]);
 }

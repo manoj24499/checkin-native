@@ -4,7 +4,14 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen, Button, LoadingView, ErrorView } from "@/components/ui";
-import { PresenceCard, WeeklyHoursChart, LateNoticeCard, PermissionStatusCard } from "@/components/dashboard";
+import {
+  PresenceCard,
+  WeeklyHoursChart,
+  LateNoticeCard,
+  PermissionStatusCard,
+  LeaveNoticeCard,
+  WorkSegmentCard,
+} from "@/components/dashboard";
 import {
   useAuth,
   useAttendanceStatus,
@@ -12,6 +19,9 @@ import {
   useGeofence,
   useRecentAttendance,
   useTimedPermissions,
+  useTodayLeave,
+  useWorkSegment,
+  useSwitchWorkSegment,
 } from "@/hooks";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { startLocationTracking } from "@/services/locationTracking";
@@ -20,6 +30,7 @@ import { getErrorMessage } from "@/utils/errors";
 import { formatDistance } from "@/utils/geo";
 import { colors, spacing, typography } from "@/theme";
 import type { AppTabParamList, DashboardStackParamList } from "@/navigation/types";
+import type { WorkSegmentMode } from "@/types";
 
 type Nav = NativeStackNavigationProp<DashboardStackParamList, "DashboardHome">;
 
@@ -47,10 +58,21 @@ export function DashboardScreen() {
     ? statusQuery.data.checkedIn && !statusQuery.data.checkedOut
     : false;
   const permissionsQuery = useTimedPermissions(hasActiveSession);
-  const target = useResolvedGeofenceTarget();
+  const todayLeave = useTodayLeave();
+  const isFieldWorker = user?.workMode === "FIELD";
+  const segmentQuery = useWorkSegment(hasActiveSession && isFieldWorker);
+  const switchSegment = useSwitchWorkSegment();
+  // A WFH employee who chose Office today (see CheckInOutScreen's Home/
+  // Office picker) needs the RANGE stat and PresenceCard geofenced against
+  // the office too, not home — same reasoning as LiveMapScreen's identical
+  // check.
+  const isWfhOfficeDay =
+    user?.workMode === "WFH" && statusQuery.data?.exists === true && statusQuery.data.checkInMode === "OFFICE";
+  const target = useResolvedGeofenceTarget(isWfhOfficeDay ? "OFFICE" : undefined);
   const geofence = useGeofence(target);
   const recentQuery = useRecentAttendance(14);
   const [enablingSharing, setEnablingSharing] = useState(false);
+  const [segmentError, setSegmentError] = useState<string | null>(null);
 
   const daySummaries = useMemo(
     () => groupAttendanceByDay(recentQuery.data?.records ?? []),
@@ -124,6 +146,15 @@ export function DashboardScreen() {
     setEnablingSharing(false);
   };
 
+  const handleSwitchSegment = async (mode: WorkSegmentMode) => {
+    setSegmentError(null);
+    try {
+      await switchSegment.mutateAsync(mode);
+    } catch (error) {
+      setSegmentError(getErrorMessage(error, "Couldn't switch your mode. Please try again."));
+    }
+  };
+
   const initials = (user?.name ?? "?")
     .split(" ")
     .map((p) => p[0])
@@ -149,6 +180,8 @@ export function DashboardScreen() {
         </View>
       </View>
 
+      {!checkedIn && todayLeave ? <LeaveNoticeCard type={todayLeave.type} /> : null}
+
       <PresenceCard
         isTracking={isTracking}
         checkInAt={checkedIn && !checkedOut ? checkInAt : null}
@@ -159,6 +192,17 @@ export function DashboardScreen() {
         onEnableSharing={!isTracking && activeCheckIn ? handleEnableSharing : undefined}
         enablingSharing={enablingSharing}
       />
+
+      {checkedIn && !checkedOut && isFieldWorker && segmentQuery.data?.mode ? (
+        <>
+          <WorkSegmentCard
+            mode={segmentQuery.data.mode}
+            onSwitch={handleSwitchSegment}
+            switching={switchSegment.isPending}
+          />
+          {segmentError ? <Text style={styles.segmentError}>{segmentError}</Text> : null}
+        </>
+      ) : null}
 
       {checkedIn && !checkedOut && currentPermission ? (
         <PermissionStatusCard permission={currentPermission} />
@@ -243,4 +287,5 @@ const styles = StyleSheet.create({
   },
   cta: { marginTop: spacing.lg },
   secondaryCta: { marginTop: spacing.sm },
+  segmentError: { ...typography.caption, color: colors.danger, marginTop: spacing.xs },
 });

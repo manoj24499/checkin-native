@@ -120,7 +120,13 @@ export function LiveMapScreen() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const isTracking = useAttendanceSessionStore((s) => s.isTracking);
   const statusQuery = useAttendanceStatus(user?.employeeCode);
-  const target = useResolvedGeofenceTarget();
+  // A WFH employee who chose Office today (see CheckInOutScreen's Home/
+  // Office picker) needs this map geofenced against the office too, not
+  // home — otherwise this screen would keep showing/enforcing their home
+  // location all day despite them actually being in the office.
+  const isWfhOfficeDay =
+    user?.workMode === "WFH" && statusQuery.data?.exists === true && statusQuery.data.checkInMode === "OFFICE";
+  const target = useResolvedGeofenceTarget(isWfhOfficeDay ? "OFFICE" : undefined);
   const pings = useActivityPattern(isTracking);
 
   const isFieldDay =
@@ -220,11 +226,13 @@ export function LiveMapScreen() {
 
   const locationLabel = isFieldDay
     ? "Field day"
-    : user?.workMode === "WFH"
-      ? "Home location"
-      : user?.workMode === "FIELD"
-        ? "No fixed location"
-        : "Office";
+    : isWfhOfficeDay
+      ? "Office (WFH)"
+      : user?.workMode === "WFH"
+        ? "Home location"
+        : user?.workMode === "FIELD"
+          ? "No fixed location"
+          : "Office";
 
   const subtitle = isFieldDay
     ? fieldSummaryQuery.data?.active

@@ -10,6 +10,7 @@ export const endpoints = {
   leaveRequests: "/api/mobile/me/leave-requests",
   leaveRequest: (id: string) => `/api/mobile/me/leave-requests/${id}`,
   holidays: "/api/mobile/holidays",
+  workSegment: "/api/mobile/me/work-segment",
   fieldSummary: "/api/mobile/me/field-summary",
   fieldVisits: "/api/mobile/field-visits",
   fieldVisitPhoto: (id: string) => `/api/mobile/field-visits/${id}/photo`,

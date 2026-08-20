@@ -11,11 +11,18 @@ import {
   useGeofence,
   useCheckInOut,
   useTimedPermissions,
+  useTodayLeave,
 } from "@/hooks";
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, radius, spacing, typography } from "@/theme";
-import type { CheckInMode } from "@/types";
+import type { CheckInMode, TimeOffType } from "@/types";
+
+const TYPE_LABEL: Record<TimeOffType, string> = {
+  CASUAL: "Casual",
+  SICK: "Sick",
+  EARNED: "Earned",
+};
 
 export function CheckInOutScreen() {
   const { user } = useAuth();
@@ -26,6 +33,7 @@ export function CheckInOutScreen() {
     ? statusQuery.data.checkedIn && !statusQuery.data.checkedOut
     : false;
   const permissionsQuery = useTimedPermissions(hasActiveSession);
+  const todayLeave = useTodayLeave();
   const checkInOut = useCheckInOut();
 
   const [pin, setPin] = useState("");
@@ -39,7 +47,20 @@ export function CheckInOutScreen() {
   const [fieldCheckInMode, setFieldCheckInMode] = useState<CheckInMode>("FIELD");
   const isFieldEmployee = user?.workMode === "FIELD";
 
-  const target = useResolvedGeofenceTarget(isFieldEmployee ? fieldCheckInMode : undefined);
+  // WFH-workMode employees get the equivalent Home/Office choice — defaults
+  // to Home (the only behavior that existed before this picker). "HOME"
+  // never leaves this screen: it just means "don't override", same as
+  // omitting checkInMode entirely (see CheckInMode's comment in @/types).
+  const [wfhCheckInMode, setWfhCheckInMode] = useState<"HOME" | "OFFICE">("HOME");
+  const isWfhEmployee = user?.workMode === "WFH";
+
+  const dayOverrideMode: CheckInMode | undefined = isFieldEmployee
+    ? fieldCheckInMode
+    : isWfhEmployee && wfhCheckInMode === "OFFICE"
+      ? "OFFICE"
+      : undefined;
+
+  const target = useResolvedGeofenceTarget(dayOverrideMode);
   const geofence = useGeofence(target);
 
   if (statusQuery.isLoading) return <LoadingView label="Checking today's status…" />;
@@ -62,6 +83,23 @@ export function CheckInOutScreen() {
     );
   }
 
+  // Check-in is blocked server-side on an approved leave day (see
+  // /api/kiosk/scan) — show this instead of a form that would just fail.
+  // Check-out is left alone: if they already checked in before leave was
+  // approved, they still need to be able to close their day out normally.
+  if (!checkedIn && todayLeave) {
+    return (
+      <Screen>
+        <Card>
+          <Text style={styles.title}>You're on leave today</Text>
+          <Text style={styles.meta}>
+            Your {TYPE_LABEL[todayLeave.type]} leave request for today was approved — check-in is disabled.
+          </Text>
+        </Card>
+      </Screen>
+    );
+  }
+
   const action = checkedIn ? "CHECK_OUT" : "CHECK_IN";
   const isPaused = status?.exists ? status.isPaused : false;
   const currentPermission = hasActiveSession
@@ -72,6 +110,7 @@ export function CheckInOutScreen() {
   // Only shown before check-in — once checked in, today's choice is locked
   // in (see status.checkInMode) and re-showing the picker would be misleading.
   const showFieldPicker = isFieldEmployee && action === "CHECK_IN";
+  const showHomePicker = isWfhEmployee && action === "CHECK_IN";
   const requiresPhoto = action === "CHECK_IN" || (action === "CHECK_OUT" && checkOutPhotoRequired);
   const requiresGeofence = action === "CHECK_IN" && !!target;
 
@@ -91,7 +130,7 @@ export function CheckInOutScreen() {
         latitude: geofence.coords?.latitude,
         longitude: geofence.coords?.longitude,
         mocked: geofence.mocked,
-        checkInMode: isFieldEmployee ? fieldCheckInMode : undefined,
+        checkInMode: dayOverrideMode,
       });
       setPin("");
       setPhotoDataUrl(null);
@@ -148,6 +187,22 @@ export function CheckInOutScreen() {
                 style={[styles.modeButtonLabel, fieldCheckInMode === mode && styles.modeButtonLabelActive]}
               >
                 {mode === "OFFICE" ? "Office" : "Field work"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {showHomePicker ? (
+        <View style={styles.modeRow}>
+          {(["HOME", "OFFICE"] as const).map((mode) => (
+            <Pressable
+              key={mode}
+              onPress={() => setWfhCheckInMode(mode)}
+              style={[styles.modeButton, wfhCheckInMode === mode && styles.modeButtonActive]}
+            >
+              <Text style={[styles.modeButtonLabel, wfhCheckInMode === mode && styles.modeButtonLabelActive]}>
+                {mode === "HOME" ? "Home" : "Office"}
               </Text>
             </Pressable>
           ))}

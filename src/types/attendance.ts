@@ -22,9 +22,26 @@ export interface AttendanceHistoryPage {
   nextCursor: string | null;
 }
 
-// The choice a FIELD-workMode employee makes at check-in each day — see
-// CheckInOutScreen's Office/Field picker and /api/kiosk/scan.
+// The choice a FIELD or WFH-workMode employee makes at check-in each day —
+// see CheckInOutScreen's Office/Field and Home/Office pickers and
+// /api/kiosk/scan. A WFH employee's picker only ever produces "OFFICE" (for
+// a day they're actually coming in) or omits this field entirely (an
+// ordinary day from home) — there's no "HOME" value, since omitting it
+// already means exactly that for a WFH profile.
 export type CheckInMode = "OFFICE" | "FIELD";
+
+// A FIELD-workMode employee's *current* Field/Office segment during an
+// active check-in — unlike CheckInMode above (fixed for the whole day, set
+// once at check-in), this changes over the day: auto-detected via GPS (see
+// /api/kiosk/location's evaluateWorkSegment) or manually corrected (see
+// useSwitchWorkSegment). Only ever meaningful for FIELD-workMode employees;
+// mode is null for everyone else, or when not currently checked in.
+export type WorkSegmentMode = "OFFICE" | "FIELD";
+
+export interface WorkSegmentStatus {
+  mode: WorkSegmentMode | null;
+  startedAt: string | null;
+}
 
 export type KioskStatus =
   | { exists: false }
@@ -96,7 +113,9 @@ export interface ScanRequest {
   // Set when the OS flags the reading as coming from a mock location
   // provider (Android only) — the server rejects check-in outright if true.
   mocked?: boolean;
-  // Only sent by FIELD-workMode employees on CHECK_IN — see CheckInOutScreen.
+  // Sent on CHECK_IN by FIELD-workMode employees (their Office/Field choice)
+  // and by WFH-workMode employees who chose Office for the day — see
+  // CheckInOutScreen. Omitted otherwise, preserving each profile's default.
   checkInMode?: CheckInMode;
 }
 
