@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Button } from "@/components/ui";
 import { colors, spacing, typography } from "@/theme";
@@ -25,11 +25,13 @@ export function PhotoCaptureView({ onCapture, onCancel, facing = "front" }: Phot
 
   if (!permission.granted) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.message}>Camera access is needed to take a check-in photo.</Text>
-        <Button label="Grant camera access" onPress={requestPermission} style={styles.button} />
-        <Button label="Cancel" variant="ghost" onPress={onCancel} />
-      </View>
+      <Modal visible animationType="slide" onRequestClose={onCancel} statusBarTranslucent>
+        <View style={styles.centered}>
+          <Text style={styles.message}>Camera access is needed to take a check-in photo.</Text>
+          <Button label="Grant camera access" onPress={requestPermission} style={styles.button} />
+          <Button label="Cancel" variant="ghost" onPress={onCancel} />
+        </View>
+      </Modal>
     );
   }
 
@@ -48,19 +50,28 @@ export function PhotoCaptureView({ onCapture, onCancel, facing = "front" }: Phot
   };
 
   return (
-    <View style={styles.container}>
-      <CameraView ref={cameraRef} style={styles.camera} facing={facing} onCameraReady={() => setIsReady(true)} />
-      <View style={styles.controls}>
-        <Button label="Cancel" variant="secondary" onPress={onCancel} style={styles.controlButton} />
-        <Button
-          label={!isReady ? "Preparing…" : isCapturing ? "Capturing…" : "Capture"}
-          onPress={handleCapture}
-          disabled={!isReady}
-          loading={isCapturing}
-          style={styles.controlButton}
-        />
+    // Rendered inside a Modal rather than swapped directly into the caller's
+    // view tree — on Android, a plain unmount of CameraView's native
+    // SurfaceView can leave a black frame composited on top of the screen
+    // behind it until something else forces a full re-layout (e.g.
+    // switching tabs). A Modal owns its own native window, so dismissing it
+    // tears the camera surface down cleanly instead. Only reproduces in
+    // release builds — dev-client's extra re-layouts happened to mask it.
+    <Modal visible animationType="slide" onRequestClose={onCancel} statusBarTranslucent>
+      <View style={styles.container}>
+        <CameraView ref={cameraRef} style={styles.camera} facing={facing} onCameraReady={() => setIsReady(true)} />
+        <View style={styles.controls}>
+          <Button label="Cancel" variant="secondary" onPress={onCancel} style={styles.controlButton} />
+          <Button
+            label={!isReady ? "Preparing…" : isCapturing ? "Capturing…" : "Capture"}
+            onPress={handleCapture}
+            disabled={!isReady}
+            loading={isCapturing}
+            style={styles.controlButton}
+          />
+        </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
