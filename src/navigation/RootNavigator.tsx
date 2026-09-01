@@ -8,6 +8,7 @@ import { Screen, Button, LoadingView } from "@/components/ui";
 import { colors, spacing, typography } from "@/theme";
 import { AuthNavigator } from "./AuthNavigator";
 import { AppTabs } from "./AppTabs";
+import { FaceEnrollmentScreen } from "@/screens/auth/FaceEnrollmentScreen";
 
 // How often to verify the background location task is still actually
 // running while it's supposed to be — catches the OS silently killing it
@@ -42,7 +43,7 @@ function BiometricLockScreen({ onRetry }: { onRetry: () => void }) {
 }
 
 export function RootNavigator() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   // Read reactively only for the final render decision below. The two
   // effects deliberately read useSettingsStore.getState() instead of
   // subscribing to this value — they must fire on cold-launch / app-
@@ -114,6 +115,14 @@ export function RootNavigator() {
 
   if (status !== "authenticated") {
     return <AuthNavigator />;
+  }
+
+  // Mandatory, blocking — an employee who wasn't already enrolled with a
+  // photo at creation time (see /api/admin/employees) must take a selfie
+  // here before reaching the rest of the app. Checked ahead of the
+  // biometric lock below since there's nothing to unlock into yet.
+  if (user?.role === "EMPLOYEE" && !user.faceVerificationEnabled) {
+    return <FaceEnrollmentScreen />;
   }
 
   // AppTabs stays mounted at all times once authenticated — locking/

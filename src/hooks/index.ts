@@ -1,4 +1,5 @@
 export { useAuth } from "./useAuth";
+export { useFaceEnroll } from "./useFaceEnroll";
 export { useAttendanceStatus } from "./useAttendanceStatus";
 export { useOfficeLocation } from "./useOfficeLocation";
 export { useGeofence } from "./useGeofence";

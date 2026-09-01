@@ -2,6 +2,7 @@ export const endpoints = {
   mobileLogin: "/api/mobile/login",
   mobileRefresh: "/api/mobile/refresh",
   me: "/api/mobile/me",
+  faceEnroll: "/api/mobile/me/face-enroll",
   meAttendance: "/api/mobile/me/attendance",
   meAttendancePhoto: (id: string) => `/api/mobile/me/attendance/${id}/photo`,
   changePin: "/api/mobile/change-pin",
