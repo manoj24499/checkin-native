@@ -8,13 +8,16 @@ import { colors, radius, spacing, typography } from "@/theme";
 
 /**
  * Mandatory, blocking screen shown by RootNavigator whenever an
- * authenticated employee's `faceVerificationEnabled` is still false —
- * i.e. an admin didn't already enroll them with a photo at creation time.
- * There's no skip: the only way off this screen (besides enrolling) is
- * logging out, in case the wrong account got logged into on this device.
+ * authenticated employee's `faceVerificationEnabled` is still false and
+ * they aren't `faceVerificationExempt` either — i.e. an admin didn't
+ * already enroll them with a photo, and hasn't granted the exemption escape
+ * hatch (see RootNavigator's gate and its schema comment) for someone who's
+ * stuck here. Besides enrolling, "Check again" re-fetches the profile in
+ * case an admin already fixed it server-side, and logging out remains an
+ * option in case the wrong account got logged into on this device.
  *
- * On success, it calls refreshProfile() rather than navigating anywhere
- * itself — RootNavigator re-renders on the updated
+ * On successful enrollment, it calls refreshProfile() rather than
+ * navigating anywhere itself — RootNavigator re-renders on the updated
  * user.faceVerificationEnabled and swaps this screen out for AppTabs on
  * its own, the same way the rest of the auth gating works.
  */
@@ -25,6 +28,25 @@ export function FaceEnrollmentScreen() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [rejection, setRejection] = useState<{ kind: "failed" | "unavailable"; message: string } | null>(null);
+  const [checkingAgain, setCheckingAgain] = useState(false);
+
+  // An admin can unblock someone stuck here from the backend (re-enrolling
+  // them with a better photo, or granting the faceVerificationExempt escape
+  // hatch — see RootNavigator's gate) without this screen ever knowing, since
+  // it only has whatever profile was fetched at login/last refresh. Rather
+  // than force a full logout/login to pick that up, let them ask directly —
+  // RootNavigator swaps this screen out on its own once the refreshed
+  // profile clears the gate.
+  const checkAgain = async () => {
+    setCheckingAgain(true);
+    try {
+      await refreshProfile();
+    } catch {
+      // Still stuck (or offline) — stay on this screen, nothing else to do.
+    } finally {
+      setCheckingAgain(false);
+    }
+  };
 
   const submit = async (photo: string) => {
     setRejection(null);
@@ -101,6 +123,10 @@ export function FaceEnrollmentScreen() {
         ) : null}
         {faceEnroll.isPending && !rejection ? <Text style={styles.pendingText}>Checking your photo…</Text> : null}
       </Card>
+
+      <Pressable onPress={() => void checkAgain()} disabled={checkingAgain} hitSlop={12} style={styles.logoutLink}>
+        <Text style={styles.logoutText}>{checkingAgain ? "Checking…" : "An admin fixed this? Check again"}</Text>
+      </Pressable>
 
       <Pressable onPress={() => void logout()} hitSlop={12} style={styles.logoutLink}>
         <Text style={styles.logoutText}>Not you? Log out</Text>

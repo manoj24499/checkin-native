@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { AppProviders } from "@/providers/AppProviders";
 import { RootNavigator } from "@/navigation/RootNavigator";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/store/authStore";
 import { reconcileLocationTrackingOnStartup } from "@/services/locationTracking";
 
@@ -48,8 +49,10 @@ export default function App() {
   }, [bootstrap]);
 
   return (
-    <AppProviders>
-      <RootNavigator />
-    </AppProviders>
+    <ErrorBoundary>
+      <AppProviders>
+        <RootNavigator />
+      </AppProviders>
+    </ErrorBoundary>
   );
 }

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { setApiAuthContext } from "@/api/client";
 import { authService, employeeService } from "@/api/services";
 import { secureStorage } from "@/utils/secureStorage";
+import { isNetworkError } from "@/utils/errors";
 import { stopLocationTracking } from "@/services/locationTracking";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
@@ -40,9 +41,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const profile = await employeeService.getProfile();
       set({ user: profile, status: "authenticated" });
-    } catch {
-      // The client already retries once via refreshAccessToken() on a 401;
-      // reaching here means the refresh token is gone too.
+    } catch (err) {
+      // A definitive session expiry (server rejected the access token, then
+      // rejected the refresh token too) already ran logout() itself via
+      // onSessionExpired (see client.ts's response interceptor) before this
+      // catch even runs — status is already "unauthenticated" in that case,
+      // and calling logout() again below would just be a harmless repeat.
+      if (get().status === "unauthenticated") return;
+      if (isNetworkError(err)) {
+        // Couldn't reach the server at all (offline, DNS, timeout) — that
+        // says nothing about whether these tokens are still valid. Wiping
+        // them here would force a real login every time the app happens to
+        // launch without connectivity. Stay authenticated with the tokens
+        // we already have; screens that need the profile will refetch once
+        // the network comes back.
+        set({ status: "authenticated" });
+        return;
+      }
+      // Any other failure (a genuine 401 with no interceptor recovery, a
+      // 5xx, ...) — treat conservatively, same as before this fix.
       await get().logout();
     }
   },
@@ -86,7 +103,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await secureStorage.setTokens(result.accessToken, result.refreshToken);
       set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       return result.accessToken;
-    } catch {
+    } catch (err) {
+      if (isNetworkError(err)) {
+        // The refresh call itself never reached the server — this says
+        // nothing about whether the refresh token is actually still valid,
+        // so it must not be treated the same as the server rejecting it.
+        // Rethrow (rather than resolving null) so the response interceptor
+        // in client.ts can tell "network down" apart from "session
+        // confirmed dead" and skip logging the user out over a
+        // connectivity blip.
+        throw err;
+      }
       return null;
     }
   },

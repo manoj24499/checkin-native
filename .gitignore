@@ -30,7 +30,11 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — .env holds this developer's machine-specific backend URL
+# (see .env.example for the template); it was git-tracked before this line
+# existed, so `git rm --cached .env` also had to run once to actually stop
+# tracking it.
+.env
 .env*.local
 
 # typescript

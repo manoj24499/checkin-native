@@ -121,7 +121,11 @@ export function RootNavigator() {
   // photo at creation time (see /api/admin/employees) must take a selfie
   // here before reaching the rest of the app. Checked ahead of the
   // biometric lock below since there's nothing to unlock into yet.
-  if (user?.role === "EMPLOYEE" && !user.faceVerificationEnabled) {
+  // faceVerificationExempt is the admin's escape hatch for someone who's
+  // stuck here (bad camera, policy exemption, ...) — see its schema comment
+  // on the backend for why it bypasses this gate without also flipping
+  // faceVerificationEnabled on.
+  if (user?.role === "EMPLOYEE" && !user.faceVerificationEnabled && !user.faceVerificationExempt) {
     return <FaceEnrollmentScreen />;
   }
 
