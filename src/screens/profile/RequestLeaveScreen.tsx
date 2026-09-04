@@ -18,14 +18,6 @@ function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** "YYYY-MM-DD" -> local midnight on that date, as a real Date — so
- * .toISOString() converts correctly instead of assuming the device's local
- * midnight coincides with UTC midnight. */
-function dateKeyToLocalMidnight(dateKey: string): Date {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(year, month - 1, day, 0, 0, 0, 0);
-}
-
 /** Calendar days in [start, end] minus holiday dates — a client-side preview
  * only; the server recomputes and snapshots the real count on submit. */
 function previewDays(start: string, end: string, holidayDates: Set<string>): number {
@@ -69,13 +61,21 @@ export function RequestLeaveScreen() {
   const onSubmit = async () => {
     if (!startDay || !endDay) return;
     setSubmitError(null);
+    const payload = {
+      type,
+      // Sent as plain "YYYY-MM-DD" — the server parses these as calendar
+      // dates directly (same convention as holidays), so this doesn't
+      // depend on the device's timezone. A previous version of this
+      // screen round-tripped through the device's local midnight and
+      // .toISOString(), which silently stored every leave request one
+      // calendar day earlier than the one picked (device-local midnight
+      // for e.g. Sept 3 IST is Sept 2, 6:30pm UTC).
+      startDate: startDay,
+      endDate: endDay,
+      reason: reason.trim() || undefined,
+    };
     try {
-      await mutateAsync({
-        type,
-        startDate: dateKeyToLocalMidnight(startDay).toISOString(),
-        endDate: dateKeyToLocalMidnight(endDay).toISOString(),
-        reason: reason.trim() || undefined,
-      });
+      await mutateAsync(payload);
       setSuccess(true);
     } catch (error) {
       setSubmitError(getErrorMessage(error, "Couldn't submit your leave request. Please try again."));

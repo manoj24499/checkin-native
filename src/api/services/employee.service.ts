@@ -1,6 +1,12 @@
 import { apiClient } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
-import type { AttendanceHistoryPage, ChangePinRequest, EmployeeProfile, FaceEnrollResult } from "@/types";
+import type {
+  AttendanceHistoryPage,
+  ChangePinRequest,
+  ChangePinResponse,
+  EmployeeProfile,
+  FaceEnrollResult,
+} from "@/types";
 
 export const employeeService = {
   getProfile() {
@@ -20,8 +26,12 @@ export const employeeService = {
       .then((r) => r.data);
   },
 
+  // Returns a fresh access/refresh token pair — the server invalidates every
+  // token issued before the PIN change (see the backend's tokenVersion
+  // mechanism), including this device's own previous pair, so the caller
+  // must store these immediately or the very next request will 401.
   changePin(payload: ChangePinRequest) {
-    return apiClient.post<{ success: true }>(endpoints.changePin, payload).then((r) => r.data);
+    return apiClient.post<ChangePinResponse>(endpoints.changePin, payload).then((r) => r.data);
   },
 
   registerPushToken(token: string) {

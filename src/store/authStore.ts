@@ -23,6 +23,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshSession: () => Promise<string | null>;
   refreshProfile: () => Promise<void>;
+  applyTokens: (accessToken: string, refreshToken: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -121,6 +122,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   async refreshProfile() {
     const profile = await employeeService.getProfile();
     set({ user: profile });
+  },
+
+  // Stores a token pair the server issued outside the normal login/refresh
+  // flow — currently just change-pin, which invalidates every previously
+  // issued token (including this device's own) the moment the PIN changes
+  // server-side, and returns a fresh pair in the same response specifically
+  // so the caller can stay signed in instead of being logged out by its own
+  // PIN change.
+  async applyTokens(accessToken, refreshToken) {
+    await secureStorage.setTokens(accessToken, refreshToken);
+    set({ accessToken, refreshToken });
   },
 }));
 

@@ -25,3 +25,7 @@ export interface ChangePinRequest {
   currentPin: string;
   newPin: string;
 }
+
+export interface ChangePinResponse extends AuthTokens {
+  success: true;
+}
