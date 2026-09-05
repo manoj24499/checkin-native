@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import * as Notifications from "expo-notifications";
 import { Screen, Button, StatusBadge, Toggle } from "@/components/ui";
 import { useAuth, useBiometricAuth } from "@/hooks";
 import type { ProfileStackParamList } from "@/navigation/types";
 import { useSettingsStore } from "@/store/settingsStore";
 import { promptBiometricAuth, getLastBiometricError } from "@/services/biometrics";
 import { registerPushTokenBestEffort } from "@/services/notifications";
+import { employeeService } from "@/api/services";
 import { colors, spacing, typography } from "@/theme";
 
 const WORK_MODE_LABEL: Record<string, string> = {
@@ -49,6 +51,7 @@ export function ProfileScreen() {
   const setLiveLocationEnabled = useSettingsStore((s) => s.setLiveLocationEnabled);
 
   const [biometricError, setBiometricError] = useState<string | null>(null);
+  const [shiftRemindersError, setShiftRemindersError] = useState<string | null>(null);
 
   const handleBiometricToggle = async (next: boolean) => {
     setBiometricError(null);
@@ -63,10 +66,35 @@ export function ProfileScreen() {
   };
 
   const handleShiftRemindersToggle = async (next: boolean) => {
+    setShiftRemindersError(null);
     setShiftRemindersEnabled(next);
     if (next) {
       const registered = await registerPushTokenBestEffort();
-      if (!registered) setShiftRemindersEnabled(false);
+      if (!registered) {
+        setShiftRemindersEnabled(false);
+        // registerPushTokenBestEffort swallows every failure into a plain
+        // `false` (permission denied, no EAS project config, offline, the
+        // backend rejecting the token) — re-check permission status
+        // specifically, since "denied" is by far the most common real-world
+        // cause and, unlike the others, has a concrete fix the employee can
+        // actually take (the OS won't re-prompt once denied; it has to be
+        // flipped on from the phone's own Settings app).
+        const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+        setShiftRemindersError(
+          status === "denied" && !canAskAgain
+            ? "Notifications are turned off for this app. Enable them in your phone's Settings, then try again."
+            : "Couldn't enable reminders — check your connection and try again.",
+        );
+        return;
+      }
+    }
+    // Best-effort — if this fails (offline, etc.), the local toggle still
+    // reflects what the employee asked for; it'll just retry silently next
+    // time they flip it, rather than blocking the UI on a network call.
+    try {
+      await employeeService.updateShiftReminders(next);
+    } catch {
+      // Non-fatal.
     }
   };
 
@@ -113,10 +141,11 @@ export function ProfileScreen() {
       {biometricError ? <Text style={styles.errorText}>Biometric error: {biometricError}</Text> : null}
       <SettingsRow
         label="Shift reminders"
-        help="Coming soon — this just enables notification permission now so it's ready when reminders launch"
+        help="A nudge to check out ~10 minutes before your shift (or approved overtime) ends"
         value={shiftRemindersEnabled}
         onValueChange={handleShiftRemindersToggle}
       />
+      {shiftRemindersError ? <Text style={styles.errorText}>{shiftRemindersError}</Text> : null}
       <SettingsRow
         label="Live location"
         help="Only ever on while checked in"

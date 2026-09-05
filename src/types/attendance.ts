@@ -92,6 +92,31 @@ export interface TimedPermissionRequest {
   endTime: string;
 }
 
+export type OvertimeRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+// A self-declared "I need to keep working past my normal end" request during
+// an active check-in — unlike TimedPermission above, this takes effect the
+// moment it's created: the shift-end reminder push uses estimatedEndAt
+// instead of the normal shift end right away, and it shows up on the admin
+// dashboard immediately. `status` is the admin's after-the-fact
+// approve/reject for their own record — it never gates anything the
+// employee can already do. See RequestOvertimeScreen and
+// /api/mobile/me/overtime.
+export interface OvertimeRequest {
+  id: string;
+  estimatedEndAt: string;
+  reason: string;
+  status: OvertimeRequestStatus;
+  /** True while this is still the active request governing the reminder/
+   * checkout flow — false once closed out with a work summary at checkout. */
+  active: boolean;
+}
+
+export interface OvertimeRequestInput {
+  estimatedEndAt: string;
+  reason: string;
+}
+
 export interface ScanResult {
   id: string;
   name: string;
@@ -117,6 +142,10 @@ export interface ScanRequest {
   // and by WFH-workMode employees who chose Office for the day — see
   // CheckInOutScreen. Omitted otherwise, preserving each profile's default.
   checkInMode?: CheckInMode;
+  // Only meaningful on CHECK_OUT, and only when the employee has an active
+  // OvertimeRequest — optional even then, never required to check out.
+  overtimeSummary?: string;
+  overtimeSummaryPhoto?: string;
 }
 
 // A request for one or more whole calendar days off — distinct from

@@ -8,6 +8,7 @@ export type DashboardStackParamList = {
   DashboardHome: undefined;
   LiveMap: undefined;
   RequestPermission: undefined;
+  RequestOvertime: undefined;
 };
 
 export type ProfileStackParamList = {

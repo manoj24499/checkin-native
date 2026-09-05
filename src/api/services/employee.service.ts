@@ -37,4 +37,13 @@ export const employeeService = {
   registerPushToken(token: string) {
     return apiClient.post<{ success: true }>(endpoints.pushToken, { token }).then((r) => r.data);
   },
+
+  // Persists the "Shift reminders" toggle server-side — the server is what
+  // decides whether to actually push a reminder, so it needs to know the
+  // employee's preference, not just the device's local one.
+  updateShiftReminders(enabled: boolean) {
+    return apiClient
+      .patch<{ shiftRemindersEnabled: boolean }>(endpoints.me, { shiftRemindersEnabled: enabled })
+      .then((r) => r.data);
+  },
 };

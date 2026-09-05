@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "340064443491",
+    "project_id": "inzivo",
+    "storage_bucket": "inzivo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:340064443491:android:4b22c3f723d60558956c56",
+        "android_client_info": {
+          "package_name": "com.anonymous.checkinapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7AiivDMLKphWGdjx_F8k2nfNsbFu2oH0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

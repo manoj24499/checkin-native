@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen, Card, Button, LoadingView, ErrorView, StatusBadge } from "@/components/ui";
+import { Screen, Card, Button, TextField, LoadingView, ErrorView, StatusBadge } from "@/components/ui";
 import { DistancePill } from "@/components/attendance";
 import { PhotoCaptureView } from "@/components/camera";
 import { SlideToConfirmTrack, PinKeypad } from "@/components/checkin";
@@ -11,6 +11,7 @@ import {
   useGeofence,
   useCheckInOut,
   useTimedPermissions,
+  useOvertimeStatus,
   useTodayLeave,
 } from "@/hooks";
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
@@ -33,13 +34,20 @@ export function CheckInOutScreen() {
     ? statusQuery.data.checkedIn && !statusQuery.data.checkedOut
     : false;
   const permissionsQuery = useTimedPermissions(hasActiveSession);
+  const overtimeQuery = useOvertimeStatus(hasActiveSession);
   const todayLeave = useTodayLeave();
   const checkInOut = useCheckInOut();
 
   const [pin, setPin] = useState("");
   const photoDataUrl = useCheckInDraftStore((s) => s.photoDataUrl);
   const setPhotoDataUrl = useCheckInDraftStore((s) => s.setPhotoDataUrl);
-  const [cameraOpen, setCameraOpen] = useState(false);
+  // Which photo the camera screen is currently capturing for — the presence
+  // photo (required whenever requiresPhoto) or the optional overtime work
+  // summary photo (only ever shown on a CHECK_OUT with an active overtime
+  // request). One camera flow, two possible destinations.
+  const [cameraTarget, setCameraTarget] = useState<"presence" | "overtime" | null>(null);
+  const [overtimeSummary, setOvertimeSummary] = useState("");
+  const [overtimeSummaryPhotoDataUrl, setOvertimeSummaryPhotoDataUrl] = useState<string | null>(null);
 
   // Field-workMode employees pick Office/Field for the day right here,
   // before checking in — defaults to Field (the only choice that existed
@@ -106,6 +114,10 @@ export function CheckInOutScreen() {
     ? (permissionsQuery.data ?? []).find((p) => p.status !== "resolved") ?? null
     : null;
   const isPermissionPause = currentPermission?.status === "active";
+  const currentOvertime = hasActiveSession
+    ? (overtimeQuery.data ?? []).find((r) => r.active) ?? null
+    : null;
+  const showOvertimeSummary = action === "CHECK_OUT" && !!currentOvertime;
   const checkOutPhotoRequired = status?.exists ? status.checkOutPhotoRequired : false;
   // Only shown before check-in — once checked in, today's choice is locked
   // in (see status.checkInMode) and re-showing the picker would be misleading.
@@ -131,22 +143,29 @@ export function CheckInOutScreen() {
         longitude: geofence.coords?.longitude,
         mocked: geofence.mocked,
         checkInMode: dayOverrideMode,
+        // Never required to check out — see the optional summary section
+        // below and the schema comment on ScanRequest.overtimeSummary.
+        overtimeSummary: showOvertimeSummary ? overtimeSummary.trim() || undefined : undefined,
+        overtimeSummaryPhoto: showOvertimeSummary ? overtimeSummaryPhotoDataUrl ?? undefined : undefined,
       });
       setPin("");
       setPhotoDataUrl(null);
+      setOvertimeSummary("");
+      setOvertimeSummaryPhotoDataUrl(null);
     } catch {
       // Surfaced below via checkInOut.error.
     }
   };
 
-  if (cameraOpen) {
+  if (cameraTarget) {
     return (
       <PhotoCaptureView
         onCapture={(base64) => {
-          setPhotoDataUrl(`data:image/jpeg;base64,${base64}`);
-          setCameraOpen(false);
+          if (cameraTarget === "presence") setPhotoDataUrl(`data:image/jpeg;base64,${base64}`);
+          else setOvertimeSummaryPhotoDataUrl(`data:image/jpeg;base64,${base64}`);
+          setCameraTarget(null);
         }}
-        onCancel={() => setCameraOpen(false)}
+        onCancel={() => setCameraTarget(null)}
       />
     );
   }
@@ -234,7 +253,7 @@ export function CheckInOutScreen() {
             </Pressable>
           </Card>
           <Pressable
-            onPress={() => setCameraOpen(true)}
+            onPress={() => setCameraTarget("presence")}
             style={[styles.photoTile, photoDataUrl && styles.photoTileReady]}
           >
             {photoDataUrl ? (
@@ -265,9 +284,33 @@ export function CheckInOutScreen() {
           <Button
             label={photoDataUrl ? "Retake photo" : "Take photo"}
             variant="secondary"
-            onPress={() => setCameraOpen(true)}
+            onPress={() => setCameraTarget("presence")}
             style={styles.retakeButton}
           />
+        </Card>
+      ) : null}
+
+      {showOvertimeSummary ? (
+        <Card style={styles.card}>
+          <Text style={styles.cardLabel}>OVERTIME SUMMARY (OPTIONAL)</Text>
+          <Text style={styles.meta}>What did you get done? Never required to check out.</Text>
+          <TextField
+            placeholder="e.g. Fixed the payment gateway bug and deployed the hotfix"
+            value={overtimeSummary}
+            onChangeText={setOvertimeSummary}
+            multiline
+            style={styles.overtimeSummaryInput}
+          />
+          <Pressable
+            onPress={() => setCameraTarget("overtime")}
+            style={[styles.overtimeSummaryPhotoTile, overtimeSummaryPhotoDataUrl && styles.photoTileReady]}
+          >
+            {overtimeSummaryPhotoDataUrl ? (
+              <Image source={{ uri: overtimeSummaryPhotoDataUrl }} style={styles.overtimeSummaryPhotoPreview} />
+            ) : (
+              <Text style={styles.meta}>Add a photo (optional)</Text>
+            )}
+          </Pressable>
         </Card>
       ) : null}
 
@@ -362,6 +405,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   retakeButton: { marginTop: spacing.sm, alignSelf: "flex-start" },
+  overtimeSummaryInput: { marginTop: spacing.sm },
+  overtimeSummaryPhotoTile: {
+    marginTop: spacing.sm,
+    height: 96,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(134,119,111,0.55)",
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  overtimeSummaryPhotoPreview: { width: "100%", height: "100%" },
   photoPreview: { width: "100%", height: 220, borderRadius: radius.lg, marginBottom: spacing.sm },
   pinSection: { marginTop: spacing.xs },
   pinHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

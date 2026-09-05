@@ -8,6 +8,7 @@ export const endpoints = {
   changePin: "/api/mobile/change-pin",
   pushToken: "/api/mobile/me/push-token",
   timedPermission: "/api/mobile/me/timed-permission",
+  overtime: "/api/mobile/me/overtime",
   leaveRequests: "/api/mobile/me/leave-requests",
   leaveRequest: (id: string) => `/api/mobile/me/leave-requests/${id}`,
   holidays: "/api/mobile/holidays",

@@ -2,6 +2,8 @@ import { apiClient } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
 import type {
   KioskStatus,
+  OvertimeRequest,
+  OvertimeRequestInput,
   ScanRequest,
   ScanResult,
   TimedPermission,
@@ -31,5 +33,15 @@ export const attendanceService = {
   /** Self-declared pause window — takes effect immediately, no approval step. */
   requestTimedPermission(payload: TimedPermissionRequest) {
     return apiClient.post<TimedPermission>(endpoints.timedPermission, payload).then((r) => r.data);
+  },
+
+  /** Today's overtime request for the caller's active check-in, if any. */
+  getOvertimeRequests() {
+    return apiClient.get<{ requests: OvertimeRequest[] }>(endpoints.overtime).then((r) => r.data.requests);
+  },
+
+  /** Self-declared, takes effect immediately — see the type's own comment. */
+  requestOvertime(payload: OvertimeRequestInput) {
+    return apiClient.post<OvertimeRequest>(endpoints.overtime, payload).then((r) => r.data);
   },
 };

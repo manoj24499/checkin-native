@@ -9,6 +9,7 @@ import {
   WeeklyHoursChart,
   LateNoticeCard,
   PermissionStatusCard,
+  OvertimeStatusCard,
   LeaveNoticeCard,
   WorkSegmentCard,
 } from "@/components/dashboard";
@@ -19,6 +20,7 @@ import {
   useGeofence,
   useRecentAttendance,
   useTimedPermissions,
+  useOvertimeStatus,
   useTodayLeave,
   useWorkSegment,
   useSwitchWorkSegment,
@@ -58,6 +60,7 @@ export function DashboardScreen() {
     ? statusQuery.data.checkedIn && !statusQuery.data.checkedOut
     : false;
   const permissionsQuery = useTimedPermissions(hasActiveSession);
+  const overtimeQuery = useOvertimeStatus(hasActiveSession);
   const todayLeave = useTodayLeave();
   const isFieldWorker = user?.workMode === "FIELD";
   const segmentQuery = useWorkSegment(hasActiveSession && isFieldWorker);
@@ -123,6 +126,13 @@ export function DashboardScreen() {
     currentPermission?.status === "scheduled" ||
     currentPermission?.status === "active";
   const pauseReason: "geofence" | "permission" = currentPermission?.status === "active" ? "permission" : "geofence";
+
+  // The active overtime request, if any — "active" (not yet closed out at a
+  // checkout) is the only thing that matters for showing this and hiding
+  // the request button; unlike TimedPermission's status, `status` here
+  // never affects whether one exists (see the type's own comment).
+  const overtimeRequests = hasActiveSession ? overtimeQuery.data ?? [] : [];
+  const currentOvertime = overtimeRequests.find((r) => r.active) ?? null;
 
   const rangeLabel =
     user?.workMode === "FIELD"
@@ -208,6 +218,10 @@ export function DashboardScreen() {
         <PermissionStatusCard permission={currentPermission} />
       ) : null}
 
+      {checkedIn && !checkedOut && currentOvertime ? (
+        <OvertimeStatusCard request={currentOvertime} />
+      ) : null}
+
       <View style={styles.statGrid}>
         <View style={styles.statCell}>
           <Text style={styles.statLabel}>IN AT</Text>
@@ -242,6 +256,15 @@ export function DashboardScreen() {
           label="Request permission"
           variant="secondary"
           onPress={() => navigation.navigate("RequestPermission")}
+          style={styles.secondaryCta}
+        />
+      ) : null}
+
+      {checkedIn && !checkedOut && !currentOvertime ? (
+        <Button
+          label="Request overtime"
+          variant="secondary"
+          onPress={() => navigation.navigate("RequestOvertime")}
           style={styles.secondaryCta}
         />
       ) : null}

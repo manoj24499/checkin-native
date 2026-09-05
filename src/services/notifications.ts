@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { employeeService } from "@/api/services";
 
@@ -34,7 +35,13 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     });
   }
 
-  const token = await Notifications.getExpoPushTokenAsync();
+  // Passed explicitly rather than relying on auto-detection — that works
+  // reliably in Expo Go, but is a known source of silent failures in a
+  // standalone dev-client/production build like this app's, exactly the
+  // shape of bug that surfaces as this whole function mysteriously
+  // returning null with no visible cause.
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  const token = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
   return token.data;
 }
 
