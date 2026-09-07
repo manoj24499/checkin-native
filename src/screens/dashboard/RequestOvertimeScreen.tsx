@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Screen, Button, TextField } from "@/components/ui";
 import { TimeSlotPicker, formatSlotLabel } from "@/components/checkin";
-import { useRequestOvertime } from "@/hooks";
+import { useAuth, useAttendanceStatus, useRequestOvertime } from "@/hooks";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, spacing, typography } from "@/theme";
 
@@ -18,6 +18,13 @@ function combineTodayAndSlot(hhmm: string): Date {
 
 export function RequestOvertimeScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
+  // Reached only while checked in (see DashboardScreen's own gating on this
+  // button), so today's status — and with it shiftEndTime — is already
+  // warm in the query cache from the Dashboard/Check-in screens; this call
+  // just reads it back rather than triggering a fresh fetch most of the time.
+  const statusQuery = useAttendanceStatus(user?.employeeCode);
+  const shiftEndTime = statusQuery.data?.exists ? statusQuery.data.shiftEndTime : null;
   const { mutateAsync, isPending } = useRequestOvertime();
   const [endSlot, setEndSlot] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -68,7 +75,15 @@ export function RequestOvertimeScreen() {
       </View>
 
       <View style={styles.pickerBlock}>
-        <TimeSlotPicker label="UNTIL ABOUT" value={endSlot} onChange={setEndSlot} />
+        <TimeSlotPicker
+          label="UNTIL ABOUT"
+          value={endSlot}
+          onChange={setEndSlot}
+          disabledAtOrBefore={shiftEndTime}
+        />
+        {shiftEndTime ? (
+          <Text style={styles.pickerHint}>Only times after your shift ends ({formatSlotLabel(shiftEndTime)}) are selectable.</Text>
+        ) : null}
       </View>
 
       <View style={styles.reasonBlock}>
@@ -112,6 +127,7 @@ const styles = StyleSheet.create({
   title: { ...typography.h1, color: colors.textPrimary, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textSecondary },
   pickerBlock: { marginBottom: spacing.lg },
+  pickerHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
   reasonBlock: { marginBottom: spacing.lg },
   error: { ...typography.caption, color: colors.danger, marginBottom: spacing.md },
   submit: { marginTop: spacing.sm },

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen, Card, Button, TextField, LoadingView, ErrorView, StatusBadge } from "@/components/ui";
 import { DistancePill } from "@/components/attendance";
+import { OvertimeStatusCard } from "@/components/dashboard";
 import { PhotoCaptureView } from "@/components/camera";
 import { SlideToConfirmTrack, PinKeypad } from "@/components/checkin";
 import {
@@ -236,6 +237,13 @@ export function CheckInOutScreen() {
           />
         </View>
       ) : null}
+
+      {/* Same card the Dashboard shows for an active overtime request — shown
+          here too so a decline is visible right on the screen the employee
+          is actually using to check out, not only on a different tab (see
+          OvertimeStatusCard's own comment on why "Declined" still renders
+          here rather than being hidden). */}
+      {currentOvertime ? <OvertimeStatusCard request={currentOvertime} /> : null}
 
       {requiresGeofence && requiresPhoto ? (
         <View style={styles.row}>
