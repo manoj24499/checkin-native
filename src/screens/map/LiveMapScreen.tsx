@@ -40,7 +40,7 @@ function buildMapHtml(
 
   const userMarker = userCoords
     ? `L.circleMarker([${userCoords.latitude}, ${userCoords.longitude}], {
-        radius: 8, color: "#F06400", fillColor: "#F06400", fillOpacity: 1, weight: 2
+        radius: 8, color: "${colors.primary}", fillColor: "${colors.primary}", fillOpacity: 1, weight: 2
       }).addTo(map).bindPopup("You");`
     : "";
 
@@ -54,7 +54,7 @@ function buildMapHtml(
   const routeLine =
     route.length > 1
       ? `L.polyline(${JSON.stringify(route.map((p) => [p.latitude, p.longitude]))}, {
-          color: "#F06400", weight: 3, opacity: 0.65
+          color: "${colors.primary}", weight: 3, opacity: 0.65
         }).addTo(map);`
       : "";
 

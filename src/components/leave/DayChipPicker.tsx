@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing, typography } from "@/theme";
 
-const DAYS_AHEAD = 60;
+const DAYS_AHEAD = 30;
 
 /** "YYYY-MM-DD" in local time — lexicographically comparable, which is all
  * the disabled-range logic below needs. */
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,

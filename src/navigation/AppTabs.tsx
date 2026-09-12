@@ -1,9 +1,11 @@
+import { View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Svg, { Circle, Path } from "react-native-svg";
 import { DashboardNavigator } from "./DashboardNavigator";
 import { CheckInOutScreen } from "@/screens/checkin/CheckInOutScreen";
-import { AttendanceHistoryScreen } from "@/screens/history/AttendanceHistoryScreen";
+import { RequestsScreen } from "@/screens/requests/RequestsScreen";
 import { ProfileNavigator } from "./ProfileNavigator";
+import { useLeaveRequests } from "@/hooks";
 import { colors } from "@/theme";
 import type { AppTabParamList } from "./types";
 
@@ -47,13 +49,32 @@ function CheckInIcon({ color }: { color: string }) {
   );
 }
 
-function HistoryIcon({ color }: { color: string }) {
+/** Replaces the old History tab slot — Leave/Permission/Overtime live here
+ * now (see RequestsScreen). Calls its own hook for the pending-leave dot
+ * since it's a real function component, not a plain render callback. */
+function RequestsIcon({ color }: { color: string }) {
+  const query = useLeaveRequests();
+  const hasPending = (query.data?.requests ?? []).some((r) => r.status === "PENDING");
   return (
-    <IconBase color={color}>
-      <Path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <Path d="M3 3v5h5" />
-      <Path d="M12 7v5l4 2" />
-    </IconBase>
+    <View>
+      <IconBase color={color}>
+        <Path d="M3 14h4l1.5 2.5h7L17 14h4" />
+        <Path d="M5.2 5.6 3 14v4a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-4l-2.2-8.4A1 1 0 0 0 17.8 5H6.2a1 1 0 0 0-1 .6z" />
+      </IconBase>
+      {hasPending ? (
+        <View
+          style={{
+            position: "absolute",
+            top: -1,
+            right: -1,
+            width: 6,
+            height: 6,
+            borderRadius: 99,
+            backgroundColor: colors.primary,
+          }}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -69,7 +90,7 @@ function ProfileIcon({ color }: { color: string }) {
 const TAB_ICONS: Record<keyof AppTabParamList, (props: { color: string }) => React.ReactElement> = {
   Dashboard: DashboardIcon,
   CheckIn: CheckInIcon,
-  History: HistoryIcon,
+  Requests: RequestsIcon,
   Profile: ProfileIcon,
 };
 
@@ -82,7 +103,7 @@ export function AppTabs() {
         tabBarInactiveTintColor: colors.textMuted,
         tabBarActiveBackgroundColor: colors.primaryMuted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-        tabBarItemStyle: { borderRadius: 12, marginHorizontal: 4, marginVertical: 4 },
+        tabBarItemStyle: { borderRadius: 8, marginHorizontal: 4, marginVertical: 4 },
         tabBarLabelStyle: { fontSize: 9.5, fontWeight: "500", letterSpacing: 0.8 },
         tabBarIcon: ({ color }) => {
           const Icon = TAB_ICONS[route.name];
@@ -92,7 +113,7 @@ export function AppTabs() {
     >
       <Tab.Screen name="Dashboard" component={DashboardNavigator} />
       <Tab.Screen name="CheckIn" component={CheckInOutScreen} options={{ title: "Check In/Out" }} />
-      <Tab.Screen name="History" component={AttendanceHistoryScreen} />
+      <Tab.Screen name="Requests" component={RequestsScreen} />
       <Tab.Screen name="Profile" component={ProfileNavigator} />
     </Tab.Navigator>
   );

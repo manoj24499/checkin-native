@@ -42,7 +42,7 @@ export function WorkSegmentCard({ mode, onSwitch, switching }: WorkSegmentCardPr
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,

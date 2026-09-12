@@ -54,6 +54,11 @@ export type KioskStatus =
       checkInAt: string | null;
       checkOutPhotoRequired: boolean;
       isPaused: boolean;
+      // Every pause (geofence or timed-permission) against today's CHECK_IN,
+      // open or closed — lets the client compute a live, pause-adjusted
+      // "worked so far" figure via computeWorkedMs (attendanceGrouping.ts)
+      // and a live "outside time" counter for whichever one is still open.
+      pauses: AttendancePauseInterval[];
       // From today's CHECK_IN record, if any — survives app restarts/reloads
       // (unlike ScanResult, which only reflects this session's own mutation).
       lateMinutes: number | null;

@@ -45,6 +45,16 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   return token.data;
 }
 
+export interface PushTokenRegistrationResult {
+  ok: boolean;
+  /** Set only on failure — the actual thrown error's message (or a fixed
+   * string for the no-permission case), since "check your connection" was
+   * previously shown for every failure regardless of real cause (a missing
+   * FCM credential, a backend rejection, getExpoPushTokenAsync throwing,
+   * etc.), which made this impossible to diagnose from the UI alone. */
+  reason?: string;
+}
+
 /**
  * Obtains a push token and registers it with the backend in one step —
  * best-effort, never throws. Used at check-in (so the "you've left your
@@ -52,14 +62,15 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
  * of whether they've separately opted into the unrelated "Shift reminders"
  * toggle in Profile, which defaults to off) and from that toggle itself.
  */
-export async function registerPushTokenBestEffort(): Promise<boolean> {
+export async function registerPushTokenBestEffort(): Promise<PushTokenRegistrationResult> {
   try {
     const token = await registerForPushNotificationsAsync();
-    if (!token) return false;
+    if (!token) return { ok: false, reason: "No push token was returned (permission not granted?)." };
     await employeeService.registerPushToken(token);
-    return true;
+    return { ok: true };
   } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     console.warn("Push token registration failed:", error);
-    return false;
+    return { ok: false, reason };
   }
 }

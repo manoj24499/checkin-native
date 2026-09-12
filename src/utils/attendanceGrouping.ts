@@ -14,8 +14,12 @@ function dateKey(iso: string) {
 }
 
 /** Mirrors the backend's lib/attendanceHours.ts computeWorkedMs — kept in
- * sync manually since this is a separate codebase from the Next.js backend. */
-function computeWorkedMs(checkIn: Date, checkOut: Date, pauses: AttendancePauseInterval[]): number {
+ * sync manually since this is a separate codebase from the Next.js backend.
+ * Exported so PresenceCard can reuse it for a *live* in-progress session too
+ * — passing `now` in place of a real checkout works unchanged, since a still
+ * -open pause is already treated as ending at whatever "checkout" moment is
+ * passed in. */
+export function computeWorkedMs(checkIn: Date, checkOut: Date, pauses: AttendancePauseInterval[]): number {
   const totalMs = checkOut.getTime() - checkIn.getTime();
   const pausedMs = pauses.reduce((sum, p) => {
     const end = p.resumedAt ? new Date(p.resumedAt) : checkOut;

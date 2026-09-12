@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { Screen, Button, TextField } from "@/components/ui";
-import { DayChipPicker, formatDayLabel } from "@/components/leave";
+import { Button, TextField, IssueDialog } from "@/components/ui";
+import { DayChipPicker } from "@/components/leave";
 import { useHolidays, useLeaveRequests, useRequestLeave } from "@/hooks";
-import { getErrorMessage } from "@/utils/errors";
-import { colors, spacing, typography } from "@/theme";
+import { getErrorMessage, isNetworkError } from "@/utils/errors";
+import { colors, radius, spacing, typography } from "@/theme";
 import type { TimeOffType } from "@/types";
 
 const TYPE_OPTIONS: { value: TimeOffType; label: string }[] = [
@@ -30,8 +29,13 @@ function previewDays(start: string, end: string, holidayDates: Set<string>): num
   return count;
 }
 
-export function RequestLeaveScreen() {
-  const navigation = useNavigation();
+/** Form body for the "Request leave" sheet — moved here from the old
+ * full-screen RequestLeaveScreen (still adapted, not deleted, per the
+ * migration plan) as part of consolidating Leave/Permission/Overtime into
+ * one Requests tab. Adds the balance-exceeded block RequestLeaveScreen never
+ * had (a plain inline error for now — Phase 3's issue dialog upgrades this
+ * without redoing the check itself). */
+export function LeaveRequestSheet({ onDone }: { onDone: () => void }) {
   const { mutateAsync, isPending } = useRequestLeave();
   const holidaysQuery = useHolidays();
   const balancesQuery = useLeaveRequests();
@@ -40,8 +44,7 @@ export function RequestLeaveScreen() {
   const [startDay, setStartDay] = useState<string | null>(null);
   const [endDay, setEndDay] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<unknown>(null);
 
   const holidayDates = useMemo(
     () => new Set((holidaysQuery.data ?? []).map((h) => toDateKey(new Date(h.date)))),
@@ -49,9 +52,9 @@ export function RequestLeaveScreen() {
   );
 
   const balance = balancesQuery.data?.balances.find((b) => b.type === type);
-
   const days = startDay && endDay ? previewDays(startDay, endDay, holidayDates) : 0;
-  const canSubmit = !!startDay && !!endDay && days > 0;
+  const exceedsBalance = !!balance && days > balance.remaining;
+  const canSubmit = !!startDay && !!endDay && days > 0 && !exceedsBalance;
 
   const handleChangeStart = (day: string) => {
     setStartDay(day);
@@ -59,52 +62,26 @@ export function RequestLeaveScreen() {
   };
 
   const onSubmit = async () => {
-    if (!startDay || !endDay) return;
+    if (!startDay || !endDay || !canSubmit) return;
     setSubmitError(null);
-    const payload = {
-      type,
-      // Sent as plain "YYYY-MM-DD" — the server parses these as calendar
-      // dates directly (same convention as holidays), so this doesn't
-      // depend on the device's timezone. A previous version of this
-      // screen round-tripped through the device's local midnight and
-      // .toISOString(), which silently stored every leave request one
-      // calendar day earlier than the one picked (device-local midnight
-      // for e.g. Sept 3 IST is Sept 2, 6:30pm UTC).
-      startDate: startDay,
-      endDate: endDay,
-      reason: reason.trim() || undefined,
-    };
     try {
-      await mutateAsync(payload);
-      setSuccess(true);
+      await mutateAsync({
+        type,
+        // Plain "YYYY-MM-DD" — see the original screen's comment on why this
+        // must not round-trip through .toISOString().
+        startDate: startDay,
+        endDate: endDay,
+        reason: reason.trim() || undefined,
+      });
+      onDone();
     } catch (error) {
-      setSubmitError(getErrorMessage(error, "Couldn't submit your leave request. Please try again."));
+      setSubmitError(error);
     }
   };
 
-  if (success && startDay && endDay) {
-    return (
-      <Screen contentStyle={styles.content}>
-        <Text style={styles.title}>Leave requested</Text>
-        <Text style={styles.subtitle}>
-          {formatDayLabel(startDay)} – {formatDayLabel(endDay)} ({days} day{days === 1 ? "" : "s"}), pending
-          admin approval.
-        </Text>
-        <Button label="Done" onPress={() => navigation.goBack()} style={styles.submit} />
-      </Screen>
-    );
-  }
-
   return (
-    <Screen scroll contentStyle={styles.content}>
-      <Pressable onPress={() => navigation.goBack()} style={styles.closeButton} hitSlop={12}>
-        <Text style={styles.closeGlyph}>✕</Text>
-      </Pressable>
-
-      <View style={styles.header}>
-        <Text style={styles.title}>Request leave</Text>
-        <Text style={styles.subtitle}>Pick a leave type and date range. An admin needs to approve it.</Text>
-      </View>
+    <View>
+      <Text style={styles.blurb}>Pick a type and the days. Public holidays in the range aren't deducted.</Text>
 
       <View style={styles.typeRow}>
         {TYPE_OPTIONS.map((opt) => (
@@ -121,16 +98,16 @@ export function RequestLeaveScreen() {
       </View>
       {balance ? (
         <Text style={styles.balanceHint}>
-          {balance.remaining} of {balance.quota} {opt(type)} day(s) remaining this year
+          {balance.remaining} of {balance.quota} {type.toLowerCase()} day(s) remaining this year
         </Text>
       ) : null}
 
       <View style={styles.pickerBlock}>
-        <DayChipPicker label="FROM" value={startDay} onChange={handleChangeStart} holidayDates={holidayDates} />
+        <DayChipPicker label="FIRST DAY" value={startDay} onChange={handleChangeStart} holidayDates={holidayDates} />
       </View>
       <View style={styles.pickerBlock}>
         <DayChipPicker
-          label="TO"
+          label="LAST DAY"
           value={endDay}
           onChange={setEndDay}
           disabledBefore={startDay}
@@ -139,16 +116,18 @@ export function RequestLeaveScreen() {
       </View>
 
       {startDay && endDay ? (
-        <Text style={styles.daysPreview}>
+        <Text style={exceedsBalance ? styles.daysPreviewWarn : styles.daysPreview}>
           {days === 0
             ? "Every day in this range is a public holiday — nothing to request."
-            : `${days} day${days === 1 ? "" : "s"} (holidays excluded)`}
+            : exceedsBalance
+              ? `${days} days requested, but only ${balance?.remaining ?? 0} ${type.toLowerCase()} day(s) remain — shorten the range or switch type.`
+              : `${days} day${days === 1 ? "" : "s"} deducted from your ${type.toLowerCase()} balance. Holidays excluded.`}
         </Text>
       ) : null}
 
       <View style={styles.reasonBlock}>
         <TextField
-          label="Reason (optional)"
+          label="REASON · OPTIONAL"
           placeholder="e.g. Family function"
           value={reason}
           onChangeText={setReason}
@@ -156,45 +135,33 @@ export function RequestLeaveScreen() {
         />
       </View>
 
-      {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
-
       <Button
-        label="Submit request"
+        label="Submit for approval"
         onPress={onSubmit}
         loading={isPending}
         disabled={!canSubmit}
         style={styles.submit}
       />
-    </Screen>
+
+      <IssueDialog
+        visible={!!submitError}
+        kicker={isNetworkError(submitError) ? "NO CONNECTION" : "REQUEST NOT SENT"}
+        title={isNetworkError(submitError) ? "You're offline" : "Couldn't submit your request"}
+        body={getErrorMessage(submitError, "Couldn't submit your leave request. Please try again.")}
+        primaryLabel="Dismiss"
+        onPrimary={() => setSubmitError(null)}
+      />
+    </View>
   );
 }
 
-function opt(type: TimeOffType) {
-  return type.toLowerCase();
-}
-
 const styles = StyleSheet.create({
-  content: { flexGrow: 1 },
-  closeButton: {
-    alignSelf: "flex-end",
-    width: 34,
-    height: 34,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.md,
-  },
-  closeGlyph: { color: colors.textSecondary, fontSize: 15 },
-  header: { marginBottom: spacing.lg },
-  title: { ...typography.h1, color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textSecondary },
-  typeRow: { flexDirection: "row", gap: spacing.sm },
+  blurb: { ...typography.body, color: colors.textSecondary },
+  typeRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
   typeChip: {
     flex: 1,
     paddingVertical: spacing.sm + 2,
-    borderRadius: 999,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -202,11 +169,11 @@ const styles = StyleSheet.create({
   },
   typeChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
   typeChipLabel: { ...typography.bodyStrong, fontSize: 13, color: colors.textSecondary },
-  typeChipLabelActive: { color: colors.primary },
+  typeChipLabelActive: { color: colors.primaryDark },
   balanceHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
   pickerBlock: { marginTop: spacing.lg },
-  daysPreview: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+  daysPreview: { ...typography.caption, color: colors.primaryDark, marginTop: spacing.sm },
+  daysPreviewWarn: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
   reasonBlock: { marginTop: spacing.lg },
-  error: { ...typography.caption, color: colors.danger, marginTop: spacing.md },
   submit: { marginTop: spacing.lg },
 });

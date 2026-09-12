@@ -47,7 +47,7 @@ export function PermissionStatusCard({ permission }: { permission: TimedPermissi
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: "rgba(184,134,11,0.35)",
     backgroundColor: colors.warningMuted,

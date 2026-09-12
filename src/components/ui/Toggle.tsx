@@ -15,8 +15,8 @@ export function Toggle({ value, onValueChange, disabled }: ToggleProps) {
       style={[
         styles.track,
         {
-          backgroundColor: value ? "rgba(240,100,0,0.16)" : colors.surfaceMuted,
-          borderColor: value ? "rgba(240,100,0,0.5)" : colors.border,
+          backgroundColor: value ? colors.primaryMuted : colors.surfaceMuted,
+          borderColor: value ? colors.primary : colors.border,
         },
         disabled && styles.disabled,
       ]}
@@ -24,7 +24,7 @@ export function Toggle({ value, onValueChange, disabled }: ToggleProps) {
       <View
         style={[
           styles.knob,
-          { left: value ? 22 : 3, backgroundColor: value ? colors.primary : "#B8ADA6" },
+          { left: value ? 22 : 3, backgroundColor: value ? colors.primary : colors.textMuted },
         ]}
       />
     </Pressable>

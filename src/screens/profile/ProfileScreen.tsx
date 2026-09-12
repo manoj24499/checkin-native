@@ -3,14 +3,15 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Notifications from "expo-notifications";
-import { Screen, Button, StatusBadge, Toggle } from "@/components/ui";
-import { useAuth, useBiometricAuth } from "@/hooks";
+import { Screen, Button, BottomSheet, Toggle } from "@/components/ui";
+import { useAuth, useAttendanceStatus, useBiometricAuth } from "@/hooks";
+import { formatSlotLabel } from "@/components/checkin";
 import type { ProfileStackParamList } from "@/navigation/types";
 import { useSettingsStore } from "@/store/settingsStore";
 import { promptBiometricAuth, getLastBiometricError } from "@/services/biometrics";
 import { registerPushTokenBestEffort } from "@/services/notifications";
 import { employeeService } from "@/api/services";
-import { colors, spacing, typography } from "@/theme";
+import { colors, radius, spacing, typography } from "@/theme";
 
 const WORK_MODE_LABEL: Record<string, string> = {
   OFFICE: "Office",
@@ -42,6 +43,9 @@ export function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { user, logout } = useAuth();
   const { available: biometricAvailable } = useBiometricAuth();
+  const statusQuery = useAttendanceStatus(user?.employeeCode);
+  const shiftEndTime = statusQuery.data?.exists ? statusQuery.data.shiftEndTime : null;
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const biometricUnlockEnabled = useSettingsStore((s) => s.biometricUnlockEnabled);
   const shiftRemindersEnabled = useSettingsStore((s) => s.shiftRemindersEnabled);
@@ -69,21 +73,21 @@ export function ProfileScreen() {
     setShiftRemindersError(null);
     setShiftRemindersEnabled(next);
     if (next) {
-      const registered = await registerPushTokenBestEffort();
-      if (!registered) {
+      const result = await registerPushTokenBestEffort();
+      if (!result.ok) {
         setShiftRemindersEnabled(false);
-        // registerPushTokenBestEffort swallows every failure into a plain
-        // `false` (permission denied, no EAS project config, offline, the
-        // backend rejecting the token) — re-check permission status
-        // specifically, since "denied" is by far the most common real-world
-        // cause and, unlike the others, has a concrete fix the employee can
-        // actually take (the OS won't re-prompt once denied; it has to be
-        // flipped on from the phone's own Settings app).
+        // "Denied and can't re-ask" is the one case with a concrete fix the
+        // employee can take themselves (the OS won't re-prompt; it has to be
+        // flipped on from the phone's own Settings app) — check for it
+        // specifically. Every other failure now shows the actual underlying
+        // reason (see PushTokenRegistrationResult) instead of a generic
+        // "check your connection" that was previously shown regardless of
+        // real cause.
         const { status, canAskAgain } = await Notifications.getPermissionsAsync();
         setShiftRemindersError(
           status === "denied" && !canAskAgain
             ? "Notifications are turned off for this app. Enable them in your phone's Settings, then try again."
-            : "Couldn't enable reminders — check your connection and try again.",
+            : `Couldn't enable reminders: ${result.reason ?? "unknown error"}`,
         );
         return;
       }
@@ -121,8 +125,15 @@ export function ProfileScreen() {
         </View>
       </View>
 
-      <View style={styles.badgeRow}>
-        <StatusBadge label={WORK_MODE_LABEL[user?.workMode ?? "OFFICE"]} tone="neutral" />
+      <View style={styles.statRow}>
+        <View style={styles.statCell}>
+          <Text style={styles.statLabel}>WORK MODE</Text>
+          <Text style={styles.statValue}>{WORK_MODE_LABEL[user?.workMode ?? "OFFICE"]}</Text>
+        </View>
+        <View style={styles.statCell}>
+          <Text style={styles.statLabel}>SHIFT ENDS</Text>
+          <Text style={styles.statValue}>{shiftEndTime ? formatSlotLabel(shiftEndTime) : "—"}</Text>
+        </View>
       </View>
 
       <View style={styles.divider} />
@@ -154,18 +165,35 @@ export function ProfileScreen() {
       />
 
       <View style={styles.linkGroup}>
-        <Pressable style={styles.linkRow} onPress={() => navigation.navigate("Leave")}>
-          <Text style={styles.linkLabel}>Leave</Text>
+        <Pressable style={styles.linkRow} onPress={() => navigation.navigate("History")}>
+          <Text style={styles.linkLabel}>History</Text>
           <Text style={styles.linkChevron}>›</Text>
         </Pressable>
 
-        <Pressable style={[styles.linkRow, styles.linkRowLast]} onPress={() => navigation.navigate("ChangePin")}>
+        <Pressable style={styles.linkRow} onPress={() => navigation.navigate("ChangePin")}>
           <Text style={styles.linkLabel}>Change PIN</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </Pressable>
+
+        <Pressable style={[styles.linkRow, styles.linkRowLast]} onPress={() => setHelpOpen(true)}>
+          <View style={styles.linkTextGroup}>
+            <Text style={styles.linkLabel}>Help & who to contact</Text>
+            <Text style={styles.linkSub}>Wrong hours, geofence trouble, PIN reset</Text>
+          </View>
           <Text style={styles.linkChevron}>›</Text>
         </Pressable>
       </View>
 
       <Button label="Log out" variant="danger" onPress={() => logout()} style={styles.logout} />
+
+      <BottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} kicker="SUPPORT" title="Something wrong?">
+        <Text style={styles.helpBody}>
+          Hours look wrong, geofence won't clear, PIN forgotten — your HR admin can fix all three from the admin
+          portal. Reach them on hr@qubespace.in or extension 204. For app crashes, note the time and tell your
+          admin; they can see your session.
+        </Text>
+        <Button label="Got it" onPress={() => setHelpOpen(false)} style={styles.helpDone} />
+      </BottomSheet>
     </Screen>
   );
 }
@@ -177,15 +205,31 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 99,
-    backgroundColor: colors.panelDark,
+    backgroundColor: colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarLabel: { ...typography.h3, color: colors.primarySoftText },
+  avatarLabel: { ...typography.h3, color: colors.primaryDark },
   identityText: { flex: 1, minWidth: 0 },
   name: { ...typography.h2, color: colors.textPrimary },
   meta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
-  badgeRow: { marginTop: spacing.sm },
+  statRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  statCell: {
+    flex: 1,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm + 3,
+  },
+  statLabel: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
+  statValue: { ...typography.bodyStrong, color: colors.textPrimary, marginTop: 4 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.lg },
   settingsRow: {
     flexDirection: "row",
@@ -209,7 +253,11 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   linkRowLast: { borderBottomWidth: 0 },
+  linkTextGroup: { flex: 1, minWidth: 0 },
   linkLabel: { ...typography.bodyStrong, color: colors.textPrimary },
+  linkSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   linkChevron: { ...typography.h3, color: colors.textMuted },
   logout: { marginTop: spacing.xl },
+  helpBody: { ...typography.body, color: colors.textPrimary, lineHeight: 20 },
+  helpDone: { marginTop: spacing.lg },
 });

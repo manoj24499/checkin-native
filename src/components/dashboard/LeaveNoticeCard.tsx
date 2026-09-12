@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm + 2,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: "rgba(46,111,82,0.35)",
     backgroundColor: colors.successMuted,

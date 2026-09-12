@@ -3,7 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { StyleSheet, Text, View } from "react-native";
-import { Screen, Button, LoadingView, ErrorView } from "@/components/ui";
+import { Screen, LoadingView, ErrorView } from "@/components/ui";
 import {
   PresenceCard,
   WeeklyHoursChart,
@@ -12,6 +12,9 @@ import {
   OvertimeStatusCard,
   LeaveNoticeCard,
   WorkSegmentCard,
+  FieldVisitCard,
+  LeaveBalanceCard,
+  RecentHistoryCard,
 } from "@/components/dashboard";
 import {
   useAuth,
@@ -30,7 +33,7 @@ import { startLocationTracking } from "@/services/locationTracking";
 import { groupAttendanceByDay } from "@/utils/attendanceGrouping";
 import { getErrorMessage } from "@/utils/errors";
 import { formatDistance } from "@/utils/geo";
-import { colors, spacing, typography } from "@/theme";
+import { colors, radius, spacing, typography } from "@/theme";
 import type { AppTabParamList, DashboardStackParamList } from "@/navigation/types";
 import type { WorkSegmentMode } from "@/types";
 
@@ -115,16 +118,9 @@ export function DashboardScreen() {
 
   // Whichever of today's timed-permission requests is currently relevant —
   // for display, that's the most recent non-resolved one (a rejected one is
-  // still worth showing so the employee sees the decline). For deciding
-  // whether a *new* request can be started, REJECTED doesn't count either —
-  // same rule the backend itself enforces — so the button only stays hidden
-  // while one is genuinely pending/scheduled/active.
+  // still worth showing so the employee sees the decline).
   const permissions = hasActiveSession ? permissionsQuery.data ?? [] : [];
   const currentPermission = permissions.find((p) => p.status !== "resolved") ?? null;
-  const hasOpenPermissionRequest =
-    currentPermission?.status === "pending" ||
-    currentPermission?.status === "scheduled" ||
-    currentPermission?.status === "active";
   const pauseReason: "geofence" | "permission" = currentPermission?.status === "active" ? "permission" : "geofence";
 
   // The active overtime request, if any — "active" (not yet closed out at a
@@ -196,11 +192,14 @@ export function DashboardScreen() {
         isTracking={isTracking}
         checkInAt={checkedIn && !checkedOut ? checkInAt : null}
         isPaused={checkedIn && !checkedOut ? isPaused : false}
+        pauses={checkedIn && !checkedOut && status?.exists ? status.pauses : []}
         pauseReason={pauseReason}
         trackingWarning={trackingWarning}
         onViewMap={() => navigation.navigate("LiveMap")}
         onEnableSharing={!isTracking && activeCheckIn ? handleEnableSharing : undefined}
         enablingSharing={enablingSharing}
+        checkedIn={checkedIn && !checkedOut}
+        onPrimaryAction={goCheckInOut}
       />
 
       {checkedIn && !checkedOut && isFieldWorker && segmentQuery.data?.mode ? (
@@ -213,6 +212,8 @@ export function DashboardScreen() {
           {segmentError ? <Text style={styles.segmentError}>{segmentError}</Text> : null}
         </>
       ) : null}
+
+      {checkedIn && !checkedOut && isFieldWorker ? <FieldVisitCard /> : null}
 
       {checkedIn && !checkedOut && currentPermission ? (
         <PermissionStatusCard permission={currentPermission} />
@@ -245,29 +246,18 @@ export function DashboardScreen() {
         <WeeklyHoursChart days={daySummaries} />
       </View>
 
-      <Button
-        label={checkedIn && !checkedOut ? "Go to check out" : "Go to check in"}
-        onPress={goCheckInOut}
-        style={styles.cta}
+      <RecentHistoryCard
+        days={daySummaries}
+        onSeeAll={() =>
+          navigation.getParent<BottomTabNavigationProp<AppTabParamList>>()?.navigate("Profile", { screen: "History" })
+        }
       />
 
-      {checkedIn && !checkedOut && !hasOpenPermissionRequest ? (
-        <Button
-          label="Request permission"
-          variant="secondary"
-          onPress={() => navigation.navigate("RequestPermission")}
-          style={styles.secondaryCta}
-        />
-      ) : null}
-
-      {checkedIn && !checkedOut && !currentOvertime ? (
-        <Button
-          label="Request overtime"
-          variant="secondary"
-          onPress={() => navigation.navigate("RequestOvertime")}
-          style={styles.secondaryCta}
-        />
-      ) : null}
+      <LeaveBalanceCard
+        onPress={() =>
+          navigation.getParent<BottomTabNavigationProp<AppTabParamList>>()?.navigate("Requests", { tab: "leave" })
+        }
+      />
     </Screen>
   );
 }
@@ -290,7 +280,7 @@ const styles = StyleSheet.create({
   statGrid: {
     flexDirection: "row",
     marginTop: spacing.md,
-    borderRadius: 14,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: "hidden",
@@ -303,12 +293,10 @@ const styles = StyleSheet.create({
   weeklyCard: {
     marginTop: spacing.lg,
     backgroundColor: colors.surface,
-    borderRadius: 14,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
   },
-  cta: { marginTop: spacing.lg },
-  secondaryCta: { marginTop: spacing.sm },
   segmentError: { ...typography.caption, color: colors.danger, marginTop: spacing.xs },
 });

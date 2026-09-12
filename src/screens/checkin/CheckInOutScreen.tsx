@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen, Card, Button, TextField, LoadingView, ErrorView, StatusBadge } from "@/components/ui";
+import { Screen, Card, Button, TextField, LoadingView, ErrorView, StatusBadge, IssueDialog } from "@/components/ui";
 import { DistancePill } from "@/components/attendance";
 import { OvertimeStatusCard } from "@/components/dashboard";
 import { PhotoCaptureView } from "@/components/camera";
-import { SlideToConfirmTrack, PinKeypad } from "@/components/checkin";
+import { SlideToConfirmTrack, PinBoxInput } from "@/components/checkin";
 import {
   useAuth,
   useAttendanceStatus,
@@ -16,7 +16,7 @@ import {
   useTodayLeave,
 } from "@/hooks";
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
-import { getErrorMessage } from "@/utils/errors";
+import { getErrorMessage, isNetworkError } from "@/utils/errors";
 import { colors, radius, spacing, typography } from "@/theme";
 import type { CheckInMode, TimeOffType } from "@/types";
 
@@ -40,6 +40,7 @@ export function CheckInOutScreen() {
   const checkInOut = useCheckInOut();
 
   const [pin, setPin] = useState("");
+  const [issueOpen, setIssueOpen] = useState(false);
   const photoDataUrl = useCheckInDraftStore((s) => s.photoDataUrl);
   const setPhotoDataUrl = useCheckInDraftStore((s) => s.setPhotoDataUrl);
   // Which photo the camera screen is currently capturing for — the presence
@@ -154,7 +155,8 @@ export function CheckInOutScreen() {
       setOvertimeSummary("");
       setOvertimeSummaryPhotoDataUrl(null);
     } catch {
-      // Surfaced below via checkInOut.error.
+      // Surfaced via the IssueDialog below, driven by checkInOut.error.
+      setIssueOpen(true);
     }
   };
 
@@ -327,10 +329,8 @@ export function CheckInOutScreen() {
           <Text style={styles.cardLabel}>PIN</Text>
           <Text style={styles.pinHint}>{pin.length ? `${pin.length} of 4+ digits` : "4 to 6 digits"}</Text>
         </View>
-        <PinKeypad value={pin} onChange={setPin} />
+        <PinBoxInput value={pin} onChange={setPin} />
       </View>
-
-      {checkInOut.isError ? <Text style={styles.errorText}>{getErrorMessage(checkInOut.error)}</Text> : null}
 
       <View style={styles.confirmWrap}>
         <SlideToConfirmTrack
@@ -341,6 +341,26 @@ export function CheckInOutScreen() {
           onConfirm={handleSubmit}
         />
       </View>
+
+      <IssueDialog
+        visible={issueOpen && checkInOut.isError}
+        kicker={isNetworkError(checkInOut.error) ? "NO CONNECTION" : action === "CHECK_IN" ? "CHECK-IN BLOCKED" : "CHECK-OUT BLOCKED"}
+        title={
+          isNetworkError(checkInOut.error)
+            ? "You're offline"
+            : action === "CHECK_IN"
+              ? "Couldn't check in"
+              : "Couldn't check out"
+        }
+        body={getErrorMessage(checkInOut.error)}
+        primaryLabel="Try again"
+        onPrimary={() => {
+          setIssueOpen(false);
+          setPin("");
+        }}
+        secondaryLabel="Dismiss"
+        onSecondary={() => setIssueOpen(false)}
+      />
     </Screen>
   );
 }
@@ -354,14 +374,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 4,
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     padding: 4,
     marginBottom: spacing.md,
   },
-  modeButton: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.md - 2, alignItems: "center" },
-  modeButtonActive: { backgroundColor: colors.surface },
+  modeButton: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm - 2, alignItems: "center" },
+  modeButtonActive: {
+    backgroundColor: colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
+  },
   modeButtonLabel: { ...typography.bodyStrong, color: colors.textSecondary, fontSize: 13 },
-  modeButtonLabelActive: { color: colors.textPrimary },
+  modeButtonLabelActive: { color: colors.primaryDark },
   row: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
   card: { marginBottom: spacing.md },
   geofenceCard: { flex: 1, gap: spacing.xs },
@@ -374,7 +398,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: "dashed",
     borderColor: "rgba(134,119,111,0.55)",
-    borderRadius: 14,
+    borderRadius: radius.sm,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
@@ -420,14 +444,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: "dashed",
     borderColor: "rgba(134,119,111,0.55)",
-    borderRadius: radius.lg,
+    borderRadius: radius.sm,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
   overtimeSummaryPhotoPreview: { width: "100%", height: "100%" },
-  photoPreview: { width: "100%", height: 220, borderRadius: radius.lg, marginBottom: spacing.sm },
+  photoPreview: { width: "100%", height: 220, borderRadius: radius.sm, marginBottom: spacing.sm },
   pinSection: { marginTop: spacing.xs },
   pinHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   pinHint: { fontSize: 10, color: colors.textMuted },

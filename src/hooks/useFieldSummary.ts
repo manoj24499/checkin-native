@@ -11,9 +11,13 @@ export function useFieldSummary(enabled: boolean) {
     queryFn: () => fieldService.getSummary(),
     enabled,
     staleTime: 30_000,
-    // Keep the route/distance fresh while the day is active — pings land
-    // every 2 minutes (see services/locationTracking.ts), so polling faster
-    // than that wouldn't show anything new.
-    refetchInterval: (query) => (query.state.data?.active ? 60_000 : false),
+    // Keep the route/distance fresh while `enabled` — pings land every 2
+    // minutes (see services/locationTracking.ts), so polling faster than
+    // that wouldn't show anything new. Gated on the external `enabled` flag,
+    // not this query's own last `data.active` answer — see
+    // useTimedPermissions' identical fix/comment for why that self-
+    // referential form is a bug (one wrong/stale read stops polling for
+    // good, no way to self-correct short of a remount).
+    refetchInterval: enabled ? 60_000 : false,
   });
 }

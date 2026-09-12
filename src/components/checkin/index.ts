@@ -1,3 +1,3 @@
 export { SlideToConfirmTrack } from "./SlideToConfirmTrack";
-export { PinKeypad } from "./PinKeypad";
+export { PinBoxInput } from "./PinBoxInput";
 export { TimeSlotPicker, formatSlotLabel } from "./TimeSlotPicker";

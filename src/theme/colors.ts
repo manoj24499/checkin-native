@@ -1,16 +1,18 @@
 // Warm off-white / brand-orange palette (see design doc "Futuristic Check-In
-// Redesign", turn 2). Token names are kept stable from the previous
-// blue-based theme so components don't all need renaming — only values (and
-// a few new dark-panel tokens) changed.
+// Redesign", turn 2; accent retuned to match the "Inzivo Redesign" mockup,
+// turn N — background/surface/text tokens already matched that mockup
+// exactly, only the accent hex moved). Token names are kept stable from the
+// previous blue-based theme so components don't all need renaming — only
+// values (and a few new dark-panel tokens) changed.
 export const colors = {
   background: "#FBF9F7",
   surface: "#FFFFFF",
   surfaceMuted: "#F4F1ED",
   border: "rgba(26,21,18,0.10)",
 
-  primary: "#F06400",
+  primary: "#ef6c00",
   primaryDark: "#C25200",
-  primaryMuted: "rgba(240,100,0,0.08)",
+  primaryMuted: "rgba(239,108,0,0.10)",
   primaryText: "#FFFFFF",
   primarySoftText: "#F7B27A", // orange text legible on dark panels
 

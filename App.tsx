@@ -1,8 +1,16 @@
 import { useEffect } from "react";
 import { AppState, type AppStateStatus } from "react-native";
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
 import { AppProviders } from "@/providers/AppProviders";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LoadingView } from "@/components/ui/LoadingView";
 import { useAuthStore } from "@/store/authStore";
 import { reconcileLocationTrackingOnStartup } from "@/services/locationTracking";
 
@@ -22,6 +30,12 @@ const RECONCILE_DEBOUNCE_MS = 8000;
 
 export default function App() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
   useEffect(() => {
     bootstrap();
@@ -47,6 +61,14 @@ export default function App() {
       subscription.remove();
     };
   }, [bootstrap]);
+
+  if (!fontsLoaded) {
+    // Reuses the existing cold-launch splash (its one-shot logo build-in)
+    // as the font-loading gate too, rather than adding a second loading
+    // screen — Inter must be in before anything renders to avoid a flash
+    // of the system font swapping to Inter mid-screen.
+    return <LoadingView animated />;
+  }
 
   return (
     <ErrorBoundary>

@@ -42,7 +42,7 @@ export function WeeklyHoursChart({ days }: { days: DaySummary[] }) {
                   styles.bar,
                   {
                     height: `${Math.max(4, (d.hoursMs / maxMs) * 100)}%`,
-                    backgroundColor: d.hoursMs > 0 ? colors.primary : "rgba(26,21,18,0.08)",
+                    backgroundColor: d.hoursMs > 0 ? colors.primary : colors.surfaceMuted,
                   },
                 ]}
               />

@@ -170,13 +170,13 @@ const styles = StyleSheet.create({
   track: {
     position: "relative",
     height: TRACK_HEIGHT,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     overflow: "hidden",
   },
-  trackEnabled: { backgroundColor: colors.surface, borderColor: "rgba(240,100,0,0.45)" },
+  trackEnabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.primary },
   trackDisabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-  fill: { position: "absolute", top: 0, bottom: 0, left: 0, backgroundColor: "rgba(240,100,0,0.10)" },
+  fill: { position: "absolute", top: 0, bottom: 0, left: 0, backgroundColor: colors.primaryMuted },
   labelWrap: {
     position: "absolute",
     top: 0,
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     top: TRACK_PADDING,
     width: KNOB_WIDTH,
     height: KNOB_HEIGHT,
-    borderRadius: radius.sm + 1,
+    borderRadius: 6, // matches the mockup's knob radius, distinct from the shared scale
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",

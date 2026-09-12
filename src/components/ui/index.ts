@@ -7,3 +7,5 @@ export { ErrorView } from "./ErrorView";
 export { EmptyState } from "./EmptyState";
 export { StatusBadge } from "./StatusBadge";
 export { Toggle } from "./Toggle";
+export { BottomSheet } from "./BottomSheet";
+export { IssueDialog } from "./IssueDialog";
