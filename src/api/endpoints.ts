@@ -1,6 +1,7 @@
 export const endpoints = {
   mobileLogin: "/api/mobile/login",
   mobileRefresh: "/api/mobile/refresh",
+  mobileLogout: "/api/mobile/logout",
   me: "/api/mobile/me",
   faceEnroll: "/api/mobile/me/face-enroll",
   meAttendance: "/api/mobile/me/attendance",
@@ -16,6 +17,7 @@ export const endpoints = {
   fieldSummary: "/api/mobile/me/field-summary",
   fieldVisits: "/api/mobile/field-visits",
   fieldVisitPhoto: (id: string) => `/api/mobile/field-visits/${id}/photo`,
+  support: "/api/mobile/support",
 
   kioskScan: "/api/kiosk/scan",
   kioskStatus: "/api/kiosk/status",

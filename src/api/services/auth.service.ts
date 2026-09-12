@@ -16,4 +16,17 @@ export const authService = {
       )
       .then((r) => r.data);
   },
+
+  // Revokes this one specific refresh token server-side (see
+  // app/api/mobile/logout/route.ts in the backend) — previously logout only
+  // ever cleared local device storage, leaving a captured refresh token
+  // valid server-side for its full 30-day life. Deliberately never throws:
+  // authStore's logout() must still clear local state even if this network
+  // call fails (offline, server error) — see its own comment.
+  logout(refreshToken: string) {
+    return apiClient.post(endpoints.mobileLogout, { refreshToken }).then(
+      () => {},
+      () => {},
+    );
+  },
 };

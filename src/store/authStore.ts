@@ -92,6 +92,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useAttendanceSessionStore.getState().stopTracking();
     useCheckInDraftStore.getState().setPhotoDataUrl(null);
 
+    // Tell the server to revoke this specific refresh token (see
+    // authService.logout) so a captured copy of it can't outlive this
+    // logout. authService.logout() never throws, and this must never block
+    // (or worse, skip) the local clear below — an offline/failed revoke
+    // call still has to log this device out locally; the token is simply
+    // left to expire naturally server-side in that case.
+    const { refreshToken } = get();
+    if (refreshToken) {
+      await authService.logout(refreshToken);
+    }
+
     await secureStorage.clearTokens();
     set({ accessToken: null, refreshToken: null, user: null, status: "unauthenticated" });
   },

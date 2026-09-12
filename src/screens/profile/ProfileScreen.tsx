@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Notifications from "expo-notifications";
-import { Screen, Button, BottomSheet, Toggle } from "@/components/ui";
+import { Screen, Button, Toggle } from "@/components/ui";
 import { useAuth, useAttendanceStatus, useBiometricAuth } from "@/hooks";
 import { formatSlotLabel } from "@/components/checkin";
 import type { ProfileStackParamList } from "@/navigation/types";
@@ -45,7 +45,6 @@ export function ProfileScreen() {
   const { available: biometricAvailable } = useBiometricAuth();
   const statusQuery = useAttendanceStatus(user?.employeeCode);
   const shiftEndTime = statusQuery.data?.exists ? statusQuery.data.shiftEndTime : null;
-  const [helpOpen, setHelpOpen] = useState(false);
 
   const biometricUnlockEnabled = useSettingsStore((s) => s.biometricUnlockEnabled);
   const shiftRemindersEnabled = useSettingsStore((s) => s.shiftRemindersEnabled);
@@ -175,9 +174,9 @@ export function ProfileScreen() {
           <Text style={styles.linkChevron}>›</Text>
         </Pressable>
 
-        <Pressable style={[styles.linkRow, styles.linkRowLast]} onPress={() => setHelpOpen(true)}>
+        <Pressable style={[styles.linkRow, styles.linkRowLast]} onPress={() => navigation.navigate("ReportIssue")}>
           <View style={styles.linkTextGroup}>
-            <Text style={styles.linkLabel}>Help & who to contact</Text>
+            <Text style={styles.linkLabel}>Help & report an issue</Text>
             <Text style={styles.linkSub}>Wrong hours, geofence trouble, PIN reset</Text>
           </View>
           <Text style={styles.linkChevron}>›</Text>
@@ -185,15 +184,6 @@ export function ProfileScreen() {
       </View>
 
       <Button label="Log out" variant="danger" onPress={() => logout()} style={styles.logout} />
-
-      <BottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)} kicker="SUPPORT" title="Something wrong?">
-        <Text style={styles.helpBody}>
-          Hours look wrong, geofence won't clear, PIN forgotten — your HR admin can fix all three from the admin
-          portal. Reach them on hr@qubespace.in or extension 204. For app crashes, note the time and tell your
-          admin; they can see your session.
-        </Text>
-        <Button label="Got it" onPress={() => setHelpOpen(false)} style={styles.helpDone} />
-      </BottomSheet>
     </Screen>
   );
 }
@@ -258,6 +248,4 @@ const styles = StyleSheet.create({
   linkSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   linkChevron: { ...typography.h3, color: colors.textMuted },
   logout: { marginTop: spacing.xl },
-  helpBody: { ...typography.body, color: colors.textPrimary, lineHeight: 20 },
-  helpDone: { marginTop: spacing.lg },
 });

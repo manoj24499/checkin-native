@@ -59,6 +59,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach one (e.g. a screenshot) to a support report."
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID for quick, secure sign-in."

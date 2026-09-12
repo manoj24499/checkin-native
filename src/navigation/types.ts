@@ -15,6 +15,9 @@ export type ProfileStackParamList = {
   // Leave/RequestLeave moved to the Requests tab — kept off this list now
   // that ProfileScreen no longer links to them directly.
   History: undefined;
+  // Replaces the old static "Help & who to contact" sheet (placeholder HR
+  // contact info) — see ReportIssueScreen.
+  ReportIssue: undefined;
 };
 
 export type AppTabParamList = {
