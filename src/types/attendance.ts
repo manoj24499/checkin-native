@@ -66,10 +66,11 @@ export type KioskStatus =
       // Only set for FIELD-workMode employees, from today's CHECK_IN. Null
       // before they've checked in yet today.
       checkInMode: CheckInMode | null;
-      // Today's assigned shift end ("HH:mm", 24-hour, IST) — see
-      // /api/kiosk/status. Null when no shift is assigned that day (e.g.
-      // most FIELD workers), in which case there's nothing to restrict the
-      // overtime-request time picker against.
+      // Today's assigned shift start/end ("HH:mm", 24-hour, IST) — see
+      // /api/kiosk/status. Both null together when no shift is assigned
+      // that day (e.g. most FIELD workers) — shiftEndTime alone also
+      // restricts the overtime-request time picker.
+      shiftStartTime: string | null;
       shiftEndTime: string | null;
     };
 

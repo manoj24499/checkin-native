@@ -21,7 +21,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       }),
   );
 
-  useReactQueryLiveSync();
+  useReactQueryLiveSync(queryClient);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

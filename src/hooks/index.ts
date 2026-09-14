@@ -24,3 +24,4 @@ export { useHolidays } from "./useHolidays";
 export { useWorkSegment } from "./useWorkSegment";
 export { useSwitchWorkSegment } from "./useSwitchWorkSegment";
 export { useSubmitSupportTicket } from "./useSubmitSupportTicket";
+export { useUploadProfilePhoto } from "./useUploadProfilePhoto";

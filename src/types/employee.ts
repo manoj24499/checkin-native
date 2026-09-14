@@ -19,6 +19,14 @@ export interface EmployeeSummary {
   // for someone who was never enrolled. Set from the employee's profile
   // page in the admin app, not by this app.
   faceVerificationExempt: boolean;
+  // Self-service only (see the backend's User.profilePhoto schema comment —
+  // no admin upload path exists). Drives whether ProfileScreen fetches the
+  // actual photo (GET /api/mobile/me/profile-photo) or falls back to
+  // initials. Optional (not `boolean`) because /api/mobile/login's response
+  // — the partial profile authStore's login() briefly stores before its own
+  // immediate refreshProfile() call backfills the real one — doesn't
+  // include it either; treated the same as false until then.
+  hasProfilePhoto?: boolean;
 }
 
 export interface EmployeeProfile extends EmployeeSummary {

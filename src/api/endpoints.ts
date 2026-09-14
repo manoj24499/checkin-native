@@ -3,6 +3,7 @@ export const endpoints = {
   mobileRefresh: "/api/mobile/refresh",
   mobileLogout: "/api/mobile/logout",
   me: "/api/mobile/me",
+  profilePhoto: "/api/mobile/me/profile-photo",
   faceEnroll: "/api/mobile/me/face-enroll",
   meAttendance: "/api/mobile/me/attendance",
   meAttendancePhoto: (id: string) => `/api/mobile/me/attendance/${id}/photo`,

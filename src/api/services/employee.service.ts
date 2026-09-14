@@ -46,4 +46,11 @@ export const employeeService = {
       .patch<{ shiftRemindersEnabled: boolean }>(endpoints.me, { shiftRemindersEnabled: enabled })
       .then((r) => r.data);
   },
+
+  // `photo` is a data URL, same convention as every other photo upload in
+  // this app. Self-service only — see the backend's User.profilePhoto
+  // schema comment.
+  uploadProfilePhoto(photo: string) {
+    return apiClient.post<{ success: true }>(endpoints.profilePhoto, { photo }).then((r) => r.data);
+  },
 };
