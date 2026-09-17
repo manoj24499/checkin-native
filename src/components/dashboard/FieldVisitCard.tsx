@@ -60,6 +60,10 @@ export function FieldVisitCard() {
   if (capturing) {
     return (
       <PhotoCaptureView
+        // "back" — this is a photo of the place the employee just reached,
+        // not of themselves. Matches LiveMapScreen.tsx's identical "Add a
+        // location" flow, which has the same requirement.
+        facing="back"
         onCapture={(base64) => {
           setPhoto(base64);
           setCapturing(false);

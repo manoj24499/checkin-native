@@ -46,6 +46,7 @@ export function DayHistoryRow({ day }: { day: DaySummary }) {
         <View style={styles.track}>
           <View style={[styles.fill, { left: `${leftPct}%`, width: `${widthPct}%` }]} />
         </View>
+        {day.outsideMs ? <Text style={styles.outside}>Outside: {formatDuration(day.outsideMs)}</Text> : null}
       </View>
       <View style={styles.tag}>
         <Text style={styles.tagLabel}>{method}</Text>
@@ -77,6 +78,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs + 2,
     overflow: "hidden",
   },
+  outside: { fontSize: 11, color: colors.warning, marginTop: spacing.xs },
   fill: { position: "absolute", top: 0, bottom: 0, borderRadius: 99, backgroundColor: colors.primary },
   tag: {
     borderWidth: 1,

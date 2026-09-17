@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Notifications from "expo-notifications";
@@ -74,12 +74,29 @@ export function ProfileScreen() {
     shiftStartTime && shiftEndTime ? `${formatSlotLabel(shiftStartTime)} – ${formatSlotLabel(shiftEndTime)}` : "—";
 
   const uploadPhoto = useUploadProfilePhoto();
+  // Tapping the avatar opens a full-screen viewer of the current photo
+  // first (WhatsApp-style) — "Change photo" from inside that is what
+  // actually opens the take-a-photo/choose-from-gallery sheet. An employee
+  // with no photo yet has nothing to view, so tapping their avatar skips
+  // straight to that sheet instead.
+  const [viewingPhoto, setViewingPhoto] = useState(false);
   const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
   const [capturingAvatar, setCapturingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<unknown>(null);
-  // Bumped after every successful upload so the <Image> below re-fetches
-  // instead of showing its previously-cached bytes at the same URL.
-  const [photoNonce, setPhotoNonce] = useState(0);
+  // Cache-busts the profile photo URL so RN's Image component re-fetches
+  // instead of reusing previously-cached bytes at the same URL — its own
+  // image cache doesn't reliably honor the backend's `Cache-Control:
+  // no-store` header the way a browser would. Seeded from Date.now(), not
+  // 0: a plain incrementing counter restarts at 0/1/2... on every fresh
+  // app launch, so the *same* low nonce values (and therefore the *same*
+  // URLs) get reused across different sessions/devices — if the image
+  // cache keys purely on URL, a later session's "?v=0" can still hit an
+  // earlier session's cached response for that exact URL, which is exactly
+  // what caused a real re-uploaded photo to keep showing the old one
+  // (confirmed live: EMP001's DB row had genuinely fresh photo bytes, but
+  // the app kept displaying the previous photo). Date.now() never repeats
+  // across sessions, so this can't happen again.
+  const [photoNonce, setPhotoNonce] = useState(() => Date.now());
 
   const biometricUnlockEnabled = useSettingsStore((s) => s.biometricUnlockEnabled);
   const shiftRemindersEnabled = useSettingsStore((s) => s.shiftRemindersEnabled);
@@ -140,7 +157,7 @@ export function ProfileScreen() {
     setAvatarError(null);
     try {
       await uploadPhoto.mutateAsync(dataUrl);
-      setPhotoNonce((n) => n + 1);
+      setPhotoNonce(Date.now());
       // Updates user.hasProfilePhoto so the <Image> below actually renders
       // instead of still falling back to initials after a first-ever upload.
       await refreshProfile();
@@ -192,7 +209,10 @@ export function ProfileScreen() {
       <Text style={styles.kicker}>ACCOUNT</Text>
 
       <View style={styles.identityRow}>
-        <Pressable onPress={() => setAvatarSheetOpen(true)} style={styles.avatarWrapper}>
+        <Pressable
+          onPress={() => (user?.hasProfilePhoto ? setViewingPhoto(true) : setAvatarSheetOpen(true))}
+          style={styles.avatarWrapper}
+        >
           {user?.hasProfilePhoto ? (
             <Image
               source={{
@@ -279,6 +299,42 @@ export function ProfileScreen() {
 
       <Button label="Log out" variant="danger" onPress={() => logout()} style={styles.logout} />
 
+      <Modal
+        visible={viewingPhoto}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setViewingPhoto(false)}
+      >
+        <View style={styles.viewerBackdrop}>
+          <Pressable
+            onPress={() => setViewingPhoto(false)}
+            style={styles.viewerCloseButton}
+            hitSlop={12}
+          >
+            <Text style={styles.viewerCloseGlyph}>✕</Text>
+          </Pressable>
+
+          <Image
+            source={{
+              uri: `${env.apiUrl}${endpoints.profilePhoto}?v=${photoNonce}`,
+              headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+            }}
+            style={styles.viewerImage}
+            resizeMode="contain"
+          />
+
+          <Button
+            label="Change photo"
+            onPress={() => {
+              setViewingPhoto(false);
+              setAvatarSheetOpen(true);
+            }}
+            style={styles.viewerChangeButton}
+          />
+        </View>
+      </Modal>
+
       <BottomSheet
         visible={avatarSheetOpen}
         onClose={() => setAvatarSheetOpen(false)}
@@ -348,6 +404,29 @@ const styles = StyleSheet.create({
   },
   avatarSheetOptionLast: { borderBottomWidth: 0 },
   avatarSheetOptionLabel: { ...typography.bodyStrong, color: colors.textPrimary },
+  viewerBackdrop: {
+    flex: 1,
+    backgroundColor: "black",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  viewerCloseButton: {
+    position: "absolute",
+    top: 56,
+    right: spacing.lg,
+    width: 36,
+    height: 36,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: "rgba(247,243,239,0.28)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  viewerCloseGlyph: { color: colors.textOnDarkMuted, fontSize: 16 },
+  viewerImage: { width: "100%", aspectRatio: 1, borderRadius: radius.sm },
+  viewerChangeButton: { marginTop: spacing.xl, alignSelf: "stretch" },
   identityText: { flex: 1, minWidth: 0 },
   name: { ...typography.h2, color: colors.textPrimary },
   meta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },

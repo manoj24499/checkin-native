@@ -6,6 +6,7 @@ export interface DaySummary {
   checkIn: AttendanceRecord | null;
   checkOut: AttendanceRecord | null;
   durationMs: number | null;
+  outsideMs: number | null;
 }
 
 function dateKey(iso: string) {
@@ -19,13 +20,16 @@ function dateKey(iso: string) {
  * — passing `now` in place of a real checkout works unchanged, since a still
  * -open pause is already treated as ending at whatever "checkout" moment is
  * passed in. */
-export function computeWorkedMs(checkIn: Date, checkOut: Date, pauses: AttendancePauseInterval[]): number {
-  const totalMs = checkOut.getTime() - checkIn.getTime();
-  const pausedMs = pauses.reduce((sum, p) => {
-    const end = p.resumedAt ? new Date(p.resumedAt) : checkOut;
+export function computePausedMs(referenceEnd: Date, pauses: AttendancePauseInterval[]): number {
+  return pauses.reduce((sum, p) => {
+    const end = p.resumedAt ? new Date(p.resumedAt) : referenceEnd;
     return sum + Math.max(0, end.getTime() - new Date(p.pausedAt).getTime());
   }, 0);
-  return Math.max(0, totalMs - pausedMs);
+}
+
+export function computeWorkedMs(checkIn: Date, checkOut: Date, pauses: AttendancePauseInterval[]): number {
+  const totalMs = checkOut.getTime() - checkIn.getTime();
+  return Math.max(0, totalMs - computePausedMs(checkOut, pauses));
 }
 
 /**
@@ -54,12 +58,19 @@ export function groupAttendanceByDay(records: AttendanceRecord[]): DaySummary[] 
       checkIn && checkOut
         ? computeWorkedMs(new Date(checkIn.timestamp), new Date(checkOut.timestamp), checkIn.pauses ?? [])
         : null;
+    // For a still-open day (no checkout yet, e.g. today), use "now" as the
+    // reference end so an open pause still counts toward outside time —
+    // mirrors PresenceCard's live figure for the same in-progress session.
+    const outsideMs = checkIn
+      ? computePausedMs(checkOut ? new Date(checkOut.timestamp) : new Date(), checkIn.pauses ?? [])
+      : null;
     summaries.push({
       dateKey: key,
       date: new Date(checkIn?.timestamp ?? checkOut?.timestamp ?? Date.now()),
       checkIn,
       checkOut,
       durationMs,
+      outsideMs,
     });
   }
 
