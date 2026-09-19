@@ -11,9 +11,10 @@ import NetInfo from "@react-native-community/netinfo";
 // one flips React Query's focus state false→true repeatedly, and every
 // query with the default `refetchOnWindowFocus` refetches each time — a
 // refetch storm that shows up as the screen flickering every couple of
-// seconds while checked in. Debouncing collapses a burst of blips into one
-// settled update once the AppState actually stops changing.
-const FOCUS_DEBOUNCE_MS = 8000;
+// seconds while checked in. This is a *cooldown* window, not a
+// wait-before-acting delay (see leading-edge note below) — it collapses a
+// burst of blips into a single reaction instead of one per blip.
+const FOCUS_COOLDOWN_MS = 8000;
 
 /**
  * React Query's "refetch on window focus / on reconnect" only works out of
@@ -24,34 +25,46 @@ const FOCUS_DEBOUNCE_MS = 8000;
  */
 export function useReactQueryLiveSync(queryClient: QueryClient) {
   useEffect(() => {
-    let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cooldownTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const onAppStateChange = (status: AppStateStatus) => {
       if (Platform.OS === "web") return;
-      if (debounceTimeout) clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(() => {
-        const nowFocused = status === "active";
-        focusManager.setFocused(nowFocused);
-        // `focusManager.setFocused(true)` is *supposed* to be enough on its
-        // own (it drives React Query's default `refetchOnWindowFocus`) —
-        // but this app's tab navigator keeps every screen (and its query
-        // observers) permanently mounted once signed in (see
-        // RootNavigator.tsx's own comment on why AppTabs never unmounts),
-        // so there's no natural "remount → fresh fetch" fallback the way a
-        // freshly-mounted screen would get. User-reported: reopening the
-        // app after sitting backgrounded for a while showed the Dashboard's
-        // check-in status stale (whatever it was before backgrounding, not
-        // reflecting anything that happened on the server since) until a
-        // manual pull-to-refresh. An explicit invalidation here is the same
-        // "don't rely on an implicit mechanism for something this visible"
-        // reasoning already applied to useAttendanceStatus's own refetch
-        // logic (see that hook's comment) — it only affects currently
-        // *active* (mounted/observed) queries, so this doesn't fetch
-        // anything nobody's looking at.
-        if (nowFocused) {
-          void queryClient.invalidateQueries();
-        }
-      }, FOCUS_DEBOUNCE_MS);
+      // Leading-edge: react to the *first* transition in a burst immediately,
+      // then ignore everything else until the cooldown clears. The previous
+      // version waited for AppState to go quiet before reacting at all —
+      // technically correct, but on a resume-after-hours-backgrounded (the
+      // case that actually matters), a real person looks at the stale
+      // Dashboard and pulls to refresh well before an 8s trailing debounce
+      // ever fires, so the auto-fix below never gets observed as working.
+      // Reacting instantly on the first event and swallowing the rest for
+      // FOCUS_COOLDOWN_MS keeps the original anti-flicker protection (still
+      // only one reaction per burst) while making a genuine resume instant.
+      if (cooldownTimeout) return;
+      cooldownTimeout = setTimeout(() => {
+        cooldownTimeout = null;
+      }, FOCUS_COOLDOWN_MS);
+
+      const nowFocused = status === "active";
+      focusManager.setFocused(nowFocused);
+      // `focusManager.setFocused(true)` is *supposed* to be enough on its
+      // own (it drives React Query's default `refetchOnWindowFocus`) —
+      // but this app's tab navigator keeps every screen (and its query
+      // observers) permanently mounted once signed in (see
+      // RootNavigator.tsx's own comment on why AppTabs never unmounts),
+      // so there's no natural "remount → fresh fetch" fallback the way a
+      // freshly-mounted screen would get. User-reported: reopening the
+      // app after sitting backgrounded for a while showed the Dashboard's
+      // check-in status stale (whatever it was before backgrounding, not
+      // reflecting anything that happened on the server since) until a
+      // manual pull-to-refresh. An explicit invalidation here is the same
+      // "don't rely on an implicit mechanism for something this visible"
+      // reasoning already applied to useAttendanceStatus's own refetch
+      // logic (see that hook's comment) — it only affects currently
+      // *active* (mounted/observed) queries, so this doesn't fetch
+      // anything nobody's looking at.
+      if (nowFocused) {
+        void queryClient.invalidateQueries();
+      }
     };
 
     const subscription = AppState.addEventListener("change", onAppStateChange);
@@ -62,7 +75,7 @@ export function useReactQueryLiveSync(queryClient: QueryClient) {
       NetInfo.addEventListener((state) => setOnline(!!state.isConnected)),
     );
     return () => {
-      if (debounceTimeout) clearTimeout(debounceTimeout);
+      if (cooldownTimeout) clearTimeout(cooldownTimeout);
       subscription.remove();
     };
   }, []);
