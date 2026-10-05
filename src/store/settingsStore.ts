@@ -13,9 +13,15 @@ interface SettingsState {
   shiftRemindersEnabled: boolean;
   /** Real opt-out: when false, checking in never starts location tracking. */
   liveLocationEnabled: boolean;
+  /** Remembered from the last successful login (see LoginScreen) — a device
+   * is almost always used by one organization's employees, so prefilling
+   * this avoids retyping it every login. Not a secret, unlike employeeCode/
+   * PIN, which are never persisted anywhere on the device. */
+  lastOrganizationCode: string;
   setBiometricUnlockEnabled: (value: boolean) => void;
   setShiftRemindersEnabled: (value: boolean) => void;
   setLiveLocationEnabled: (value: boolean) => void;
+  setLastOrganizationCode: (value: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -24,9 +30,11 @@ export const useSettingsStore = create<SettingsState>()(
       biometricUnlockEnabled: false,
       shiftRemindersEnabled: true,
       liveLocationEnabled: true,
+      lastOrganizationCode: "",
       setBiometricUnlockEnabled: (value) => set({ biometricUnlockEnabled: value }),
       setShiftRemindersEnabled: (value) => set({ shiftRemindersEnabled: value }),
       setLiveLocationEnabled: (value) => set({ liveLocationEnabled: value }),
+      setLastOrganizationCode: (value) => set({ lastOrganizationCode: value }),
     }),
     {
       name: "checkin.settings",

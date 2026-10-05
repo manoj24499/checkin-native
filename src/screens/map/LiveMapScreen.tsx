@@ -193,6 +193,7 @@ export function LiveMapScreen() {
 
   const [addingVisit, setAddingVisit] = useState(false);
   const [visitName, setVisitName] = useState("");
+  const [visitDescription, setVisitDescription] = useState("");
   const [visitPhotoDataUrl, setVisitPhotoDataUrl] = useState<string | null>(null);
   const [visitCameraOpen, setVisitCameraOpen] = useState(false);
 
@@ -301,11 +302,13 @@ export function LiveMapScreen() {
     try {
       await logVisit.mutateAsync({
         name: visitName.trim(),
+        description: visitDescription.trim() || undefined,
         photo: visitPhotoDataUrl,
         latitude: userCoords.latitude,
         longitude: userCoords.longitude,
       });
       setVisitName("");
+      setVisitDescription("");
       setVisitPhotoDataUrl(null);
       setAddingVisit(false);
     } catch {
@@ -410,6 +413,7 @@ export function LiveMapScreen() {
                 />
                 <View style={styles.visitInfo}>
                   <Text style={styles.visitName}>{visit.name}</Text>
+                  {visit.description ? <Text style={styles.visitTime}>{visit.description}</Text> : null}
                   <Text style={styles.visitTime}>Reached {formatVisitTime(visit.reachedAt)}</Text>
                 </View>
               </View>
@@ -423,6 +427,17 @@ export function LiveMapScreen() {
                 placeholder="e.g. Springfield High School"
                 value={visitName}
                 onChangeText={setVisitName}
+              />
+              <Text style={styles.cardLabel}>DESCRIPTION (OPTIONAL)</Text>
+              <TextField
+                placeholder="e.g. Met the owner, order follow-up needed"
+                value={visitDescription}
+                onChangeText={setVisitDescription}
+                multiline
+                numberOfLines={3}
+                maxLength={500}
+                textAlignVertical="top"
+                style={{ minHeight: 76 }}
               />
               <Pressable
                 onPress={() => setVisitCameraOpen(true)}
@@ -450,6 +465,7 @@ export function LiveMapScreen() {
                   onPress={() => {
                     setAddingVisit(false);
                     setVisitName("");
+                    setVisitDescription("");
                     setVisitPhotoDataUrl(null);
                   }}
                   style={styles.addVisitButtonHalf}

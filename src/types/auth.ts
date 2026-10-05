@@ -1,6 +1,7 @@
 import type { EmployeeSummary } from "./employee";
 
 export interface LoginRequest {
+  organizationCode: string;
   employeeCode: string;
   pin: string;
 }

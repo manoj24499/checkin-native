@@ -21,6 +21,7 @@ export function FieldVisitCard() {
   const logVisit = useLogFieldVisit();
   const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -34,6 +35,7 @@ export function FieldVisitCard() {
   const reset = () => {
     setExpanded(false);
     setName("");
+    setDescription("");
     setPhoto(null);
     setSubmitError(null);
   };
@@ -47,6 +49,7 @@ export function FieldVisitCard() {
       });
       await logVisit.mutateAsync({
         name: name.trim(),
+        description: description.trim() || undefined,
         photo,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -65,7 +68,7 @@ export function FieldVisitCard() {
         // location" flow, which has the same requirement.
         facing="back"
         onCapture={(base64) => {
-          setPhoto(base64);
+          setPhoto(`data:image/jpeg;base64,${base64}`);
           setCapturing(false);
         }}
         onCancel={() => setCapturing(false)}
@@ -90,6 +93,17 @@ export function FieldVisitCard() {
             placeholder="e.g. Sri Balaji Traders"
             value={name}
             onChangeText={setName}
+          />
+          <TextField
+            label="DESCRIPTION (OPTIONAL)"
+            placeholder="e.g. Met the owner, order follow-up needed"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+            maxLength={500}
+            textAlignVertical="top"
+            style={styles.descriptionInput}
           />
           <Pressable
             onPress={() => setCapturing(true)}
@@ -132,6 +146,7 @@ export function FieldVisitCard() {
               </View>
               <View style={styles.visitInfo}>
                 <Text style={styles.visitName}>{v.name}</Text>
+                {v.description ? <Text style={styles.visitDescription}>{v.description}</Text> : null}
                 <Text style={styles.visitMeta}>
                   {new Date(v.reachedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                 </Text>
@@ -210,5 +225,7 @@ const styles = StyleSheet.create({
   visitPhotoLabel: { fontSize: 8, letterSpacing: 1, color: colors.textMuted, fontWeight: "600" },
   visitInfo: { flex: 1 },
   visitName: { ...typography.bodyStrong, fontSize: 13, color: colors.textPrimary },
+  descriptionInput: { minHeight: 76 },
+  visitDescription: { ...typography.caption, color: colors.textSecondary, fontSize: 12, marginTop: 1 },
   visitMeta: { ...typography.caption, color: colors.textSecondary, fontSize: 11.5 },
 });

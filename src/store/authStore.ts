@@ -19,7 +19,7 @@ interface AuthState {
   user: EmployeeProfile | null;
 
   bootstrap: () => Promise<void>;
-  login: (employeeCode: string, pin: string) => Promise<void>;
+  login: (organizationCode: string, employeeCode: string, pin: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<string | null>;
   refreshProfile: () => Promise<void>;
@@ -65,8 +65,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  async login(employeeCode, pin) {
-    const result = await authService.login({ employeeCode, pin });
+  async login(organizationCode, employeeCode, pin) {
+    const result = await authService.login({ organizationCode, employeeCode, pin });
     await secureStorage.setTokens(result.accessToken, result.refreshToken);
     set({
       accessToken: result.accessToken,

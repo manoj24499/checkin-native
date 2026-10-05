@@ -209,6 +209,7 @@ export interface PublicHoliday {
 export interface FieldVisit {
   id: string;
   name: string;
+  description?: string | null;
   reachedAt: string;
   latitude: number;
   longitude: number;
@@ -216,6 +217,7 @@ export interface FieldVisit {
 
 export interface FieldVisitRequest {
   name: string;
+  description?: string;
   photo: string;
   latitude: number;
   longitude: number;
