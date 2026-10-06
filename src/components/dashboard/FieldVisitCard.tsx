@@ -1,11 +1,16 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import * as Location from "expo-location";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { TextField } from "@/components/ui";
 import { PhotoCaptureView } from "@/components/camera";
-import { useFieldSummary, useLogFieldVisit } from "@/hooks";
-import { getCurrentPositionWithTimeout, formatDistance } from "@/utils/geo";
+import { useFieldSummary, useQueuedFieldVisit } from "@/hooks";
+import { getQuickPosition, formatDistance } from "@/utils/geo";
+import {
+  EMPTY_VISIT_FORM,
+  VisitFormFields,
+  validateVisitForm,
+  visitFormToPayload,
+  type VisitFormValues,
+} from "./VisitFormFields";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, radius, spacing, typography } from "@/theme";
 
@@ -18,45 +23,52 @@ import { colors, radius, spacing, typography } from "@/theme";
  */
 export function FieldVisitCard() {
   const summaryQuery = useFieldSummary(true);
-  const logVisit = useLogFieldVisit();
+  const queue = useQueuedFieldVisit();
   const [expanded, setExpanded] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [form, setForm] = useState<VisitFormValues>(EMPTY_VISIT_FORM);
   const [photo, setPhoto] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
 
   const summary = summaryQuery.data;
   const visits = summary?.active ? summary.visits : [];
   const distanceMeters = summary?.active ? summary.distanceMeters : 0;
 
-  const canSubmit = name.trim().length > 0 && !!photo;
+  const canSubmit = form.name.trim().length > 0 && !!photo && !locating;
 
   const reset = () => {
     setExpanded(false);
-    setName("");
-    setDescription("");
+    setForm(EMPTY_VISIT_FORM);
     setPhoto(null);
     setSubmitError(null);
   };
 
+  // Saving is deliberately non-blocking: the position comes from the device's
+  // cached fix (instant), the visit is queued, and the form closes right away —
+  // the photo upload runs in the background and shows "Saving…" in the list.
   const handleSubmit = async () => {
     if (!canSubmit || !photo) return;
+    const invalid = validateVisitForm(form);
+    if (invalid) {
+      setSubmitError(invalid);
+      return;
+    }
     setSubmitError(null);
+    setLocating(true);
     try {
-      const position = await getCurrentPositionWithTimeout({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      await logVisit.mutateAsync({
-        name: name.trim(),
-        description: description.trim() || undefined,
+      const position = await getQuickPosition();
+      queue.submit({
+        ...visitFormToPayload(form),
         photo,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       });
       reset();
-    } catch (error) {
-      setSubmitError(getErrorMessage(error, "Couldn't log that visit. Please try again."));
+    } catch {
+      setSubmitError("Couldn't get your location. Move to a clearer spot and try again.");
+    } finally {
+      setLocating(false);
     }
   };
 
@@ -88,23 +100,7 @@ export function FieldVisitCard() {
 
       {expanded ? (
         <View style={styles.form}>
-          <TextField
-            label="PLACE NAME"
-            placeholder="e.g. Sri Balaji Traders"
-            value={name}
-            onChangeText={setName}
-          />
-          <TextField
-            label="DESCRIPTION (OPTIONAL)"
-            placeholder="e.g. Met the owner, order follow-up needed"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-            textAlignVertical="top"
-            style={styles.descriptionInput}
-          />
+          <VisitFormFields values={form} onChange={setForm} />
           <Pressable
             onPress={() => setCapturing(true)}
             style={[styles.photoTile, photo && styles.photoTileFilled]}
@@ -121,10 +117,14 @@ export function FieldVisitCard() {
             </Pressable>
             <Pressable
               onPress={handleSubmit}
-              disabled={!canSubmit || logVisit.isPending}
-              style={[styles.submitButton, (!canSubmit || logVisit.isPending) && styles.submitButtonDisabled]}
+              disabled={!canSubmit}
+              style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
             >
-              <Text style={styles.submitButtonLabel}>{logVisit.isPending ? "Saving…" : "Save visit"}</Text>
+              {locating ? (
+                <ActivityIndicator color={colors.primaryDark} />
+              ) : (
+                <Text style={styles.submitButtonLabel}>Save visit</Text>
+              )}
             </Pressable>
           </View>
         </View>
@@ -137,8 +137,35 @@ export function FieldVisitCard() {
         </Pressable>
       )}
 
-      {visits.length > 0 ? (
+      {visits.length > 0 || queue.pending.length > 0 ? (
         <View style={styles.visitList}>
+          {queue.pending.map((p) => (
+            <View key={p.key} style={styles.visitRow}>
+              <View style={styles.visitPhoto}>
+                {p.status === "saving" ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Text style={styles.visitPhotoLabel}>FAILED</Text>
+                )}
+              </View>
+              <View style={styles.visitInfo}>
+                <Text style={styles.visitName}>{p.name}</Text>
+                <Text style={[styles.visitMeta, p.status === "failed" && styles.pendingFailed]}>
+                  {p.status === "saving" ? "Saving…" : p.error ?? "Couldn't save"}
+                </Text>
+              </View>
+              {p.status === "failed" ? (
+                <View style={styles.pendingActions}>
+                  <Pressable onPress={() => queue.retry(p.key)} hitSlop={8}>
+                    <Text style={styles.pendingRetry}>Retry</Text>
+                  </Pressable>
+                  <Pressable onPress={() => queue.remove(p.key)} hitSlop={8}>
+                    <Text style={styles.pendingRemove}>Remove</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ))}
           {visits.map((v) => (
             <View key={v.id} style={styles.visitRow}>
               <View style={styles.visitPhoto}>
@@ -147,6 +174,11 @@ export function FieldVisitCard() {
               <View style={styles.visitInfo}>
                 <Text style={styles.visitName}>{v.name}</Text>
                 {v.description ? <Text style={styles.visitDescription}>{v.description}</Text> : null}
+                {v.contactName || v.contactPhone ? (
+                  <Text style={styles.visitDescription}>
+                    {[v.contactName, v.contactPhone].filter(Boolean).join(" · ")}
+                  </Text>
+                ) : null}
                 <Text style={styles.visitMeta}>
                   {new Date(v.reachedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                 </Text>
@@ -225,7 +257,10 @@ const styles = StyleSheet.create({
   visitPhotoLabel: { fontSize: 8, letterSpacing: 1, color: colors.textMuted, fontWeight: "600" },
   visitInfo: { flex: 1 },
   visitName: { ...typography.bodyStrong, fontSize: 13, color: colors.textPrimary },
-  descriptionInput: { minHeight: 76 },
   visitDescription: { ...typography.caption, color: colors.textSecondary, fontSize: 12, marginTop: 1 },
+  pendingFailed: { color: colors.danger },
+  pendingActions: { gap: spacing.xs, alignItems: "flex-end" },
+  pendingRetry: { ...typography.bodyStrong, fontSize: 12.5, color: colors.primaryDark },
+  pendingRemove: { ...typography.caption, fontSize: 12, color: colors.textMuted },
   visitMeta: { ...typography.caption, color: colors.textSecondary, fontSize: 11.5 },
 });

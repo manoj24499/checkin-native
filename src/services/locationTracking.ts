@@ -24,6 +24,30 @@ export function msSinceLocationTrackingStart(): number {
 // minutes — 2 minutes leaves headroom for network latency/retries.
 export const PING_INTERVAL_MS = 2 * 60 * 1000;
 
+// Field workers are on the road, and distance is summed between recorded
+// points: with only one point every 2 minutes, a vehicle at 40 km/h covers
+// ~1.3 km between points and the straight line between them cuts every corner,
+// so the total came out 10-15 km short on a long day. Field profiles therefore
+// sample the GPS every FIELD_SAMPLE_INTERVAL_MS, keep the samples in memory,
+// and upload them in one batch along with the regular 2-minute ping (which
+// still drives live status and auto-pause on its own). Office/WFH profiles are
+// unchanged — no extra battery or data use.
+export const FIELD_SAMPLE_INTERVAL_MS = 15 * 1000;
+const MAX_BUFFERED_SAMPLES = 400;
+const MAX_TRAIL_PER_PING = 120;
+
+type TrailSample = { latitude: number; longitude: number; accuracy: number; timestamp: string };
+let trailBuffer: TrailSample[] = [];
+let lastPingSentAt = 0;
+
+function isFieldProfile(): boolean {
+  // Loaded lazily: authStore itself imports this module (to stop tracking on
+  // sign-out), so a top-level import here would be a circular dependency.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useAuthStore } = require("@/store/authStore") as typeof import("@/store/authStore");
+  return useAuthStore.getState().user?.workMode === "FIELD";
+}
+
 type BackgroundLocationTaskBody = {
   locations: Location.LocationObject[];
 };
@@ -41,18 +65,34 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
   }
 
   const { locations } = (data ?? { locations: [] }) as BackgroundLocationTaskBody;
-  const latest = locations[locations.length - 1];
-  if (!latest) return;
-
-  if (latest.mocked) {
-    // Drop this sample rather than reporting a fake position — if every
-    // subsequent ping is also mocked, the employee will simply age past the
-    // admin dashboard's 3-minute "Live" threshold and show as Offline,
-    // which is a more honest signal than a spoofed location.
-    console.warn("Skipping location ping — mock location detected");
+  // A mocked fix is dropped rather than reported — if every subsequent fix is
+  // also mocked, the employee simply ages past the admin dashboard's 3-minute
+  // "Live" threshold and shows as Offline, which is a more honest signal than
+  // a spoofed location.
+  const real = locations.filter((l) => !l.mocked);
+  const latest = real[real.length - 1];
+  if (!latest) {
+    if (locations.length > 0) console.warn("Skipping location ping — mock location detected");
     return;
   }
 
+  const field = isFieldProfile();
+  if (field) {
+    for (const l of real) {
+      trailBuffer.push({
+        latitude: l.coords.latitude,
+        longitude: l.coords.longitude,
+        accuracy: l.coords.accuracy ?? 0,
+        timestamp: new Date(l.timestamp).toISOString(),
+      });
+    }
+    if (trailBuffer.length > MAX_BUFFERED_SAMPLES) trailBuffer = trailBuffer.slice(-MAX_BUFFERED_SAMPLES);
+    // Samples arrive every ~15s but the server only needs a ping every ~2 min.
+    const due = Date.now() - lastPingSentAt >= PING_INTERVAL_MS - 5_000;
+    if (!due && trailBuffer.length < MAX_TRAIL_PER_PING) return;
+  }
+
+  const sentSamples = field ? trailBuffer.slice(-MAX_TRAIL_PER_PING - 1, -1) : [];
   try {
     const result = await locationService.sendPing({
       attendanceId,
@@ -60,13 +100,19 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
       longitude: latest.coords.longitude,
       accuracy: latest.coords.accuracy ?? 0,
       timestamp: new Date(latest.timestamp).toISOString(),
+      ...(sentSamples.length > 0 ? { trail: sentSamples } : {}),
     });
+    if (field) {
+      trailBuffer = [];
+      lastPingSentAt = Date.now();
+    }
     if (!result.tracking) {
       await stopLocationTracking();
       useAttendanceSessionStore.getState().stopTracking();
     }
   } catch {
-    // Transient network failure — the next scheduled ping will retry.
+    // Transient network failure — the buffered samples are kept and go out with
+    // the next ping (field profiles), or the next ping simply retries.
   }
 });
 
@@ -146,7 +192,7 @@ export async function startLocationTracking(attendanceId: string, checkedInAt: s
         // effectively never trigger. This is a deliberate battery-vs-accuracy
         // tradeoff in favor of the pause feature actually working.
         accuracy: Location.Accuracy.High,
-        timeInterval: PING_INTERVAL_MS,
+        timeInterval: isFieldProfile() ? FIELD_SAMPLE_INTERVAL_MS : PING_INTERVAL_MS,
         distanceInterval: 0,
         showsBackgroundLocationIndicator: true,
         pausesUpdatesAutomatically: false,
@@ -177,6 +223,8 @@ export async function startLocationTracking(attendanceId: string, checkedInAt: s
 }
 
 export async function stopLocationTracking() {
+  trailBuffer = [];
+  lastPingSentAt = 0;
   try {
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING_TASK).catch(
       () => false,

@@ -4,7 +4,14 @@ import { useNavigation } from "@react-navigation/native";
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import { BarSpark } from "@/components/dashboard/BarSpark";
-import { Card, Button, TextField } from "@/components/ui";
+import { Card, Button } from "@/components/ui";
+import {
+  EMPTY_VISIT_FORM,
+  VisitFormFields,
+  validateVisitForm,
+  visitFormToPayload,
+  type VisitFormValues,
+} from "@/components/dashboard/VisitFormFields";
 import { PhotoCaptureView } from "@/components/camera";
 import {
   useActivityPattern,
@@ -12,7 +19,7 @@ import {
   useAttendanceStatus,
   useResolvedGeofenceTarget,
   useFieldSummary,
-  useLogFieldVisit,
+  useQueuedFieldVisit,
 } from "@/hooks";
 import type { GeofenceTarget } from "@/hooks/useGeofence";
 import type { FieldVisit } from "@/types";
@@ -181,7 +188,7 @@ export function LiveMapScreen() {
   const isFieldDay =
     user?.workMode === "FIELD" && statusQuery.data?.exists === true && statusQuery.data.checkInMode === "FIELD";
   const fieldSummaryQuery = useFieldSummary(isFieldDay);
-  const logVisit = useLogFieldVisit();
+  const queue = useQueuedFieldVisit();
 
   const [userCoords, setUserCoords] = useState<Coords | null>(null);
   // Accuracy (meters) of whichever fix `userCoords` currently reflects — a
@@ -192,8 +199,8 @@ export function LiveMapScreen() {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const [addingVisit, setAddingVisit] = useState(false);
-  const [visitName, setVisitName] = useState("");
-  const [visitDescription, setVisitDescription] = useState("");
+  const [visitForm, setVisitForm] = useState<VisitFormValues>(EMPTY_VISIT_FORM);
+  const [visitFormError, setVisitFormError] = useState<string | null>(null);
   const [visitPhotoDataUrl, setVisitPhotoDataUrl] = useState<string | null>(null);
   const [visitCameraOpen, setVisitCameraOpen] = useState(false);
 
@@ -297,23 +304,26 @@ export function LiveMapScreen() {
     [userCoords, target, isFieldDay, route, visits],
   );
 
-  const handleSaveVisit = async () => {
+  // Non-blocking save: the position is already live on this screen, so the
+  // visit is queued and the form closes immediately; the photo upload happens
+  // in the background and shows "Saving…" in the list below.
+  const handleSaveVisit = () => {
     if (!visitPhotoDataUrl || !userCoords) return;
-    try {
-      await logVisit.mutateAsync({
-        name: visitName.trim(),
-        description: visitDescription.trim() || undefined,
-        photo: visitPhotoDataUrl,
-        latitude: userCoords.latitude,
-        longitude: userCoords.longitude,
-      });
-      setVisitName("");
-      setVisitDescription("");
-      setVisitPhotoDataUrl(null);
-      setAddingVisit(false);
-    } catch {
-      // Surfaced below via logVisit.error.
+    const invalid = validateVisitForm(visitForm);
+    if (invalid) {
+      setVisitFormError(invalid);
+      return;
     }
+    queue.submit({
+      ...visitFormToPayload(visitForm),
+      photo: visitPhotoDataUrl,
+      latitude: userCoords.latitude,
+      longitude: userCoords.longitude,
+    });
+    setVisitForm(EMPTY_VISIT_FORM);
+    setVisitFormError(null);
+    setVisitPhotoDataUrl(null);
+    setAddingVisit(false);
   };
 
   if (visitCameraOpen) {
@@ -399,7 +409,31 @@ export function LiveMapScreen() {
         <ScrollView style={styles.fieldPanel} contentContainerStyle={styles.fieldPanelContent}>
           <Text style={styles.sectionLabel}>LOGGED LOCATIONS</Text>
 
-          {visits.length === 0 ? (
+          {queue.pending.map((p) => (
+            <View key={p.key} style={styles.visitRow}>
+              <View style={[styles.visitThumb, styles.pendingThumb]}>
+                {p.status === "saving" ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.pendingFailedGlyph}>!</Text>}
+              </View>
+              <View style={styles.visitInfo}>
+                <Text style={styles.visitName}>{p.name}</Text>
+                <Text style={[styles.visitTime, p.status === "failed" && { color: colors.danger }]}>
+                  {p.status === "saving" ? "Saving…" : p.error ?? "Couldn't save"}
+                </Text>
+                {p.status === "failed" ? (
+                  <View style={styles.pendingRow}>
+                    <Pressable onPress={() => queue.retry(p.key)} hitSlop={8}>
+                      <Text style={styles.pendingRetry}>Retry</Text>
+                    </Pressable>
+                    <Pressable onPress={() => queue.remove(p.key)} hitSlop={8}>
+                      <Text style={styles.visitTime}>Remove</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          ))}
+
+          {visits.length === 0 && queue.pending.length === 0 ? (
             <Text style={styles.emptyVisits}>Nothing logged yet — add the places you visit as you go.</Text>
           ) : (
             visits.map((visit) => (
@@ -414,6 +448,9 @@ export function LiveMapScreen() {
                 <View style={styles.visitInfo}>
                   <Text style={styles.visitName}>{visit.name}</Text>
                   {visit.description ? <Text style={styles.visitTime}>{visit.description}</Text> : null}
+                  {visit.contactName || visit.contactPhone ? (
+                    <Text style={styles.visitTime}>{[visit.contactName, visit.contactPhone].filter(Boolean).join(" · ")}</Text>
+                  ) : null}
                   <Text style={styles.visitTime}>Reached {formatVisitTime(visit.reachedAt)}</Text>
                 </View>
               </View>
@@ -422,23 +459,7 @@ export function LiveMapScreen() {
 
           {addingVisit ? (
             <Card style={styles.addVisitCard}>
-              <Text style={styles.cardLabel}>LOCATION NAME</Text>
-              <TextField
-                placeholder="e.g. Springfield High School"
-                value={visitName}
-                onChangeText={setVisitName}
-              />
-              <Text style={styles.cardLabel}>DESCRIPTION (OPTIONAL)</Text>
-              <TextField
-                placeholder="e.g. Met the owner, order follow-up needed"
-                value={visitDescription}
-                onChangeText={setVisitDescription}
-                multiline
-                numberOfLines={3}
-                maxLength={500}
-                textAlignVertical="top"
-                style={{ minHeight: 76 }}
-              />
+              <VisitFormFields values={visitForm} onChange={setVisitForm} />
               <Pressable
                 onPress={() => setVisitCameraOpen(true)}
                 style={[styles.photoTile, visitPhotoDataUrl && styles.photoTileReady]}
@@ -454,9 +475,7 @@ export function LiveMapScreen() {
               {!userCoords ? (
                 <Text style={styles.meta}>Waiting for your location before this can be saved…</Text>
               ) : null}
-              {logVisit.isError ? (
-                <Text style={styles.errorText}>{getErrorMessage(logVisit.error)}</Text>
-              ) : null}
+              {visitFormError ? <Text style={styles.errorText}>{visitFormError}</Text> : null}
 
               <View style={styles.addVisitButtonRow}>
                 <Button
@@ -464,17 +483,16 @@ export function LiveMapScreen() {
                   variant="secondary"
                   onPress={() => {
                     setAddingVisit(false);
-                    setVisitName("");
-                    setVisitDescription("");
+                    setVisitForm(EMPTY_VISIT_FORM);
+                    setVisitFormError(null);
                     setVisitPhotoDataUrl(null);
                   }}
                   style={styles.addVisitButtonHalf}
                 />
                 <Button
-                  label={logVisit.isPending ? "Saving…" : "Save location"}
+                  label="Save location"
                   onPress={handleSaveVisit}
-                  loading={logVisit.isPending}
-                  disabled={!visitName.trim() || !visitPhotoDataUrl || !userCoords}
+                  disabled={!visitForm.name.trim() || !visitPhotoDataUrl || !userCoords}
                   style={styles.addVisitButtonHalf}
                 />
               </View>
@@ -585,6 +603,10 @@ const styles = StyleSheet.create({
   },
   visitThumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceMuted },
   visitInfo: { flex: 1 },
+  pendingThumb: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceMuted },
+  pendingFailedGlyph: { color: colors.danger, fontSize: 18, fontWeight: "700" },
+  pendingRow: { flexDirection: "row", gap: spacing.md, marginTop: 2 },
+  pendingRetry: { ...typography.bodyStrong, fontSize: 12.5, color: colors.primaryDark },
   visitName: { ...typography.bodyStrong, color: colors.textPrimary },
   visitTime: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
 

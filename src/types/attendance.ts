@@ -157,6 +157,9 @@ export interface ScanRequest {
   // OvertimeRequest — optional even then, never required to check out.
   overtimeSummary?: string;
   overtimeSummaryPhoto?: string;
+  // Vehicle odometer (km): the start reading on a Field CHECK_IN, the end
+  // reading on the matching CHECK_OUT. Required by the app for Field sessions.
+  odometerKm?: number;
 }
 
 // A request for one or more whole calendar days off — distinct from
@@ -210,6 +213,10 @@ export interface FieldVisit {
   id: string;
   name: string;
   description?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  remarks?: string | null;
   reachedAt: string;
   latitude: number;
   longitude: number;
@@ -218,6 +225,10 @@ export interface FieldVisit {
 export interface FieldVisitRequest {
   name: string;
   description?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  remarks?: string;
   photo: string;
   latitude: number;
   longitude: number;

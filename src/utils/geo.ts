@@ -43,3 +43,19 @@ export function formatDistance(meters: number): string {
   if (meters < 1000) return `${Math.round(meters)} m`;
   return `${(meters / 1000).toFixed(1)} km`;
 }
+
+/**
+ * A position for logging something *now* (e.g. a field visit) without making
+ * the employee wait on a fresh GPS fix: reuses the device's cached fix when it
+ * is recent and reasonably accurate (background tracking keeps it warm), and
+ * only falls back to a real fix when there is no usable cache.
+ */
+export async function getQuickPosition(): Promise<Location.LocationObject> {
+  try {
+    const cached = await Location.getLastKnownPositionAsync({ maxAge: 3 * 60 * 1000, requiredAccuracy: 150 });
+    if (cached) return cached;
+  } catch {
+    // fall through to a fresh fix
+  }
+  return getCurrentPositionWithTimeout({ accuracy: Location.Accuracy.Balanced });
+}

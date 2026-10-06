@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigation } from "@react-navigation/native";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen, Card, Button, TextField, LoadingView, ErrorView, StatusBadge, IssueDialog } from "@/components/ui";
 import { DistancePill } from "@/components/attendance";
@@ -38,8 +39,12 @@ export function CheckInOutScreen() {
   const overtimeQuery = useOvertimeStatus(hasActiveSession);
   const todayLeave = useTodayLeave();
   const checkInOut = useCheckInOut();
+  const navigation = useNavigation();
 
   const [pin, setPin] = useState("");
+  // Vehicle odometer reading (km) — asked for on Field sessions only: start
+  // reading at check-in, end reading at check-out.
+  const [odometer, setOdometer] = useState("");
   const [issueOpen, setIssueOpen] = useState(false);
   const photoDataUrl = useCheckInDraftStore((s) => s.photoDataUrl);
   const setPhotoDataUrl = useCheckInDraftStore((s) => s.setPhotoDataUrl);
@@ -128,8 +133,16 @@ export function CheckInOutScreen() {
   const requiresPhoto = action === "CHECK_IN" || (action === "CHECK_OUT" && checkOutPhotoRequired);
   const requiresGeofence = action === "CHECK_IN" && !!target;
 
+  const needsOdometer =
+    isFieldEmployee &&
+    ((action === "CHECK_IN" && fieldCheckInMode === "FIELD") ||
+      (action === "CHECK_OUT" && status?.exists === true && status.checkInMode === "FIELD"));
+  const odometerValue = Number(odometer.replace(/,/g, "").trim());
+  const odometerValid = odometer.trim() !== "" && Number.isFinite(odometerValue) && odometerValue >= 0;
+
   const canSubmit =
     pin.length >= 4 &&
+    (!needsOdometer || odometerValid) &&
     (!requiresPhoto || !!photoDataUrl) &&
     (!requiresGeofence || geofence.withinRadius === true);
 
@@ -145,15 +158,20 @@ export function CheckInOutScreen() {
         longitude: geofence.coords?.longitude,
         mocked: geofence.mocked,
         checkInMode: dayOverrideMode,
+        odometerKm: needsOdometer ? odometerValue : undefined,
         // Never required to check out — see the optional summary section
         // below and the schema comment on ScanRequest.overtimeSummary.
         overtimeSummary: showOvertimeSummary ? overtimeSummary.trim() || undefined : undefined,
         overtimeSummaryPhoto: showOvertimeSummary ? overtimeSummaryPhotoDataUrl ?? undefined : undefined,
       });
       setPin("");
+      setOdometer("");
       setPhotoDataUrl(null);
       setOvertimeSummary("");
       setOvertimeSummaryPhotoDataUrl(null);
+      // After checking in, land on the Dashboard rather than leaving the
+      // employee on the (now "check out") form.
+      if (action === "CHECK_IN") navigation.navigate("Dashboard" as never);
     } catch {
       // Surfaced via the IssueDialog below, driven by checkInOut.error.
       setIssueOpen(true);
@@ -185,9 +203,11 @@ export function CheckInOutScreen() {
       : "Slide to check out";
   const ringHelp = canSubmit
     ? "The server re-checks your PIN, photo and distance before it counts."
-    : requiresPhoto && !photoDataUrl
-      ? "Take the presence photo and enter your PIN to unlock."
-      : "Enter your PIN to unlock.";
+    : needsOdometer && !odometerValid
+      ? `Enter the ${action === "CHECK_IN" ? "start" : "end"} km reading to unlock.`
+      : requiresPhoto && !photoDataUrl
+        ? "Take the presence photo and enter your PIN to unlock."
+        : "Enter your PIN to unlock.";
 
   return (
     <Screen scroll>
@@ -324,6 +344,25 @@ export function CheckInOutScreen() {
         </Card>
       ) : null}
 
+      {needsOdometer ? (
+        <Card style={styles.card}>
+          <Text style={styles.cardLabel}>{action === "CHECK_IN" ? "START KM" : "END KM"}</Text>
+          <Text style={styles.meta}>
+            {action === "CHECK_IN"
+              ? "Enter the vehicle's odometer reading before you start."
+              : "Enter the odometer reading now that you've finished."}
+          </Text>
+          <TextField
+            placeholder="e.g. 12450"
+            value={odometer}
+            onChangeText={(t) => setOdometer(t.replace(/[^0-9.]/g, ""))}
+            keyboardType="decimal-pad"
+            maxLength={9}
+            style={styles.odometerInput}
+          />
+        </Card>
+      ) : null}
+
       <View style={styles.pinSection}>
         <View style={styles.pinHeaderRow}>
           <Text style={styles.cardLabel}>PIN</Text>
@@ -436,6 +475,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
   },
+  odometerInput: { marginTop: spacing.sm, marginBottom: 0 },
   retakeButton: { marginTop: spacing.sm, alignSelf: "flex-start" },
   overtimeSummaryInput: { marginTop: spacing.sm },
   overtimeSummaryPhotoTile: {
