@@ -1,5 +1,7 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState } from "react-native";
 import { locationService } from "@/api/services";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 
@@ -32,13 +34,36 @@ export const PING_INTERVAL_MS = 2 * 60 * 1000;
 // and upload them in one batch along with the regular 2-minute ping (which
 // still drives live status and auto-pause on its own). Office/WFH profiles are
 // unchanged — no extra battery or data use.
-export const FIELD_SAMPLE_INTERVAL_MS = 15 * 1000;
+export const FIELD_SAMPLE_INTERVAL_MS = 10 * 1000;
 const MAX_BUFFERED_SAMPLES = 400;
 const MAX_TRAIL_PER_PING = 120;
 
 type TrailSample = { latitude: number; longitude: number; accuracy: number; timestamp: string };
 let trailBuffer: TrailSample[] = [];
 let lastPingSentAt = 0;
+let bufferLoaded = false;
+
+// Samples waiting to be uploaded are also kept on disk, so if the OS kills the app the points
+// recorded since the last upload are not lost and go out with the next ping.
+const TRAIL_STORAGE_KEY = "checkin.trailBuffer";
+
+async function loadTrailBuffer() {
+  if (bufferLoaded) return;
+  bufferLoaded = true;
+  try {
+    const raw = await AsyncStorage.getItem(TRAIL_STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw) as TrailSample[];
+      if (Array.isArray(saved)) trailBuffer = [...saved, ...trailBuffer].slice(-MAX_BUFFERED_SAMPLES);
+    }
+  } catch {
+    // Best effort.
+  }
+}
+
+function saveTrailBuffer() {
+  AsyncStorage.setItem(TRAIL_STORAGE_KEY, JSON.stringify(trailBuffer)).catch(() => {});
+}
 
 function isFieldProfile(): boolean {
   // Loaded lazily: authStore itself imports this module (to stop tracking on
@@ -78,6 +103,7 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
 
   const field = isFieldProfile();
   if (field) {
+    await loadTrailBuffer();
     for (const l of real) {
       trailBuffer.push({
         latitude: l.coords.latitude,
@@ -87,6 +113,7 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
       });
     }
     if (trailBuffer.length > MAX_BUFFERED_SAMPLES) trailBuffer = trailBuffer.slice(-MAX_BUFFERED_SAMPLES);
+    saveTrailBuffer();
     // Samples arrive every ~15s but the server only needs a ping every ~2 min.
     const due = Date.now() - lastPingSentAt >= PING_INTERVAL_MS - 5_000;
     if (!due && trailBuffer.length < MAX_TRAIL_PER_PING) return;
@@ -105,6 +132,7 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
     if (field) {
       trailBuffer = [];
       lastPingSentAt = Date.now();
+      AsyncStorage.removeItem(TRAIL_STORAGE_KEY).catch(() => {});
     }
     if (!result.tracking) {
       await stopLocationTracking();
@@ -225,6 +253,7 @@ export async function startLocationTracking(attendanceId: string, checkedInAt: s
 export async function stopLocationTracking() {
   trailBuffer = [];
   lastPingSentAt = 0;
+  AsyncStorage.removeItem(TRAIL_STORAGE_KEY).catch(() => {});
   try {
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING_TASK).catch(
       () => false,
@@ -257,6 +286,13 @@ export async function checkTrackingHealth(): Promise<void> {
   if (active) {
     if (session.trackingWarning) session.setTrackingWarning(null);
     return;
+  }
+
+  // The OS stopped the background task. While the app is open, try to start it again by
+  // itself; only warn the employee if that fails (permission gone, battery saver, ...).
+  if (AppState.currentState === "active" && session.activeAttendanceId && session.checkedInAt) {
+    await startLocationTracking(session.activeAttendanceId, session.checkedInAt);
+    if (await isLocationTrackingActive()) return;
   }
 
   session.setTrackingWarning(

@@ -17,6 +17,8 @@ import {
   useTodayLeave,
 } from "@/hooks";
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
+import { useTrackingFixStore } from "@/store/trackingFixStore";
+import { checkTrackingReadiness } from "@/services/trackingReadiness";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
 import { colors, radius, spacing, typography } from "@/theme";
 import type { CheckInMode, TimeOffType } from "@/types";
@@ -146,7 +148,22 @@ export function CheckInOutScreen() {
     (!requiresPhoto || !!photoDataUrl) &&
     (!requiresGeofence || geofence.withinRadius === true);
 
+  // Field days only: before checking in, make sure the phone will actually keep recording the
+  // route (location "all the time" + no battery restriction). If not, show the fix-it sheet
+  // first; the employee can still check in anyway from there.
   const handleSubmit = async () => {
+    if (!user) return;
+    if (action === "CHECK_IN" && needsOdometer) {
+      const readiness = await checkTrackingReadiness();
+      if (!readiness.ok) {
+        useTrackingFixStore.getState().show(() => void submitCheckIn());
+        return;
+      }
+    }
+    await submitCheckIn();
+  };
+
+  const submitCheckIn = async () => {
     if (!user) return;
     try {
       await checkInOut.mutateAsync({

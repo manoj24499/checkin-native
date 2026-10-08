@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks";
 import { useSettingsStore } from "@/store/settingsStore";
 import { promptBiometricAuth, msSinceLastBiometricPrompt } from "@/services/biometrics";
 import { checkTrackingHealth, msSinceLocationTrackingStart } from "@/services/locationTracking";
-import { Screen, Button, LoadingView } from "@/components/ui";
+import { Screen, Button, LoadingView, TrackingReadinessSheet } from "@/components/ui";
 import { colors, spacing, typography } from "@/theme";
 import { AuthNavigator } from "./AuthNavigator";
 import { AppTabs } from "./AppTabs";
@@ -141,6 +141,7 @@ export function RootNavigator() {
   return (
     <View style={styles.fill}>
       <AppTabs />
+      <TrackingReadinessSheet />
       {showLock ? (
         <View style={styles.lockOverlay}>
           <BiometricLockScreen onRetry={requestUnlock} />

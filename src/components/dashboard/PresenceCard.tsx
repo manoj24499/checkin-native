@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
 import { PING_INTERVAL_MS } from "@/services/locationTracking";
+import { useTrackingFixStore } from "@/store/trackingFixStore";
 import { formatElapsed, formatDuration, computeWorkedMs } from "@/utils/attendanceGrouping";
 import { colors, radius, spacing, typography, fontFamily } from "@/theme";
 import type { AttendancePauseInterval } from "@/types";
@@ -137,7 +138,11 @@ export function PresenceCard({
 
       {trackingWarning ? (
         <View style={styles.warningBox}>
+          <Text style={styles.warningTitle}>Location sharing has stopped</Text>
           <Text style={styles.warningText}>{trackingWarning}</Text>
+          <Pressable onPress={() => useTrackingFixStore.getState().show()} style={styles.warningButton}>
+            <Text style={styles.warningButtonLabel}>Fix now</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -242,6 +247,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   warningText: { ...typography.caption, color: colors.warning },
+  warningTitle: { ...typography.bodyStrong, color: colors.warning, marginBottom: 2 },
+  warningButton: {
+    alignSelf: "flex-start",
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  warningButtonLabel: { ...typography.bodyStrong, color: colors.warning, fontSize: 13 },
   actionRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
   primaryButton: {
     flex: 1,
