@@ -232,6 +232,63 @@ export interface FieldVisitRequest {
   photo: string;
   latitude: number;
   longitude: number;
+  /** Set when this visit completes a place the admin assigned. */
+  assignedPlaceId?: string;
+}
+
+// A place an admin assigned to this field worker for a day (see /api/mobile/me/assigned-places).
+export type AssignedPlaceStatus = "PENDING" | "VISITED" | "SKIPPED";
+
+export interface AssignedPlace {
+  id: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  description: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  notes: string | null;
+  sortOrder: number;
+  status: AssignedPlaceStatus;
+  skipReason: string | null;
+  visitedAt: string | null;
+}
+
+/** One turn instruction. `from`/`to` are indices into the route's geometry. */
+export interface RouteStep {
+  instruction: string;
+  /** Maneuver code: 0 left, 1 right, 2 sharp left, 3 sharp right, 4 slight left, 5 slight right,
+   * 6 straight, 7 enter roundabout, 8 exit roundabout, 9 u-turn, 10 arrive, 11 depart,
+   * 12 keep left, 13 keep right. */
+  type: number;
+  name: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  from: number;
+  to: number;
+}
+
+export interface RouteLeg {
+  distanceMeters: number;
+  durationSeconds: number;
+  /** [latitude, longitude] pairs along the road. */
+  geometry: [number, number][];
+  steps: RouteStep[];
+  provider: "openrouteservice" | "straight-line";
+}
+
+export interface PlannedPlace extends AssignedPlace {
+  /** Distance and time from the previous stop (from the worker for the first one). */
+  distanceMeters: number;
+  durationSeconds: number;
+}
+
+export interface RoutePlan {
+  /** True when planned by road distance, false when only straight lines were available. */
+  roads: boolean;
+  ordered: PlannedPlace[];
+  next: { placeId: string; leg: RouteLeg } | null;
 }
 
 export type FieldSummary =

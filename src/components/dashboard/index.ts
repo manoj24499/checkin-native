@@ -7,5 +7,6 @@ export { OvertimeStatusCard } from "./OvertimeStatusCard";
 export { LeaveNoticeCard } from "./LeaveNoticeCard";
 export { WorkSegmentCard } from "./WorkSegmentCard";
 export { FieldVisitCard } from "./FieldVisitCard";
+export { AssignedPlacesCard } from "./AssignedPlacesCard";
 export { LeaveBalanceCard } from "./LeaveBalanceCard";
 export { RecentHistoryCard } from "./RecentHistoryCard";

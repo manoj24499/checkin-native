@@ -3,6 +3,7 @@ export { employeeService } from "./employee.service";
 export { attendanceService } from "./attendance.service";
 export { locationService } from "./location.service";
 export { fieldService } from "./field.service";
+export { assignedPlacesService } from "./assignedPlaces.service";
 export { leaveService } from "./leave.service";
 export { workSegmentService } from "./workSegment.service";
 export { supportService } from "./support.service";

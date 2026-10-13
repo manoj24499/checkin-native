@@ -13,6 +13,7 @@ import {
   LeaveNoticeCard,
   WorkSegmentCard,
   FieldVisitCard,
+  AssignedPlacesCard,
   LeaveBalanceCard,
   RecentHistoryCard,
 } from "@/components/dashboard";
@@ -212,6 +213,8 @@ export function DashboardScreen() {
           {segmentError ? <Text style={styles.segmentError}>{segmentError}</Text> : null}
         </>
       ) : null}
+
+      {isFieldWorker ? <AssignedPlacesCard onOpen={() => navigation.navigate("TodaysPlaces")} /> : null}
 
       {checkedIn && !checkedOut && isFieldWorker ? <FieldVisitCard /> : null}
 

@@ -7,6 +7,9 @@ export type AuthStackParamList = {
 export type DashboardStackParamList = {
   DashboardHome: undefined;
   LiveMap: undefined;
+  // Places an admin assigned for today, and the turn-by-turn screen that guides the worker to them.
+  TodaysPlaces: undefined;
+  Navigate: undefined;
 };
 
 export type ProfileStackParamList = {

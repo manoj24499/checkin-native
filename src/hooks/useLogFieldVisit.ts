@@ -8,6 +8,8 @@ export function useLogFieldVisit() {
     mutationFn: (payload: FieldVisitRequest) => fieldService.logVisit(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["field-summary"] });
+      // A visit may have completed an assigned place.
+      queryClient.invalidateQueries({ queryKey: ["assigned-places"] });
     },
   });
 }

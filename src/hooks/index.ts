@@ -11,6 +11,8 @@ export { useBiometricAuth } from "./useBiometricAuth";
 export { useActivityPattern } from "./useActivityPattern";
 export { useChangePin } from "./useChangePin";
 export { useFieldSummary } from "./useFieldSummary";
+export { useAssignedPlaces } from "./useAssignedPlaces";
+export { useRoutePlanner } from "./useRoutePlanner";
 export { useLogFieldVisit } from "./useLogFieldVisit";
 export { useTimedPermissions } from "./useTimedPermissions";
 export { useRequestTimedPermission } from "./useRequestTimedPermission";

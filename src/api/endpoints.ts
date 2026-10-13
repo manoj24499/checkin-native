@@ -18,6 +18,10 @@ export const endpoints = {
   fieldSummary: "/api/mobile/me/field-summary",
   fieldVisits: "/api/mobile/field-visits",
   fieldVisitPhoto: (id: string) => `/api/mobile/field-visits/${id}/photo`,
+  assignedPlaces: "/api/mobile/me/assigned-places",
+  skipAssignedPlace: (id: string) => `/api/mobile/me/assigned-places/${id}/skip`,
+  routePlan: "/api/mobile/me/route-plan",
+  routeLeg: "/api/mobile/me/route-leg",
   support: "/api/mobile/support",
 
   kioskScan: "/api/kiosk/scan",
