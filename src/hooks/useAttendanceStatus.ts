@@ -1,10 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { attendanceService } from "@/api/services";
+import { rememberKioskStatus } from "@/services/offlineQueue";
 
 export function useAttendanceStatus(employeeCode: string | undefined) {
   return useQuery({
     queryKey: ["attendance-status", employeeCode],
-    queryFn: () => attendanceService.getStatus(employeeCode as string),
+    queryFn: async () => {
+      const status = await attendanceService.getStatus(employeeCode as string);
+      // Keeps the org's offline check-in setting and today's status on the
+      // phone for when there's no connection (see services/offlineQueue.ts).
+      rememberKioskStatus(employeeCode as string, status);
+      return status;
+    },
     enabled: !!employeeCode,
     staleTime: 15_000,
     // Poll so an auto-pause/resume (driven entirely by background location

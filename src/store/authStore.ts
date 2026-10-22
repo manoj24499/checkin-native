@@ -1,12 +1,33 @@
 import { create } from "zustand";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { setApiAuthContext } from "@/api/client";
 import { authService, employeeService } from "@/api/services";
 import { secureStorage } from "@/utils/secureStorage";
 import { isNetworkError } from "@/utils/errors";
 import { stopLocationTracking } from "@/services/locationTracking";
+import { rememberVerifiedPin } from "@/services/pinVerifier";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
 import type { EmployeeProfile } from "@/types";
+
+// The last profile fetched, so a launch with no connection still knows who is
+// signed in (employee code, work mode, home location) — without it an offline
+// check-in (see services/offlineQueue.ts) is impossible after a cold start.
+// Non-secret profile fields only; removed on sign-out.
+const CACHED_PROFILE_KEY = "checkin.cachedProfile";
+
+function cacheProfile(profile: EmployeeProfile) {
+  AsyncStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(profile)).catch(() => {});
+}
+
+async function loadCachedProfile(): Promise<EmployeeProfile | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHED_PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as EmployeeProfile) : null;
+  } catch {
+    return null;
+  }
+}
 
 export type AuthStatus = "bootstrapping" | "authenticated" | "unauthenticated";
 
@@ -41,6 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
     try {
       const profile = await employeeService.getProfile();
+      cacheProfile(profile);
       set({ user: profile, status: "authenticated" });
     } catch (err) {
       // A definitive session expiry (server rejected the access token, then
@@ -55,8 +77,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // them here would force a real login every time the app happens to
         // launch without connectivity. Stay authenticated with the tokens
         // we already have; screens that need the profile will refetch once
-        // the network comes back.
-        set({ status: "authenticated" });
+        // the network comes back. The cached profile (if any) fills in who
+        // is signed in meanwhile.
+        set({ user: await loadCachedProfile(), status: "authenticated" });
         return;
       }
       // Any other failure (a genuine 401 with no interceptor recovery, a
@@ -68,6 +91,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   async login(organizationCode, employeeCode, pin) {
     const result = await authService.login({ organizationCode, employeeCode, pin });
     await secureStorage.setTokens(result.accessToken, result.refreshToken);
+    // Same PIN the check-in uses — seeds the local verifier for offline check-ins.
+    void rememberVerifiedPin(result.user.employeeCode, pin);
     set({
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
@@ -104,6 +129,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     await secureStorage.clearTokens();
+    await AsyncStorage.removeItem(CACHED_PROFILE_KEY).catch(() => {});
     set({ accessToken: null, refreshToken: null, user: null, status: "unauthenticated" });
   },
 
@@ -132,6 +158,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async refreshProfile() {
     const profile = await employeeService.getProfile();
+    cacheProfile(profile);
     set({ user: profile });
   },
 

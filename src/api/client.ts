@@ -1,4 +1,5 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { env } from "@/config/env";
 import { isNetworkError } from "@/utils/errors";
 
@@ -70,11 +71,85 @@ function refreshAccessTokenOnce(): Promise<string | null> {
   return refreshPromise;
 }
 
+/**
+ * Trusted-time anchor for offline check-ins (see services/offlineQueue.ts).
+ * Every response the server actually sent carries its own clock in the
+ * `Date` header; remembering it together with the phone's wall clock and its
+ * monotonic clock (performance.now(), which the user can't change) at that
+ * moment lets a later offline capture tell whether the wall clock was moved
+ * since: both clocks should have advanced by the same amount. Only the
+ * in-memory anchor from *this* process counts for that check (the monotonic
+ * clock restarts with the process); the persisted copy is kept for
+ * diagnostics only.
+ */
+export interface ServerTimeAnchor {
+  serverMs: number;
+  wallMs: number;
+  perfMs: number;
+}
+
+const TIME_ANCHOR_STORAGE_KEY = "checkin.serverTimeAnchor";
+// Second-resolution header + network latency; anything past this means the
+// wall clock was changed (or the device slept, see isWallClockTrusted).
+const MAX_CLOCK_DRIFT_MS = 2 * 60 * 1000;
+let timeAnchor: ServerTimeAnchor | null = null;
+let lastAnchorPersistedAt = 0;
+
+function recordServerTime(response: AxiosResponse) {
+  const header = response.headers?.["date"];
+  const serverMs = typeof header === "string" ? Date.parse(header) : NaN;
+  if (!Number.isFinite(serverMs)) return;
+  const wallMs = Date.now();
+  timeAnchor = { serverMs, wallMs, perfMs: performance.now() };
+  // Persisting on every single response is wasteful; once a minute is plenty.
+  if (wallMs - lastAnchorPersistedAt > 60_000) {
+    lastAnchorPersistedAt = wallMs;
+    AsyncStorage.setItem(TIME_ANCHOR_STORAGE_KEY, JSON.stringify({ serverMs, wallMs })).catch(() => {});
+  }
+}
+
+/**
+ * True only if this process has heard from the server and the wall clock has
+ * advanced in step with the monotonic clock since then. Note the monotonic
+ * clock doesn't advance while the phone is in deep sleep, so a long sleep
+ * reads as "not verified" too — the safe direction: the server just treats
+ * the capture time with more suspicion.
+ */
+export function isWallClockTrusted(): boolean {
+  if (!timeAnchor) return false;
+  const wallElapsed = Date.now() - timeAnchor.wallMs;
+  const monoElapsed = performance.now() - timeAnchor.perfMs;
+  return Math.abs(wallElapsed - monoElapsed) < MAX_CLOCK_DRIFT_MS;
+}
+
+/**
+ * Used by the offline queue when the server rejects an upload because the
+ * bearer token is missing/expired (kiosk/* isn't in SESSION_PROTECTED_PREFIXES,
+ * so the interceptor below never refreshes for it). Same rules as the
+ * interceptor: only a refresh the server itself rejected ends the session.
+ */
+export async function recoverSession(): Promise<"refreshed" | "expired" | "offline"> {
+  try {
+    const token = await refreshAccessTokenOnce();
+    if (token) return "refreshed";
+    authContext?.onSessionExpired();
+    return "expired";
+  } catch (error) {
+    if (isNetworkError(error)) return "offline";
+    throw error;
+  }
+}
+
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    recordServerTime(response);
+    return response;
+  },
   async (error: AxiosError) => {
     const config = error.config as InternalAxiosRequestConfig | undefined;
     const status = error.response?.status;
+    // An error response is still the server's clock.
+    if (error.response) recordServerTime(error.response);
     const isSessionProtected = SESSION_PROTECTED_PREFIXES.some((prefix) => config?.url?.includes(prefix));
 
     if (status === 401 && isSessionProtected && config && !config._isRetry) {

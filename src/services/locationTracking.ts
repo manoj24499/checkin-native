@@ -58,6 +58,20 @@ let flushing = false;
 
 const TRAIL_STORAGE_KEY = "checkin.trailBuffer";
 
+// A check-in saved offline (see services/offlineQueue.ts) has no attendance id until it reaches
+// the server, so tracking runs under a temporary "local-<clientId>" session id meanwhile. Samples
+// for such a session are only ever buffered, never sent; once the check-in is recorded,
+// remapOutboxSession() moves them to the real id and they go out like any other backlog.
+export const LOCAL_SESSION_PREFIX = "local-";
+
+export function isLocalSessionId(attendanceId: string | null | undefined): boolean {
+  return !!attendanceId && attendanceId.startsWith(LOCAL_SESSION_PREFIX);
+}
+
+// temp id -> real id, for a sample the background task records under the temp id after the remap
+// already ran (it may have read the session id just before the store switched over).
+const remappedSessions = new Map<string, string>();
+
 function sampleOf(l: Location.LocationObject): TrailSample {
   return {
     latitude: l.coords.latitude,
@@ -106,7 +120,8 @@ function saveOutbox() {
   AsyncStorage.setItem(TRAIL_STORAGE_KEY, JSON.stringify(outbox)).catch(() => {});
 }
 
-function addToOutbox(attendanceId: string, sample: TrailSample) {
+function addToOutbox(sessionId: string, sample: TrailSample) {
+  const attendanceId = remappedSessions.get(sessionId) ?? sessionId;
   if (outbox.some((s) => s.a === attendanceId && s.timestamp === sample.timestamp)) return;
   outbox.push({ ...sample, a: attendanceId });
   pruneOutbox();
@@ -122,6 +137,28 @@ function httpStatusOf(error: unknown): number | undefined {
 }
 
 /**
+ * Moves every buffered sample of an offline check-in's temporary session to the real attendance id
+ * once that check-in is recorded, so the next flush uploads them (with backfill, which the server
+ * also accepts for a session that has already ended).
+ */
+export async function remapOutboxSession(tempId: string, realId: string): Promise<void> {
+  remappedSessions.set(tempId, realId);
+  await loadOutbox();
+  const known = new Set(outbox.filter((s) => s.a === realId).map((s) => s.timestamp));
+  outbox = outbox
+    .filter((s) => !(s.a === tempId && known.has(s.timestamp)))
+    .map((s) => (s.a === tempId ? { ...s, a: realId } : s));
+  saveOutbox();
+}
+
+/** Drops a temporary session's samples — its offline check-in was cancelled or rejected. */
+export async function dropOutboxSession(tempId: string): Promise<void> {
+  await loadOutbox();
+  outbox = outbox.filter((s) => s.a !== tempId);
+  saveOutbox();
+}
+
+/**
  * Uploads everything waiting in the outbox, oldest first, in batches the server accepts. Safe to
  * call any time (it does nothing when empty or when a flush is already running, and the server
  * ignores samples it already has): after a successful live ping, when the network comes back,
@@ -132,8 +169,11 @@ export async function flushPendingLocations(): Promise<void> {
   flushing = true;
   try {
     await loadOutbox();
-    for (let round = 0; round < MAX_FLUSH_ROUNDS && outbox.length > 0; round++) {
-      const attendanceId = outbox[0].a;
+    for (let round = 0; round < MAX_FLUSH_ROUNDS; round++) {
+      // Samples of an offline check-in that hasn't reached the server yet have nowhere to go.
+      const next = outbox.find((s) => !isLocalSessionId(s.a));
+      if (!next) break;
+      const attendanceId = next.a;
       const batch = outbox.filter((s) => s.a === attendanceId).slice(0, MAX_TRAIL_PER_PING);
       const last = batch[batch.length - 1];
       try {
@@ -204,6 +244,13 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
 
   const field = isFieldProfile();
   await loadOutbox();
+  if (isLocalSessionId(attendanceId)) {
+    // Offline check-in not recorded yet: there is no session on the server to ping. Just keep the
+    // readings (every one for Field, the latest otherwise — same density as the online path).
+    for (const l of field ? real : [latest]) addToOutbox(attendanceId, sampleOf(l));
+    saveOutbox();
+    return;
+  }
   if (field) {
     // Field profiles record every sample into the outbox as it arrives (so the route survives a
     // crash or a dead zone), and upload them in batches along with the regular 2-minute ping.

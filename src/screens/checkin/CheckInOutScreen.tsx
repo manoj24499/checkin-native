@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
+import { useNetInfo } from "@react-native-community/netinfo";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen, Card, Button, TextField, LoadingView, ErrorView, StatusBadge, IssueDialog } from "@/components/ui";
 import { DistancePill } from "@/components/attendance";
@@ -8,10 +9,11 @@ import { PhotoCaptureView } from "@/components/camera";
 import { SlideToConfirmTrack, PinBoxInput } from "@/components/checkin";
 import {
   useAuth,
-  useAttendanceStatus,
+  useEffectiveAttendanceStatus,
   useResolvedGeofenceTarget,
   useGeofence,
   useCheckInOut,
+  useSaveOfflineAttempt,
   useTimedPermissions,
   useOvertimeStatus,
   useTodayLeave,
@@ -19,9 +21,12 @@ import {
 import { useCheckInDraftStore } from "@/store/checkInDraftStore";
 import { useTrackingFixStore } from "@/store/trackingFixStore";
 import { checkTrackingReadiness } from "@/services/trackingReadiness";
+import { checkPinLocally } from "@/services/pinVerifier";
+import { syncOfflineQueue } from "@/services/offlineQueue";
+import { useOfflineQueueStore } from "@/store/offlineQueueStore";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
 import { colors, radius, spacing, typography } from "@/theme";
-import type { CheckInMode, TimeOffType } from "@/types";
+import type { AttendanceAction, CheckInMode, ScanRequest, TimeOffType } from "@/types";
 
 const TYPE_LABEL: Record<TimeOffType, string> = {
   CASUAL: "Casual",
@@ -31,7 +36,11 @@ const TYPE_LABEL: Record<TimeOffType, string> = {
 
 export function CheckInOutScreen() {
   const { user } = useAuth();
-  const statusQuery = useAttendanceStatus(user?.employeeCode);
+  // Server status plus anything saved offline and not yet sent (see
+  // useEffectiveAttendanceStatus) — a queued check-in makes this screen the
+  // check-out form. `statusQuery` stays the raw server query.
+  const effective = useEffectiveAttendanceStatus(user?.employeeCode);
+  const statusQuery = effective.query;
   // See DashboardScreen's identical comment — must stay unconditional, so it
   // can't wait for the loading/error guards below to compute `status` first.
   const hasActiveSession = statusQuery.data?.exists
@@ -41,7 +50,32 @@ export function CheckInOutScreen() {
   const overtimeQuery = useOvertimeStatus(hasActiveSession);
   const todayLeave = useTodayLeave();
   const checkInOut = useCheckInOut();
+  const saveOffline = useSaveOfflineAttempt();
   const navigation = useNavigation();
+
+  // Offline check-in: only when the organization allows it (the last status
+  // fetched for this employee said so — see services/offlineQueue.ts).
+  // Otherwise being offline behaves exactly as before.
+  const netInfo = useNetInfo();
+  const isOffline = netInfo.isConnected === false;
+  const offlineConfig = useOfflineQueueStore((s) => s.config);
+  const offlineEnabled = !!user && offlineConfig?.employeeCode === user.employeeCode && offlineConfig.enabled;
+  const offlineMode = isOffline && offlineEnabled;
+  // Anything of this employee's still waiting to be sent: a new attempt must
+  // queue up behind it even when online, or e.g. an online check-out could
+  // reach the server before the offline check-in it depends on.
+  const hasQueuedItems = useOfflineQueueStore((s) =>
+    s.items.some((i) => i.employeeCode === user?.employeeCode && (i.status === "pending" || i.status === "syncing")),
+  );
+  // Set right after an attempt was saved on the phone — shows the "saved"
+  // confirmation in place of the form until dismissed.
+  const [savedOffline, setSavedOffline] = useState<{
+    action: AttendanceAction;
+    pinUnverified: boolean;
+    // Online, but queued behind earlier unsent items — sent right away.
+    sendingNow: boolean;
+  } | null>(null);
+  const [offlineIssue, setOfflineIssue] = useState<{ title: string; body: string } | null>(null);
 
   const [pin, setPin] = useState("");
   // Vehicle odometer reading (km) — asked for on Field sessions only: start
@@ -80,12 +114,51 @@ export function CheckInOutScreen() {
   const target = useResolvedGeofenceTarget(dayOverrideMode);
   const geofence = useGeofence(target);
 
-  if (statusQuery.isLoading) return <LoadingView label="Checking today's status…" />;
-  if (statusQuery.isError) {
+  // Offline there may be no target to measure against (the office location is
+  // only cached in memory), so useGeofence never reads the position on its own
+  // — but a saved check-in still needs one for the server to check later.
+  const needsOfflinePosition = offlineMode && !target && !geofence.coords && !geofence.isLoading && !geofence.error;
+  useEffect(() => {
+    if (needsOfflinePosition) void geofence.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsOfflinePosition]);
+
+  if (savedOffline) {
+    return (
+      <Screen>
+        <Card>
+          <View style={styles.savedBadgeWrap}>
+            <StatusBadge label="PENDING SYNC" tone="warning" />
+          </View>
+          <Text style={styles.title}>{savedOffline.action === "CHECK_IN" ? "Check-in saved" : "Check-out saved"}</Text>
+          <Text style={styles.meta}>
+            {savedOffline.sendingNow
+              ? "Saved on this device. Sending now, right after your earlier offline check-in."
+              : "Saved on this device. Will be sent when you're back online."}
+          </Text>
+          {savedOffline.pinUnverified ? (
+            <Text style={styles.meta}>Your PIN couldn't be checked offline — it's verified when it's sent.</Text>
+          ) : null}
+          <Button
+            label="Go to Dashboard"
+            variant="primary"
+            onPress={() => {
+              setSavedOffline(null);
+              navigation.navigate("Dashboard" as never);
+            }}
+            style={styles.savedButton}
+          />
+        </Card>
+      </Screen>
+    );
+  }
+
+  if (effective.isLoading) return <LoadingView label="Checking today's status…" />;
+  if (effective.isError) {
     return <ErrorView message={getErrorMessage(statusQuery.error)} onRetry={() => statusQuery.refetch()} />;
   }
 
-  const status = statusQuery.data;
+  const status = effective.data;
   const checkedIn = status?.exists ? status.checkedIn : false;
   const checkedOut = status?.exists ? status.checkedOut : false;
 
@@ -95,6 +168,14 @@ export function CheckInOutScreen() {
         <Card>
           <Text style={styles.title}>All done for today</Text>
           <Text style={styles.meta}>You've already checked in and out today.</Text>
+          {effective.pendingCheckIn || effective.pendingCheckOut ? (
+            <>
+              <View style={styles.pendingBadgeWrap}>
+                <StatusBadge label="PENDING SYNC" tone="warning" />
+              </View>
+              <Text style={styles.meta}>Saved on this device. Will be sent when you're back online.</Text>
+            </>
+          ) : null}
         </Card>
       </Screen>
     );
@@ -142,11 +223,21 @@ export function CheckInOutScreen() {
   const odometerValue = Number(odometer.replace(/,/g, "").trim());
   const odometerValid = odometer.trim() !== "" && Number.isFinite(odometerValue) && odometerValue >= 0;
 
+  // Offline the distance check stays advisory exactly like online, but only a
+  // clear "outside" blocks — the cached target may be stale, and the server
+  // re-checks (and flags, rather than rejects) on upload. A position is still
+  // needed for any check-in the server geofences (everything but a Field day),
+  // and a mocked one would only be rejected later.
+  const needsOfflineCoords = action === "CHECK_IN" && !(isFieldEmployee && fieldCheckInMode === "FIELD");
+  const locationOk = offlineMode
+    ? geofence.withinRadius !== false && !geofence.mocked && (!needsOfflineCoords || !!geofence.coords)
+    : !requiresGeofence || geofence.withinRadius === true;
+
   const canSubmit =
     pin.length >= 4 &&
     (!needsOdometer || odometerValid) &&
     (!requiresPhoto || !!photoDataUrl) &&
-    (!requiresGeofence || geofence.withinRadius === true);
+    locationOk;
 
   // Field days only: before checking in, make sure the phone will actually keep recording the
   // route (location "all the time" + no battery restriction). If not, show the fix-it sheet
@@ -163,33 +254,76 @@ export function CheckInOutScreen() {
     await submitCheckIn();
   };
 
+  const resetForm = () => {
+    setPin("");
+    setOdometer("");
+    setPhotoDataUrl(null);
+    setOvertimeSummary("");
+    setOvertimeSummaryPhotoDataUrl(null);
+  };
+
+  // Offline path: check the PIN against the local verifier (see
+  // services/pinVerifier.ts), then save the attempt on the phone.
+  const saveAttemptOffline = async (payload: ScanRequest, sendingNow = false) => {
+    const check = await checkPinLocally(payload.employeeCode, payload.pin);
+    if (check.result === "wrong" || check.result === "locked") {
+      setPin("");
+      setOfflineIssue(
+        check.result === "wrong"
+          ? {
+              title: "Wrong PIN",
+              body: `That PIN doesn't match. ${check.attemptsLeft} ${check.attemptsLeft === 1 ? "try" : "tries"} left before you'll need to connect to the internet.`,
+            }
+          : { title: "Too many wrong PINs", body: "Connect to the internet to continue." },
+      );
+      return;
+    }
+    try {
+      await saveOffline.save({ payload, pinUnverified: check.result === "unverified" });
+      resetForm();
+      setSavedOffline({ action: payload.action, pinUnverified: check.result === "unverified", sendingNow });
+      if (sendingNow) void syncOfflineQueue();
+    } catch (error) {
+      setOfflineIssue({ title: "Couldn't save on this phone", body: getErrorMessage(error) });
+    }
+  };
+
   const submitCheckIn = async () => {
     if (!user) return;
+    const payload: ScanRequest = {
+      employeeCode: user.employeeCode,
+      pin,
+      action,
+      photo: photoDataUrl ?? undefined,
+      latitude: geofence.coords?.latitude,
+      longitude: geofence.coords?.longitude,
+      mocked: geofence.mocked,
+      checkInMode: dayOverrideMode,
+      odometerKm: needsOdometer ? odometerValue : undefined,
+      // Never required to check out — see the optional summary section
+      // below and the schema comment on ScanRequest.overtimeSummary.
+      overtimeSummary: showOvertimeSummary ? overtimeSummary.trim() || undefined : undefined,
+      overtimeSummaryPhoto: showOvertimeSummary ? overtimeSummaryPhotoDataUrl ?? undefined : undefined,
+    };
+    if (offlineMode || (offlineEnabled && hasQueuedItems)) {
+      await saveAttemptOffline(payload, !isOffline);
+      return;
+    }
     try {
-      await checkInOut.mutateAsync({
-        employeeCode: user.employeeCode,
-        pin,
-        action,
-        photo: photoDataUrl ?? undefined,
-        latitude: geofence.coords?.latitude,
-        longitude: geofence.coords?.longitude,
-        mocked: geofence.mocked,
-        checkInMode: dayOverrideMode,
-        odometerKm: needsOdometer ? odometerValue : undefined,
-        // Never required to check out — see the optional summary section
-        // below and the schema comment on ScanRequest.overtimeSummary.
-        overtimeSummary: showOvertimeSummary ? overtimeSummary.trim() || undefined : undefined,
-        overtimeSummaryPhoto: showOvertimeSummary ? overtimeSummaryPhotoDataUrl ?? undefined : undefined,
-      });
-      setPin("");
-      setOdometer("");
-      setPhotoDataUrl(null);
-      setOvertimeSummary("");
-      setOvertimeSummaryPhotoDataUrl(null);
+      await checkInOut.mutateAsync(payload);
+      resetForm();
       // After checking in, land on the Dashboard rather than leaving the
       // employee on the (now "check out") form.
       if (action === "CHECK_IN") navigation.navigate("Dashboard" as never);
-    } catch {
+    } catch (error) {
+      // "Connected" but the request never reached the server (dead Wi-Fi,
+      // captive portal, signal lost mid-request): save it instead. If the
+      // server did get it and only the reply was lost, the later upload comes
+      // back "already checked in" and shows as Already recorded.
+      if (offlineEnabled && isNetworkError(error)) {
+        await saveAttemptOffline(payload);
+        return;
+      }
       // Surfaced via the IssueDialog below, driven by checkInOut.error.
       setIssueOpen(true);
     }
@@ -208,18 +342,29 @@ export function CheckInOutScreen() {
     );
   }
 
-  const ringKicker = checkInOut.isPending
+  const isSubmitting = checkInOut.isPending || saveOffline.isSaving;
+  const ringKicker = isSubmitting
     ? "PROCESSING"
     : canSubmit
       ? "SLIDE TO CONFIRM"
       : "BLOCKED";
-  const ringTitle = checkInOut.isPending
-    ? "Confirming…"
+  const ringTitle = isSubmitting
+    ? offlineMode
+      ? "Saving…"
+      : "Confirming…"
     : action === "CHECK_IN"
       ? "Slide to check in"
       : "Slide to check out";
   const ringHelp = canSubmit
-    ? "The server re-checks your PIN, photo and distance before it counts."
+    ? offlineMode
+      ? "You're offline — this is saved on the phone and sent automatically. The server checks it then."
+      : "The server re-checks your PIN, photo and distance before it counts."
+    : offlineMode && !locationOk
+      ? geofence.isLoading
+        ? "Getting your location…"
+        : geofence.withinRadius === false
+          ? "You're outside your work area."
+          : "Your location is needed to unlock."
     : needsOdometer && !odometerValid
       ? `Enter the ${action === "CHECK_IN" ? "start" : "end"} km reading to unlock.`
       : requiresPhoto && !photoDataUrl
@@ -233,6 +378,21 @@ export function CheckInOutScreen() {
       <Text style={styles.subtitle}>
         {user?.employeeCode} · {user?.name}
       </Text>
+
+      {offlineMode ? (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerTitle}>You're offline</Text>
+          <Text style={styles.offlineBannerText}>
+            Your {action === "CHECK_IN" ? "check-in" : "check-out"} will be saved and sent automatically.
+          </Text>
+        </View>
+      ) : null}
+
+      {effective.pendingCheckIn && action === "CHECK_OUT" ? (
+        <View style={styles.pausedBadgeWrap}>
+          <StatusBadge label="Checked in · pending sync" tone="warning" />
+        </View>
+      ) : null}
 
       {showFieldPicker ? (
         <View style={styles.modeRow}>
@@ -283,6 +443,22 @@ export function CheckInOutScreen() {
           OvertimeStatusCard's own comment on why "Declined" still renders
           here rather than being hidden). */}
       {currentOvertime ? <OvertimeStatusCard request={currentOvertime} /> : null}
+
+      {offlineMode && !requiresGeofence && needsOfflineCoords ? (
+        <Card style={styles.card}>
+          <Text style={styles.cardLabel}>LOCATION</Text>
+          {geofence.isLoading ? (
+            <Text style={styles.meta}>Getting your location…</Text>
+          ) : geofence.error ? (
+            <Text style={styles.errorText}>{geofence.error}</Text>
+          ) : geofence.coords ? (
+            <Text style={styles.meta}>Saved with your check-in; the server checks the distance when it's sent.</Text>
+          ) : null}
+          <Pressable onPress={geofence.refresh}>
+            <Text style={styles.refreshLink}>Refresh</Text>
+          </Pressable>
+        </Card>
+      ) : null}
 
       {requiresGeofence && requiresPhoto ? (
         <View style={styles.row}>
@@ -393,7 +569,7 @@ export function CheckInOutScreen() {
           kicker={ringKicker}
           title={ringTitle}
           helpText={ringHelp}
-          disabled={!canSubmit || checkInOut.isPending}
+          disabled={!canSubmit || isSubmitting}
           onConfirm={handleSubmit}
         />
       </View>
@@ -417,12 +593,34 @@ export function CheckInOutScreen() {
         secondaryLabel="Dismiss"
         onSecondary={() => setIssueOpen(false)}
       />
+
+      <IssueDialog
+        visible={!!offlineIssue}
+        kicker="OFFLINE"
+        title={offlineIssue?.title ?? ""}
+        body={offlineIssue?.body ?? ""}
+        primaryLabel="OK"
+        onPrimary={() => setOfflineIssue(null)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   pausedBadgeWrap: { marginBottom: spacing.md },
+  pendingBadgeWrap: { marginTop: spacing.md },
+  savedBadgeWrap: { marginBottom: spacing.sm },
+  savedButton: { marginTop: spacing.lg },
+  offlineBanner: {
+    backgroundColor: colors.warningMuted,
+    borderWidth: 1,
+    borderColor: "rgba(184,134,11,0.35)",
+    borderRadius: radius.sm,
+    padding: spacing.sm + 2,
+    marginBottom: spacing.md,
+  },
+  offlineBannerTitle: { ...typography.bodyStrong, color: colors.warning, marginBottom: 2 },
+  offlineBannerText: { ...typography.caption, color: colors.warning },
   kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary },
   title: { ...typography.h1, color: colors.textPrimary, marginTop: spacing.xs },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 4, marginBottom: spacing.lg },

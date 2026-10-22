@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { useReactQueryLiveSync } from "@/config/reactQueryLiveSync";
+import { useOfflineQueueSync } from "@/hooks/useOfflineQueueSync";
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [queryClient] = useState(
@@ -22,6 +23,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   );
 
   useReactQueryLiveSync(queryClient);
+  useOfflineQueueSync(queryClient);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

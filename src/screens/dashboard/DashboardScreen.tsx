@@ -16,10 +16,11 @@ import {
   AssignedPlacesCard,
   LeaveBalanceCard,
   RecentHistoryCard,
+  PendingSyncCard,
 } from "@/components/dashboard";
 import {
   useAuth,
-  useAttendanceStatus,
+  useEffectiveAttendanceStatus,
   useResolvedGeofenceTarget,
   useGeofence,
   useRecentAttendance,
@@ -56,7 +57,10 @@ export function DashboardScreen() {
   const navigation = useNavigation<Nav>();
   const isTracking = useAttendanceSessionStore((s) => s.isTracking);
   const trackingWarning = useAttendanceSessionStore((s) => s.trackingWarning);
-  const statusQuery = useAttendanceStatus(user?.employeeCode);
+  // Server status with anything saved offline (not yet sent) applied on top —
+  // see useEffectiveAttendanceStatus. `statusQuery` stays the raw server query.
+  const effective = useEffectiveAttendanceStatus(user?.employeeCode);
+  const statusQuery = effective.query;
   // Computed off statusQuery.data directly (not the `status` var below,
   // which is only derived after the loading/error guards) — this hook call
   // must stay unconditional, so it can't wait for those guards to pass.
@@ -99,8 +103,8 @@ export function DashboardScreen() {
   })();
   const activeCheckIn = daySummaries.find((d) => d.dateKey === todayKey && !d.checkOut)?.checkIn ?? null;
 
-  if (statusQuery.isLoading) return <LoadingView label="Loading your status…" />;
-  if (statusQuery.isError) {
+  if (effective.isLoading) return <LoadingView label="Loading your status…" />;
+  if (effective.isError) {
     return (
       <ErrorView
         message={getErrorMessage(statusQuery.error, "Couldn't load today's status.")}
@@ -109,7 +113,7 @@ export function DashboardScreen() {
     );
   }
 
-  const status = statusQuery.data;
+  const status = effective.data;
   const checkedIn = status?.exists ? status.checkedIn : false;
   const checkedOut = status?.exists ? status.checkedOut : false;
   const checkInAt = status?.exists ? status.checkInAt : null;
@@ -201,7 +205,10 @@ export function DashboardScreen() {
         enablingSharing={enablingSharing}
         checkedIn={checkedIn && !checkedOut}
         onPrimaryAction={goCheckInOut}
+        pendingSync={!!effective.pendingCheckIn}
       />
+
+      <PendingSyncCard employeeCode={user?.employeeCode} />
 
       {checkedIn && !checkedOut && isFieldWorker && segmentQuery.data?.mode ? (
         <>

@@ -11,6 +11,9 @@ import { formatSlotLabel } from "@/components/checkin";
 import type { ProfileStackParamList } from "@/navigation/types";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useAuthStore } from "@/store/authStore";
+import { useOfflineQueueStore } from "@/store/offlineQueueStore";
+import { discardOfflineQueue } from "@/services/offlineQueue";
+import { forgetVerifiedPin } from "@/services/pinVerifier";
 import { promptBiometricAuth, getLastBiometricError } from "@/services/biometrics";
 import { registerPushTokenBestEffort } from "@/services/notifications";
 import { employeeService } from "@/api/services";
@@ -107,6 +110,25 @@ export function ProfileScreen() {
 
   const [biometricError, setBiometricError] = useState<string | null>(null);
   const [shiftRemindersError, setShiftRemindersError] = useState<string | null>(null);
+
+  // Check-ins/outs saved offline and not sent yet (see services/offlineQueue.ts).
+  // They can only be sent with this employee's own sign-in, so signing out
+  // means losing them — warn first. Signing out always wipes the queue (PINs
+  // and photos included) and the local PIN verifier, so nothing of this
+  // employee's stays on a possibly shared phone.
+  const unsentCount = useOfflineQueueStore(
+    (s) =>
+      s.items.filter(
+        (i) => i.employeeCode === user?.employeeCode && (i.status === "pending" || i.status === "syncing"),
+      ).length,
+  );
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  const signOut = async () => {
+    setConfirmLogoutOpen(false);
+    await discardOfflineQueue();
+    if (user) await forgetVerifiedPin(user.employeeCode);
+    await logout();
+  };
 
   const handleBiometricToggle = async (next: boolean) => {
     setBiometricError(null);
@@ -297,7 +319,12 @@ export function ProfileScreen() {
         </Pressable>
       </View>
 
-      <Button label="Log out" variant="danger" onPress={() => logout()} style={styles.logout} />
+      <Button
+        label="Log out"
+        variant="danger"
+        onPress={() => (unsentCount > 0 ? setConfirmLogoutOpen(true) : void signOut())}
+        style={styles.logout}
+      />
 
       <Modal
         visible={viewingPhoto}
@@ -362,6 +389,17 @@ export function ProfileScreen() {
         body={getErrorMessage(avatarError, "Couldn't update your photo. Please try again.")}
         primaryLabel="Dismiss"
         onPrimary={() => setAvatarError(null)}
+      />
+
+      <IssueDialog
+        visible={confirmLogoutOpen}
+        kicker="UNSENT CHECK-INS"
+        title={`You have ${unsentCount} unsent ${unsentCount === 1 ? "check-in" : "check-ins"}`}
+        body="They're saved on this phone and will be sent when you're back online. If you log out now, they'll be deleted and won't be recorded."
+        primaryLabel="Stay signed in"
+        onPrimary={() => setConfirmLogoutOpen(false)}
+        secondaryLabel="Log out anyway"
+        onSecondary={() => void signOut()}
       />
     </Screen>
   );

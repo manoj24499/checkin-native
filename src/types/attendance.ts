@@ -72,6 +72,12 @@ export type KioskStatus =
       // restricts the overtime-request time picker.
       shiftStartTime: string | null;
       shiftEndTime: string | null;
+      // Organization setting: whether this app may save a check-in/out on
+      // the phone while offline and send it later (see services/offlineQueue.ts),
+      // and how old such a saved attempt may be when it reaches the server.
+      // Optional so an older backend that doesn't send them reads as "off".
+      offlineCheckInEnabled?: boolean;
+      offlineMaxAgeMinutes?: number;
     };
 
 // Set only for CHECK_IN results, computed server-side from the employee's
@@ -137,6 +143,25 @@ export interface ScanResult {
   lateMinutes: number | null;
   leaveType: LeaveType;
   checkInMode: CheckInMode | null;
+  // Only on an offline upload (ScanRequest.offline): the record was made from
+  // a saved attempt, `timestamp` is its capture time, and
+  // `offlineOutsideArea` means the saved location was outside the work area
+  // (accepted anyway and flagged for the admin — not an error).
+  recordedOffline?: boolean;
+  offlineOutsideArea?: boolean;
+  // The same clientId had already been recorded (an earlier reply was lost).
+  idempotentReplay?: boolean;
+}
+
+/** Sent only when uploading an attempt saved on the phone while offline. */
+export interface ScanOfflineInfo {
+  // Idempotency key made on the phone per attempt (16-64 chars, [A-Za-z0-9-]).
+  clientId: string;
+  // Device clock at the moment of the action (ISO).
+  capturedAt: string;
+  // Whether the phone could show its clock wasn't changed since its last
+  // contact with the server (see recordServerTime in api/client.ts).
+  timeVerified: boolean;
 }
 
 export interface ScanRequest {
@@ -160,6 +185,9 @@ export interface ScanRequest {
   // Vehicle odometer (km): the start reading on a Field CHECK_IN, the end
   // reading on the matching CHECK_OUT. Required by the app for Field sessions.
   odometerKm?: number;
+  // Present only for an offline-saved attempt being sent later — see
+  // services/offlineQueue.ts. Requires the bearer token (sent by apiClient).
+  offline?: ScanOfflineInfo;
 }
 
 // A request for one or more whole calendar days off — distinct from

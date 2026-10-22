@@ -10,3 +10,4 @@ export { FieldVisitCard } from "./FieldVisitCard";
 export { AssignedPlacesCard } from "./AssignedPlacesCard";
 export { LeaveBalanceCard } from "./LeaveBalanceCard";
 export { RecentHistoryCard } from "./RecentHistoryCard";
+export { PendingSyncCard } from "./PendingSyncCard";

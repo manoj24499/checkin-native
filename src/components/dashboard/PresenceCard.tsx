@@ -34,6 +34,9 @@ interface PresenceCardProps {
    * out") and the big-clock caption. */
   checkedIn: boolean;
   onPrimaryAction: () => void;
+  /** Today's check-in only exists on this phone so far (saved offline, see
+   * services/offlineQueue.ts) — `checkInAt` is its capture time. */
+  pendingSync?: boolean;
 }
 
 export function PresenceCard({
@@ -48,6 +51,7 @@ export function PresenceCard({
   enablingSharing,
   checkedIn,
   onPrimaryAction,
+  pendingSync,
 }: PresenceCardProps) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -79,7 +83,9 @@ export function PresenceCard({
       ? "PAUSED — ON PERMISSION"
       : "PAUSED — OUTSIDE RANGE"
     : checkedIn
-      ? isTracking
+      ? pendingSync
+        ? "CHECKED IN · PENDING SYNC"
+        : isTracking
         ? "CHECKED IN · SHARING LIVE"
         : "CHECKED IN · SHARING OFF"
       : "NOT CHECKED IN";
@@ -89,7 +95,9 @@ export function PresenceCard({
       ? "This time won't count while your requested permission is active."
       : "You're outside your assigned area — this time won't count until you're back in range."
     : checkedIn
-      ? "Worked so far today. Stops the moment you check out."
+      ? pendingSync
+        ? "Saved on this phone — it's sent automatically when you're back online."
+        : "Worked so far today. Stops the moment you check out."
       : "Check in when you arrive.";
 
   return (
