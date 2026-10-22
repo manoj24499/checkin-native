@@ -81,7 +81,7 @@ export function ChangePinScreen() {
         name="newPin"
         rules={{
           required: "New PIN is required",
-          pattern: { value: /^\d{4,10}$/, message: "PIN must be 4-10 digits" },
+          pattern: { value: /^\d{6,10}$/, message: "PIN must be 6-10 digits" },
         }}
         render={({ field: { onChange, onBlur, value } }) => (
           <TextField

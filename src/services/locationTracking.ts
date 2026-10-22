@@ -35,34 +35,135 @@ export const PING_INTERVAL_MS = 2 * 60 * 1000;
 // still drives live status and auto-pause on its own). Office/WFH profiles are
 // unchanged — no extra battery or data use.
 export const FIELD_SAMPLE_INTERVAL_MS = 10 * 1000;
-const MAX_BUFFERED_SAMPLES = 400;
+// Everything waiting to reach the server (see the outbox below). ~3000 samples is ~8h of Field
+// sampling at 10s; anything older than MAX_SAMPLE_AGE_MS is dropped so a phone that stays
+// offline for days can't grow the stored list without limit.
+const MAX_BUFFERED_SAMPLES = 3000;
+const MAX_SAMPLE_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+const MAX_FLUSH_ROUNDS = 25;
 const MAX_TRAIL_PER_PING = 120;
 
 type TrailSample = { latitude: number; longitude: number; accuracy: number; timestamp: string };
-let trailBuffer: TrailSample[] = [];
+// A sample plus the check-in session (attendanceId) it belongs to, so samples that were still
+// waiting when a session ended (check-out) can be uploaded to the right session later.
+type OutboxSample = TrailSample & { a: string };
+
+// The outbox: every location reading that hasn't been confirmed by the server yet, oldest first.
+// It is kept on disk, so nothing is lost if the phone has no signal, the app is killed, or the
+// session ends before the upload succeeds — it goes out as soon as the server can be reached.
+let outbox: OutboxSample[] = [];
 let lastPingSentAt = 0;
 let bufferLoaded = false;
+let flushing = false;
 
-// Samples waiting to be uploaded are also kept on disk, so if the OS kills the app the points
-// recorded since the last upload are not lost and go out with the next ping.
 const TRAIL_STORAGE_KEY = "checkin.trailBuffer";
 
-async function loadTrailBuffer() {
+function sampleOf(l: Location.LocationObject): TrailSample {
+  return {
+    latitude: l.coords.latitude,
+    longitude: l.coords.longitude,
+    accuracy: l.coords.accuracy ?? 0,
+    timestamp: new Date(l.timestamp).toISOString(),
+  };
+}
+
+function strip({ latitude, longitude, accuracy, timestamp }: OutboxSample): TrailSample {
+  return { latitude, longitude, accuracy, timestamp };
+}
+
+function pruneOutbox() {
+  const cutoff = Date.now() - MAX_SAMPLE_AGE_MS;
+  outbox = outbox.filter((s) => new Date(s.timestamp).getTime() >= cutoff);
+  if (outbox.length > MAX_BUFFERED_SAMPLES) outbox = outbox.slice(-MAX_BUFFERED_SAMPLES);
+}
+
+async function loadOutbox() {
   if (bufferLoaded) return;
   bufferLoaded = true;
   try {
     const raw = await AsyncStorage.getItem(TRAIL_STORAGE_KEY);
-    if (raw) {
-      const saved = JSON.parse(raw) as TrailSample[];
-      if (Array.isArray(saved)) trailBuffer = [...saved, ...trailBuffer].slice(-MAX_BUFFERED_SAMPLES);
-    }
+    if (!raw) return;
+    const saved = JSON.parse(raw) as (TrailSample & { a?: string })[];
+    if (!Array.isArray(saved)) return;
+    // Samples saved by older builds have no session id: they belong to the current session.
+    const fallback = useAttendanceSessionStore.getState().activeAttendanceId ?? "";
+    const known = new Set(outbox.map((s) => `${s.a}|${s.timestamp}`));
+    const restored = saved
+      .map((s) => ({ ...s, a: s.a ?? fallback }))
+      .filter((s) => s.a && !known.has(`${s.a}|${s.timestamp}`));
+    outbox = [...restored, ...outbox].sort((x, y) => x.timestamp.localeCompare(y.timestamp));
+    pruneOutbox();
   } catch {
     // Best effort.
   }
 }
 
-function saveTrailBuffer() {
-  AsyncStorage.setItem(TRAIL_STORAGE_KEY, JSON.stringify(trailBuffer)).catch(() => {});
+function saveOutbox() {
+  if (outbox.length === 0) {
+    AsyncStorage.removeItem(TRAIL_STORAGE_KEY).catch(() => {});
+    return;
+  }
+  AsyncStorage.setItem(TRAIL_STORAGE_KEY, JSON.stringify(outbox)).catch(() => {});
+}
+
+function addToOutbox(attendanceId: string, sample: TrailSample) {
+  if (outbox.some((s) => s.a === attendanceId && s.timestamp === sample.timestamp)) return;
+  outbox.push({ ...sample, a: attendanceId });
+  pruneOutbox();
+}
+
+function removeFromOutbox(attendanceId: string, timestamps: string[]) {
+  const done = new Set(timestamps);
+  outbox = outbox.filter((s) => !(s.a === attendanceId && done.has(s.timestamp)));
+}
+
+function httpStatusOf(error: unknown): number | undefined {
+  return (error as { response?: { status?: number } })?.response?.status;
+}
+
+/**
+ * Uploads everything waiting in the outbox, oldest first, in batches the server accepts. Safe to
+ * call any time (it does nothing when empty or when a flush is already running, and the server
+ * ignores samples it already has): after a successful live ping, when the network comes back,
+ * and when a session ends. Stops at the first failure and leaves the rest stored for next time.
+ */
+export async function flushPendingLocations(): Promise<void> {
+  if (flushing) return;
+  flushing = true;
+  try {
+    await loadOutbox();
+    for (let round = 0; round < MAX_FLUSH_ROUNDS && outbox.length > 0; round++) {
+      const attendanceId = outbox[0].a;
+      const batch = outbox.filter((s) => s.a === attendanceId).slice(0, MAX_TRAIL_PER_PING);
+      const last = batch[batch.length - 1];
+      try {
+        await locationService.sendPing({
+          attendanceId,
+          latitude: last.latitude,
+          longitude: last.longitude,
+          accuracy: last.accuracy,
+          timestamp: last.timestamp,
+          trail: batch.map(strip),
+          backfill: true,
+        });
+        removeFromOutbox(attendanceId, batch.map((s) => s.timestamp));
+        saveOutbox();
+      } catch (error) {
+        const status = httpStatusOf(error);
+        // The server understood the request and will never accept it (unknown session, bad data):
+        // drop that session's samples instead of retrying forever. Anything else (no signal,
+        // timeout, 5xx, rate limit) keeps them for the next attempt.
+        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+          outbox = outbox.filter((s) => s.a !== attendanceId);
+          saveOutbox();
+          continue;
+        }
+        break;
+      }
+    }
+  } finally {
+    flushing = false;
+  }
 }
 
 function isFieldProfile(): boolean {
@@ -102,45 +203,51 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
   }
 
   const field = isFieldProfile();
+  await loadOutbox();
   if (field) {
-    await loadTrailBuffer();
-    for (const l of real) {
-      trailBuffer.push({
-        latitude: l.coords.latitude,
-        longitude: l.coords.longitude,
-        accuracy: l.coords.accuracy ?? 0,
-        timestamp: new Date(l.timestamp).toISOString(),
-      });
-    }
-    if (trailBuffer.length > MAX_BUFFERED_SAMPLES) trailBuffer = trailBuffer.slice(-MAX_BUFFERED_SAMPLES);
-    saveTrailBuffer();
+    // Field profiles record every sample into the outbox as it arrives (so the route survives a
+    // crash or a dead zone), and upload them in batches along with the regular 2-minute ping.
+    for (const l of real) addToOutbox(attendanceId, sampleOf(l));
+    saveOutbox();
     // Samples arrive every ~15s but the server only needs a ping every ~2 min.
     const due = Date.now() - lastPingSentAt >= PING_INTERVAL_MS - 5_000;
-    if (!due && trailBuffer.length < MAX_TRAIL_PER_PING) return;
+    const waiting = outbox.filter((s) => s.a === attendanceId).length;
+    if (!due && waiting < MAX_TRAIL_PER_PING) return;
   }
 
-  const sentSamples = field ? trailBuffer.slice(-MAX_TRAIL_PER_PING - 1, -1) : [];
+  const latestSample = sampleOf(latest);
+  // Oldest waiting samples go out first, so a long outage drains in order instead of keeping
+  // only the newest ones.
+  const batch = outbox
+    .filter((s) => s.a === attendanceId && s.timestamp !== latestSample.timestamp)
+    .slice(0, MAX_TRAIL_PER_PING);
   try {
     const result = await locationService.sendPing({
       attendanceId,
       latitude: latest.coords.latitude,
       longitude: latest.coords.longitude,
       accuracy: latest.coords.accuracy ?? 0,
-      timestamp: new Date(latest.timestamp).toISOString(),
-      ...(sentSamples.length > 0 ? { trail: sentSamples } : {}),
+      timestamp: latestSample.timestamp,
+      ...(batch.length > 0 ? { trail: batch.map(strip) } : {}),
     });
-    if (field) {
-      trailBuffer = [];
-      lastPingSentAt = Date.now();
-      AsyncStorage.removeItem(TRAIL_STORAGE_KEY).catch(() => {});
-    }
+    // Only what the server just confirmed leaves the outbox — never the whole list.
+    removeFromOutbox(attendanceId, [...batch.map((s) => s.timestamp), latestSample.timestamp]);
+    if (field) lastPingSentAt = Date.now();
+    saveOutbox();
     if (!result.tracking) {
       await stopLocationTracking();
       useAttendanceSessionStore.getState().stopTracking();
+      return;
     }
+    // Signal is back: send whatever else piled up while it was down.
+    await flushPendingLocations();
   } catch {
-    // Transient network failure — the buffered samples are kept and go out with
-    // the next ping (field profiles), or the next ping simply retries.
+    // No signal / server unreachable. Keep the reading (Field profiles already hold it in the
+    // outbox) so it is uploaded later instead of being lost.
+    if (!field) {
+      addToOutbox(attendanceId, latestSample);
+      saveOutbox();
+    }
   }
 });
 
@@ -251,9 +358,12 @@ export async function startLocationTracking(attendanceId: string, checkedInAt: s
 }
 
 export async function stopLocationTracking() {
-  trailBuffer = [];
   lastPingSentAt = 0;
-  AsyncStorage.removeItem(TRAIL_STORAGE_KEY).catch(() => {});
+  // Try to upload anything still waiting before the session is gone (brief, best effort). What
+  // can't be sent stays stored and goes out later; it is never discarded here.
+  await Promise.race([flushPendingLocations(), new Promise<void>((resolve) => setTimeout(resolve, 6_000))]).catch(
+    () => {},
+  );
   try {
     const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING_TASK).catch(
       () => false,

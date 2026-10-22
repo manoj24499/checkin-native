@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
 import { focusManager, onlineManager, type QueryClient } from "@tanstack/react-query";
 import NetInfo from "@react-native-community/netinfo";
+import { flushPendingLocations } from "@/services/locationTracking";
 
 // Some Android OEM skins (MIUI/HyperOS in particular — see the identical
 // blip guards in RootNavigator.tsx for the biometric lock and location
@@ -72,7 +73,11 @@ export function useReactQueryLiveSync(queryClient: QueryClient) {
     // it has no public unsubscribe, so this is registered once for the
     // app's lifetime (standard TanStack Query React Native setup).
     onlineManager.setEventListener((setOnline) =>
-      NetInfo.addEventListener((state) => setOnline(!!state.isConnected)),
+      NetInfo.addEventListener((state) => {
+        setOnline(!!state.isConnected);
+        // Signal is back: upload any location samples saved while offline right away.
+        if (state.isConnected) void flushPendingLocations();
+      }),
     );
     return () => {
       if (cooldownTimeout) clearTimeout(cooldownTimeout);
