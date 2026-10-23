@@ -23,6 +23,7 @@ export const endpoints = {
   routePlan: "/api/mobile/me/route-plan",
   routeLeg: "/api/mobile/me/route-leg",
   support: "/api/mobile/support",
+  reimbursements: "/api/mobile/me/reimbursements",
 
   kioskScan: "/api/kiosk/scan",
   kioskStatus: "/api/kiosk/status",

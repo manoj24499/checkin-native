@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, Modal, Pressable, StyleSheet, Text, View }
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImageManipulator from "expo-image-manipulator";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button } from "@/components/ui";
+import { Button, Icon } from "@/components/ui";
 import { colors, spacing, typography } from "@/theme";
 
 interface PhotoCaptureViewProps {
@@ -89,7 +89,7 @@ export function PhotoCaptureView({ onCapture, onCancel, facing = "front" }: Phot
           hitSlop={12}
           style={[styles.close, { top: insets.top + spacing.sm }]}
         >
-          <Text style={styles.closeGlyph}>✕</Text>
+          <Icon name="close" size={18} color={colors.lime} strokeWidth={2.2} />
         </Pressable>
 
         {/* Round shutter ring, centred at the bottom. */}
@@ -104,7 +104,7 @@ export function PhotoCaptureView({ onCapture, onCancel, facing = "front" }: Phot
             style={[styles.ring, (!isReady || isCapturing) && styles.ringDisabled]}
           >
             <Animated.View style={[styles.shutterCore, { transform: [{ scale: pressScale }] }]}>
-              {isCapturing ? <ActivityIndicator color={colors.textSecondary} /> : null}
+              {isCapturing ? <ActivityIndicator color={colors.ink} /> : null}
             </Animated.View>
           </Pressable>
         </View>
@@ -122,11 +122,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(14,36,16,0.72)",
     alignItems: "center",
     justifyContent: "center",
   },
-  closeGlyph: { color: "#fff", fontSize: 18, fontWeight: "600" },
   shutterBar: {
     position: "absolute",
     left: 0,
@@ -134,14 +133,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingTop: spacing.lg,
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.28)",
+    backgroundColor: "rgba(14,36,16,0.35)",
   },
   ring: {
     width: RING_SIZE,
     height: RING_SIZE,
     borderRadius: RING_SIZE / 2,
     borderWidth: 4,
-    borderColor: "#ffffff",
+    borderColor: colors.lime,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -150,11 +149,17 @@ const styles = StyleSheet.create({
     width: RING_SIZE - 16,
     height: RING_SIZE - 16,
     borderRadius: (RING_SIZE - 16) / 2,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+    backgroundColor: colors.background,
+  },
   message: {
     ...typography.body,
     color: colors.textSecondary,

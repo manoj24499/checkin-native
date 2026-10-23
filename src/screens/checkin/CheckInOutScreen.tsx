@@ -2,7 +2,21 @@ import { useEffect, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen, Card, Button, TextField, LoadingView, ErrorView, StatusBadge, IssueDialog } from "@/components/ui";
+import {
+  Screen,
+  Card,
+  Button,
+  TextField,
+  LoadingView,
+  ErrorView,
+  StatusBadge,
+  IssueDialog,
+  Icon,
+  IconTile,
+  Kicker,
+  ScreenTitle,
+  SegmentedControl,
+} from "@/components/ui";
 import { DistancePill } from "@/components/attendance";
 import { OvertimeStatusCard } from "@/components/dashboard";
 import { PhotoCaptureView } from "@/components/camera";
@@ -125,30 +139,31 @@ export function CheckInOutScreen() {
 
   if (savedOffline) {
     return (
-      <Screen>
-        <Card>
-          <View style={styles.savedBadgeWrap}>
-            <StatusBadge label="PENDING SYNC" tone="warning" />
-          </View>
-          <Text style={styles.title}>{savedOffline.action === "CHECK_IN" ? "Check-in saved" : "Check-out saved"}</Text>
-          <Text style={styles.meta}>
-            {savedOffline.sendingNow
-              ? "Saved on this device. Sending now, right after your earlier offline check-in."
-              : "Saved on this device. Will be sent when you're back online."}
-          </Text>
-          {savedOffline.pinUnverified ? (
-            <Text style={styles.meta}>Your PIN couldn't be checked offline — it's verified when it's sent.</Text>
-          ) : null}
-          <Button
-            label="Go to Dashboard"
-            variant="primary"
-            onPress={() => {
-              setSavedOffline(null);
-              navigation.navigate("Dashboard" as never);
-            }}
-            style={styles.savedButton}
-          />
-        </Card>
+      <Screen contentStyle={styles.endState}>
+        <View style={styles.endIcon}>
+          <Icon name="check" size={44} color={colors.lime} />
+        </View>
+        <StatusBadge label="Pending sync" tone="warning" style={styles.endBadge} />
+        <ScreenTitle style={styles.endTitle}>
+          {savedOffline.action === "CHECK_IN" ? "Check-in saved" : "Check-out saved"}
+        </ScreenTitle>
+        <Text style={styles.endMeta}>
+          {savedOffline.sendingNow
+            ? "Saved on this device. Sending now, right after your earlier offline check-in."
+            : "Saved on this device. Will be sent when you're back online."}
+        </Text>
+        {savedOffline.pinUnverified ? (
+          <Text style={styles.endMeta}>Your PIN couldn't be checked offline — it's verified when it's sent.</Text>
+        ) : null}
+        <Button
+          label="Go to Dashboard"
+          variant="primary"
+          onPress={() => {
+            setSavedOffline(null);
+            navigation.navigate("Dashboard" as never);
+          }}
+          style={styles.savedButton}
+        />
       </Screen>
     );
   }
@@ -164,19 +179,18 @@ export function CheckInOutScreen() {
 
   if (checkedIn && checkedOut) {
     return (
-      <Screen>
-        <Card>
-          <Text style={styles.title}>All done for today</Text>
-          <Text style={styles.meta}>You've already checked in and out today.</Text>
-          {effective.pendingCheckIn || effective.pendingCheckOut ? (
-            <>
-              <View style={styles.pendingBadgeWrap}>
-                <StatusBadge label="PENDING SYNC" tone="warning" />
-              </View>
-              <Text style={styles.meta}>Saved on this device. Will be sent when you're back online.</Text>
-            </>
-          ) : null}
-        </Card>
+      <Screen contentStyle={styles.endState}>
+        <View style={styles.endIcon}>
+          <Icon name="check" size={44} color={colors.lime} />
+        </View>
+        <ScreenTitle style={styles.endTitle}>All done for today</ScreenTitle>
+        <Text style={styles.endMeta}>You've already checked in and out today.</Text>
+        {effective.pendingCheckIn || effective.pendingCheckOut ? (
+          <>
+            <StatusBadge label="Pending sync" tone="warning" style={styles.pendingBadge} />
+            <Text style={styles.endMeta}>Saved on this device. Will be sent when you're back online.</Text>
+          </>
+        ) : null}
       </Screen>
     );
   }
@@ -187,13 +201,12 @@ export function CheckInOutScreen() {
   // approved, they still need to be able to close their day out normally.
   if (!checkedIn && todayLeave) {
     return (
-      <Screen>
-        <Card>
-          <Text style={styles.title}>You're on leave today</Text>
-          <Text style={styles.meta}>
-            Your {TYPE_LABEL[todayLeave.type]} leave request for today was approved — check-in is disabled.
-          </Text>
-        </Card>
+      <Screen contentStyle={styles.endState}>
+        <IconTile icon="calendar" tone="success" size={84} radius={42} />
+        <ScreenTitle style={styles.endTitle}>You're on leave today</ScreenTitle>
+        <Text style={styles.endMeta}>
+          Your {TYPE_LABEL[todayLeave.type]} leave request for today was approved — check-in is disabled.
+        </Text>
       </Screen>
     );
   }
@@ -373,18 +386,21 @@ export function CheckInOutScreen() {
 
   return (
     <Screen scroll>
-      <Text style={styles.kicker}>{action === "CHECK_IN" ? "STEP 1 OF 1" : "CONFIRM"}</Text>
-      <Text style={styles.title}>{action === "CHECK_IN" ? "Check in" : "Check out"}</Text>
+      <Kicker style={styles.kicker}>{action === "CHECK_IN" ? "Step 1 of 1" : "Confirm"}</Kicker>
+      <ScreenTitle>{action === "CHECK_IN" ? "Check in" : "Check out"}</ScreenTitle>
       <Text style={styles.subtitle}>
         {user?.employeeCode} · {user?.name}
       </Text>
 
       {offlineMode ? (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineBannerTitle}>You're offline</Text>
-          <Text style={styles.offlineBannerText}>
-            Your {action === "CHECK_IN" ? "check-in" : "check-out"} will be saved and sent automatically.
-          </Text>
+          <Icon name="wifi" size={18} color={colors.limeDeep} />
+          <View style={styles.offlineBannerTextWrap}>
+            <Text style={styles.offlineBannerTitle}>You're offline</Text>
+            <Text style={styles.offlineBannerText}>
+              Your {action === "CHECK_IN" ? "check-in" : "check-out"} will be saved and sent automatically.
+            </Text>
+          </View>
         </View>
       ) : null}
 
@@ -395,37 +411,29 @@ export function CheckInOutScreen() {
       ) : null}
 
       {showFieldPicker ? (
-        <View style={styles.modeRow}>
-          {(["OFFICE", "FIELD"] as const).map((mode) => (
-            <Pressable
-              key={mode}
-              onPress={() => setFieldCheckInMode(mode)}
-              style={[styles.modeButton, fieldCheckInMode === mode && styles.modeButtonActive]}
-            >
-              <Text
-                style={[styles.modeButtonLabel, fieldCheckInMode === mode && styles.modeButtonLabelActive]}
-              >
-                {mode === "OFFICE" ? "Office" : "Field work"}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <SegmentedControl
+          variant="ink"
+          options={[
+            { key: "OFFICE", label: "Office" },
+            { key: "FIELD", label: "Field work" },
+          ]}
+          value={fieldCheckInMode}
+          onChange={setFieldCheckInMode}
+          style={styles.modeRow}
+        />
       ) : null}
 
       {showHomePicker ? (
-        <View style={styles.modeRow}>
-          {(["HOME", "OFFICE"] as const).map((mode) => (
-            <Pressable
-              key={mode}
-              onPress={() => setWfhCheckInMode(mode)}
-              style={[styles.modeButton, wfhCheckInMode === mode && styles.modeButtonActive]}
-            >
-              <Text style={[styles.modeButtonLabel, wfhCheckInMode === mode && styles.modeButtonLabelActive]}>
-                {mode === "HOME" ? "Home" : "Office"}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <SegmentedControl
+          variant="ink"
+          options={[
+            { key: "HOME", label: "Home" },
+            { key: "OFFICE", label: "Office" },
+          ]}
+          value={wfhCheckInMode}
+          onChange={setWfhCheckInMode}
+          style={styles.modeRow}
+        />
       ) : null}
 
       {isPaused ? (
@@ -442,11 +450,15 @@ export function CheckInOutScreen() {
           is actually using to check out, not only on a different tab (see
           OvertimeStatusCard's own comment on why "Declined" still renders
           here rather than being hidden). */}
-      {currentOvertime ? <OvertimeStatusCard request={currentOvertime} /> : null}
+      {currentOvertime ? (
+        <View style={styles.overtimeWrap}>
+          <OvertimeStatusCard request={currentOvertime} />
+        </View>
+      ) : null}
 
       {offlineMode && !requiresGeofence && needsOfflineCoords ? (
         <Card style={styles.card}>
-          <Text style={styles.cardLabel}>LOCATION</Text>
+          <Kicker>Location</Kicker>
           {geofence.isLoading ? (
             <Text style={styles.meta}>Getting your location…</Text>
           ) : geofence.error ? (
@@ -454,7 +466,8 @@ export function CheckInOutScreen() {
           ) : geofence.coords ? (
             <Text style={styles.meta}>Saved with your check-in; the server checks the distance when it's sent.</Text>
           ) : null}
-          <Pressable onPress={geofence.refresh}>
+          <Pressable onPress={geofence.refresh} hitSlop={6} style={styles.refreshRow}>
+            <Icon name="refresh" size={14} color={colors.primaryDark} strokeWidth={2} />
             <Text style={styles.refreshLink}>Refresh</Text>
           </Pressable>
         </Card>
@@ -463,7 +476,7 @@ export function CheckInOutScreen() {
       {requiresGeofence && requiresPhoto ? (
         <View style={styles.row}>
           <Card style={styles.geofenceCard}>
-            <Text style={styles.cardLabel}>GEOFENCE</Text>
+            <Kicker>Geofence</Kicker>
             {geofence.isLoading ? (
               <Text style={styles.meta}>Getting your location…</Text>
             ) : geofence.error ? (
@@ -471,7 +484,8 @@ export function CheckInOutScreen() {
             ) : (
               <DistancePill distanceMeters={geofence.distanceMeters} withinRadius={geofence.withinRadius} />
             )}
-            <Pressable onPress={geofence.refresh}>
+            <Pressable onPress={geofence.refresh} hitSlop={6} style={styles.refreshRow}>
+              <Icon name="refresh" size={14} color={colors.primaryDark} strokeWidth={2} />
               <Text style={styles.refreshLink}>Refresh</Text>
             </Pressable>
           </Card>
@@ -483,20 +497,18 @@ export function CheckInOutScreen() {
               <>
                 <Image source={{ uri: photoDataUrl }} style={styles.photoTileImage} />
                 <View style={styles.photoTileBadge}>
-                  <Text style={styles.photoGlyphReady}>✓</Text>
+                  <Icon name="checkmark" size={12} color={colors.lime} strokeWidth={2.4} />
                 </View>
               </>
             ) : (
-              <View style={styles.photoGlyphWrap}>
-                <Text style={styles.photoGlyph}>⌾</Text>
-              </View>
+              <IconTile icon="user" tone="muted" size={44} />
             )}
             <Text style={styles.photoTileLabel}>{photoDataUrl ? "PHOTO READY" : "PRESENCE PHOTO"}</Text>
           </Pressable>
         </View>
       ) : requiresPhoto ? (
         <Card style={styles.card}>
-          <Text style={styles.cardLabel}>PRESENCE PHOTO</Text>
+          <Kicker>Presence photo</Kicker>
           {photoDataUrl ? (
             <Image source={{ uri: photoDataUrl }} style={styles.photoPreview} />
           ) : (
@@ -507,6 +519,8 @@ export function CheckInOutScreen() {
           <Button
             label={photoDataUrl ? "Retake photo" : "Take photo"}
             variant="secondary"
+            size="sm"
+            icon="camera"
             onPress={() => setCameraTarget("presence")}
             style={styles.retakeButton}
           />
@@ -515,7 +529,7 @@ export function CheckInOutScreen() {
 
       {showOvertimeSummary ? (
         <Card style={styles.card}>
-          <Text style={styles.cardLabel}>OVERTIME SUMMARY (OPTIONAL)</Text>
+          <Kicker>Overtime summary (optional)</Kicker>
           <Text style={styles.meta}>What did you get done? Never required to check out.</Text>
           <TextField
             placeholder="e.g. Fixed the payment gateway bug and deployed the hotfix"
@@ -531,7 +545,10 @@ export function CheckInOutScreen() {
             {overtimeSummaryPhotoDataUrl ? (
               <Image source={{ uri: overtimeSummaryPhotoDataUrl }} style={styles.overtimeSummaryPhotoPreview} />
             ) : (
-              <Text style={styles.meta}>Add a photo (optional)</Text>
+              <View style={styles.overtimePhotoEmpty}>
+                <Icon name="camera" size={22} color={colors.ink} />
+                <Text style={styles.metaSmall}>Add a photo (optional)</Text>
+              </View>
             )}
           </Pressable>
         </Card>
@@ -539,7 +556,7 @@ export function CheckInOutScreen() {
 
       {needsOdometer ? (
         <Card style={styles.card}>
-          <Text style={styles.cardLabel}>{action === "CHECK_IN" ? "START KM" : "END KM"}</Text>
+          <Kicker>{action === "CHECK_IN" ? "Start km" : "End km"}</Kicker>
           <Text style={styles.meta}>
             {action === "CHECK_IN"
               ? "Enter the vehicle's odometer reading before you start."
@@ -556,13 +573,13 @@ export function CheckInOutScreen() {
         </Card>
       ) : null}
 
-      <View style={styles.pinSection}>
+      <Card style={styles.card}>
         <View style={styles.pinHeaderRow}>
-          <Text style={styles.cardLabel}>PIN</Text>
+          <Kicker style={styles.pinKicker}>PIN</Kicker>
           <Text style={styles.pinHint}>{pin.length ? `${pin.length} of 4+ digits` : "4 to 6 digits"}</Text>
         </View>
         <PinBoxInput value={pin} onChange={setPin} />
-      </View>
+      </Card>
 
       <View style={styles.confirmWrap}>
         <SlideToConfirmTrack
@@ -607,57 +624,70 @@ export function CheckInOutScreen() {
 }
 
 const styles = StyleSheet.create({
-  pausedBadgeWrap: { marginBottom: spacing.md },
-  pendingBadgeWrap: { marginTop: spacing.md },
-  savedBadgeWrap: { marginBottom: spacing.sm },
-  savedButton: { marginTop: spacing.lg },
-  offlineBanner: {
-    backgroundColor: colors.warningMuted,
-    borderWidth: 1,
-    borderColor: "rgba(184,134,11,0.35)",
-    borderRadius: radius.sm,
-    padding: spacing.sm + 2,
-    marginBottom: spacing.md,
-  },
-  offlineBannerTitle: { ...typography.bodyStrong, color: colors.warning, marginBottom: 2 },
-  offlineBannerText: { ...typography.caption, color: colors.warning },
-  kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary },
-  title: { ...typography.h1, color: colors.textPrimary, marginTop: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 4, marginBottom: spacing.lg },
-  modeRow: {
-    flexDirection: "row",
-    gap: 4,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.sm,
-    padding: 4,
-    marginBottom: spacing.md,
-  },
-  modeButton: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm - 2, alignItems: "center" },
-  modeButtonActive: {
-    backgroundColor: colors.primaryMuted,
-    borderWidth: 1,
-    borderColor: colors.primaryMuted,
-  },
-  modeButtonLabel: { ...typography.bodyStrong, color: colors.textSecondary, fontSize: 13 },
-  modeButtonLabelActive: { color: colors.primaryDark },
-  row: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
-  card: { marginBottom: spacing.md },
-  geofenceCard: { flex: 1, gap: spacing.xs },
-  cardLabel: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
-  meta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
-  errorText: { ...typography.caption, color: colors.danger, marginBottom: spacing.sm },
-  refreshLink: { ...typography.bodyStrong, color: colors.primary, marginTop: spacing.xs, fontSize: 13 },
-  photoTile: {
-    width: 96,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "rgba(134,119,111,0.55)",
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceMuted,
+  // End states (saved offline / all done / on leave): centred, like the mockup's "saved" screen.
+  endState: { alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.lg },
+  endIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
+  },
+  endBadge: { alignSelf: "center", marginTop: spacing.md },
+  endTitle: { textAlign: "center", marginTop: spacing.sm + 2 },
+  endMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: spacing.sm,
+    lineHeight: 19,
+  },
+  pendingBadge: { alignSelf: "center", marginTop: spacing.md },
+  pausedBadgeWrap: { marginBottom: spacing.sm + 4 },
+  savedButton: { marginTop: spacing.lg, alignSelf: "stretch" },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm + 2,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: radius.input,
+    padding: spacing.sm + 4,
+    marginBottom: spacing.sm + 4,
+  },
+  offlineBannerTextWrap: { flex: 1 },
+  offlineBannerTitle: { ...typography.bodyStrong, fontSize: 14, color: colors.limeDeep, marginBottom: 2 },
+  offlineBannerText: { ...typography.caption, color: colors.limeDeep },
+  kicker: { marginTop: spacing.xs },
+  subtitle: { ...typography.caption, color: colors.textSecondary, marginTop: 4, marginBottom: spacing.md + 2 },
+  modeRow: { marginBottom: spacing.sm + 4 },
+  // OvertimeStatusCard carries its own top margin (Home layout); cancel it here.
+  overtimeWrap: { marginTop: -(spacing.sm + 4), marginBottom: spacing.sm + 4 },
+  row: { flexDirection: "row", gap: spacing.sm + 2, marginBottom: spacing.sm + 4 },
+  card: { marginBottom: spacing.sm + 4 },
+  geofenceCard: { flex: 1, gap: spacing.xs },
+  meta: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
+  metaSmall: { ...typography.caption, fontSize: 12, color: colors.textSecondary },
+  errorText: { ...typography.caption, color: colors.danger, marginBottom: spacing.sm },
+  refreshRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: spacing.xs + 2,
+    alignSelf: "flex-start",
+  },
+  refreshLink: { ...typography.bodyStrong, color: colors.primaryDark, fontSize: 13 },
+  photoTile: {
+    width: 100,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "rgba(14,36,16,0.3)",
+    borderRadius: radius.tile,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs + 2,
+    paddingVertical: spacing.sm + 2,
     overflow: "hidden",
   },
   photoTileReady: { borderStyle: "solid", borderColor: colors.success },
@@ -665,50 +695,53 @@ const styles = StyleSheet.create({
   photoTileBadge: {
     position: "absolute",
     top: spacing.sm,
-    right: (96 - 56) / 2,
-    width: 18,
-    height: 18,
+    right: (100 - 56) / 2 - 4,
+    width: 20,
+    height: 20,
     borderRadius: 99,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
-  photoGlyphWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: "rgba(134,119,111,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  photoGlyph: { color: colors.textSecondary, fontSize: 13 },
-  photoGlyphReady: { color: colors.success, fontSize: 11, fontWeight: "700" },
   photoTileLabel: {
-    fontSize: 9.5,
-    letterSpacing: 0.5,
-    color: colors.textSecondary,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    color: colors.ink,
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     textAlign: "center",
   },
   odometerInput: { marginTop: spacing.sm, marginBottom: 0 },
-  retakeButton: { marginTop: spacing.sm, alignSelf: "flex-start" },
+  retakeButton: { marginTop: spacing.sm + 2, alignSelf: "flex-start" },
   overtimeSummaryInput: { marginTop: spacing.sm },
   overtimeSummaryPhotoTile: {
     marginTop: spacing.sm,
     height: 96,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: "rgba(134,119,111,0.55)",
-    borderRadius: radius.sm,
+    borderColor: "rgba(14,36,16,0.3)",
+    borderRadius: radius.tile,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
+  overtimePhotoEmpty: { alignItems: "center", gap: spacing.xs },
   overtimeSummaryPhotoPreview: { width: "100%", height: "100%" },
-  photoPreview: { width: "100%", height: 220, borderRadius: radius.sm, marginBottom: spacing.sm },
-  pinSection: { marginTop: spacing.xs },
-  pinHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  pinHint: { fontSize: 10, color: colors.textMuted },
-  confirmWrap: { marginTop: spacing.xl, marginBottom: spacing.md },
+  photoPreview: {
+    width: "100%",
+    height: 220,
+    borderRadius: radius.tile,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  pinHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+  },
+  pinKicker: { marginBottom: 0 },
+  pinHint: { fontSize: 11.5, color: colors.textSecondary },
+  confirmWrap: { marginTop: spacing.md, marginBottom: spacing.md },
 });

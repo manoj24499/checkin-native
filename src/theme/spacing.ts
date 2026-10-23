@@ -7,14 +7,27 @@ export const spacing = {
   xxl: 48,
 } as const;
 
+// Lime theme: everything is rounder. The original four names are kept (and
+// re-valued) so existing styles still compile; prefer the semantic names
+// below in new code.
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  // Sheet/dialog corner radius from the "Inzivo Redesign" mockup (bottom
-  // sheets and the blocking issue dialog use 14px, distinct from the 8px
-  // cards/buttons use) — introduced for Phase 2/3, not yet consumed in
-  // Phase 1's card/button restyle.
-  xl: 14,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  // Sheet/dialog corner radius (bottom sheets, dark map/nav bottom panels).
+  xl: 30,
   full: 999,
+
+  /** Inputs, PIN boxes, notes/callouts. */
+  input: 14,
+  /** Icon tiles and quick-action tiles (18-20 in the mockup). */
+  tile: 18,
+  /** Standard white cards. */
+  card: 26,
+  /** The lime hero card. */
+  hero: 30,
+  /** Bottom sheet top corners. */
+  sheet: 30,
+  /** 50-high pill buttons. */
+  button: 25,
 } as const;

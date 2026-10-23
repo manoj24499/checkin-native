@@ -1,4 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { StatusBadge } from "@/components/ui";
 import type { DaySummary } from "@/utils/attendanceGrouping";
 import { formatDuration } from "@/utils/attendanceGrouping";
 import { colors, spacing, typography } from "@/theme";
@@ -31,21 +33,20 @@ export function WeeklyHoursChart({ days }: { days: DaySummary[] }) {
     <View>
       <View style={styles.headerRow}>
         <Text style={styles.title}>This week</Text>
-        <Text style={styles.total}>{formatDuration(totalMs)}</Text>
+        <StatusBadge label={formatDuration(totalMs)} tone="primary" />
       </View>
       <View style={styles.chart}>
         {weekDays.map((d) => (
           <View key={d.label} style={styles.col}>
             <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height: `${Math.max(4, (d.hoursMs / maxMs) * 100)}%`,
-                    backgroundColor: d.hoursMs > 0 ? colors.primary : colors.surfaceMuted,
-                  },
-                ]}
-              />
+              {d.hoursMs > 0 ? (
+                <LinearGradient
+                  colors={[colors.lime, "#7FAE12"]}
+                  style={[styles.bar, { height: `${Math.max(4, (d.hoursMs / maxMs) * 100)}%` }]}
+                />
+              ) : (
+                <View style={[styles.bar, styles.barEmpty]} />
+              )}
             </View>
             <Text style={styles.dayLabel}>{d.label}</Text>
           </View>
@@ -56,12 +57,12 @@ export function WeeklyHoursChart({ days }: { days: DaySummary[] }) {
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
-  title: { ...typography.h3, color: colors.textPrimary },
-  total: { ...typography.caption, color: colors.textSecondary },
-  chart: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, height: 88 },
-  col: { flex: 1, alignItems: "center", gap: spacing.sm },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  title: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
+  chart: { flexDirection: "row", gap: spacing.sm + 2, marginTop: spacing.md, height: 92 },
+  col: { flex: 1, alignItems: "center", gap: spacing.xs + 2 },
   barTrack: { flex: 1, width: "100%", justifyContent: "flex-end" },
-  bar: { width: "100%", borderRadius: 6 },
+  bar: { width: "100%", borderTopLeftRadius: 8, borderTopRightRadius: 8, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
+  barEmpty: { height: "8%", backgroundColor: colors.surfaceMuted },
   dayLabel: { fontSize: 9.5, letterSpacing: 1, color: colors.textMuted, fontWeight: "600" },
 });

@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing, typography } from "@/theme";
+import { StyleSheet, Text, View } from "react-native";
+import { Button, Card, Kicker } from "@/components/ui";
+import { colors, spacing, typography } from "@/theme";
 import type { WorkSegmentMode } from "@/types";
 
 interface WorkSegmentCardProps {
@@ -17,51 +18,33 @@ const MODE_LABEL: Record<WorkSegmentMode, string> = { OFFICE: "Office", FIELD: "
 export function WorkSegmentCard({ mode, onSwitch, switching }: WorkSegmentCardProps) {
   const other: WorkSegmentMode = mode === "FIELD" ? "OFFICE" : "FIELD";
   return (
-    <View style={styles.card}>
+    <Card style={styles.card}>
       <View style={styles.statusRow}>
         <View style={styles.dot} />
-        <Text style={styles.label}>CURRENTLY {MODE_LABEL[mode].toUpperCase()}</Text>
+        <Kicker style={styles.label}>{`Currently ${MODE_LABEL[mode]}`}</Kicker>
       </View>
 
       <Text style={styles.whyLine}>
         Switches automatically when you arrive at or leave the office. Not right? Correct it below.
       </Text>
 
-      <Pressable
+      <Button
+        label={switching ? "Switching…" : `I'm actually in ${MODE_LABEL[other]}`}
+        variant="secondary"
+        size="sm"
         onPress={() => onSwitch(other)}
         disabled={switching}
-        style={({ pressed }) => [styles.switchButton, pressed && !switching && styles.switchButtonPressed]}
-      >
-        <Text style={styles.switchButtonLabel}>
-          {switching ? "Switching…" : `I'm actually in ${MODE_LABEL[other]}`}
-        </Text>
-      </Pressable>
-    </View>
+        style={styles.switchButton}
+      />
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.sm + 4,
-    marginTop: spacing.md,
-  },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs + 1 },
-  dot: { width: 9, height: 9, borderRadius: 99, backgroundColor: colors.primary },
-  label: { ...typography.label, letterSpacing: 1.5, color: colors.textSecondary },
-  whyLine: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm, maxWidth: 300 },
-  switchButton: {
-    marginTop: spacing.sm + 2,
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md - 3,
-    paddingVertical: spacing.sm - 1,
-  },
-  switchButtonPressed: { backgroundColor: colors.surfaceMuted },
-  switchButtonLabel: { ...typography.bodyStrong, color: colors.primary, fontSize: 12.5 },
+  card: { marginTop: spacing.sm + 4 },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  dot: { width: 8, height: 8, borderRadius: 99, backgroundColor: colors.limeMid },
+  label: { marginBottom: 0 },
+  whyLine: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  switchButton: { marginTop: spacing.sm + 4, alignSelf: "flex-start" },
 });

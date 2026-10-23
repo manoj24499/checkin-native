@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Screen, Button, TextField, IssueDialog } from "@/components/ui";
+import { Screen, Button, TextField, IssueDialog, Card, Icon, IconButton, IconTile, Kicker, ScreenTitle } from "@/components/ui";
 import { PhotoCaptureView } from "@/components/camera";
 import { useSubmitSupportTicket } from "@/hooks";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
@@ -88,13 +88,16 @@ export function ReportIssueScreen() {
 
   if (submitted) {
     return (
-      <Screen>
-        <Text style={styles.kicker}>SUPPORT</Text>
-        <Text style={styles.title}>Thanks — we'll take a look</Text>
-        <Text style={styles.body}>
-          Your report went through. Your admin can see it from their dashboard and will follow up if they need
-          more from you.
-        </Text>
+      <Screen contentStyle={styles.doneContent}>
+        <Card style={styles.successCard}>
+          <IconTile icon="checkmark" size={64} radius={32} style={styles.successIcon} />
+          <Kicker>Support</Kicker>
+          <Text style={styles.successTitle}>Thanks — we'll take a look</Text>
+          <Text style={[styles.body, styles.centered]}>
+            Your report went through. Your admin can see it from their dashboard and will follow up if they need
+            more from you.
+          </Text>
+        </Card>
         <Button label="Done" onPress={() => navigation.goBack()} style={styles.submit} />
       </Screen>
     );
@@ -102,8 +105,9 @@ export function ReportIssueScreen() {
 
   return (
     <Screen scroll>
-      <Text style={styles.kicker}>SUPPORT</Text>
-      <Text style={styles.title}>Report an issue</Text>
+      <IconButton icon="close" onPress={() => navigation.goBack()} accessibilityLabel="Close" style={styles.closeButton} />
+      <Kicker>Support</Kicker>
+      <ScreenTitle>Report an issue</ScreenTitle>
       <Text style={styles.body}>
         Wrong hours, geofence trouble, a forgotten PIN, anything else — describe what happened and your admin
         will follow up.
@@ -130,9 +134,11 @@ export function ReportIssueScreen() {
       ) : (
         <View style={styles.photoSourceRow}>
           <Pressable onPress={() => setCapturing(true)} style={styles.photoSourceButton}>
+            <Icon name="camera" size={18} color={colors.ink} />
             <Text style={styles.photoSourceLabel}>Take a photo</Text>
           </Pressable>
           <Pressable onPress={pickFromGallery} style={styles.photoSourceButton}>
+            <Icon name="image" size={18} color={colors.ink} />
             <Text style={styles.photoSourceLabel}>Choose from gallery</Text>
           </Pressable>
         </View>
@@ -154,38 +160,42 @@ export function ReportIssueScreen() {
 }
 
 const styles = StyleSheet.create({
-  kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary },
-  title: { ...typography.h2, color: colors.textPrimary, marginTop: spacing.xs },
-  body: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm },
+  closeButton: { alignSelf: "flex-end", marginBottom: spacing.sm },
+  body: { ...typography.caption, fontSize: 13.5, lineHeight: 19, color: colors.textSecondary, marginTop: spacing.sm },
+  centered: { textAlign: "center" },
   messageField: { marginTop: spacing.lg },
   photoTile: {
     marginTop: spacing.md,
-    height: 96,
-    borderWidth: 1,
+    height: 120,
+    borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderColor: "rgba(14,36,16,0.3)",
+    borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  photoTileReady: { borderStyle: "solid", borderColor: colors.success },
+  photoTileReady: { borderStyle: "solid", borderColor: colors.ink },
   photoPreview: { width: "100%", height: "100%" },
-  photoSourceRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
+  photoSourceRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm + 2 },
   photoSourceButton: {
     flex: 1,
-    height: 96,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: colors.border,
-    borderRadius: radius.sm,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 46,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
   },
-  photoSourceLabel: { ...typography.caption, color: colors.textSecondary, textAlign: "center" },
+  photoSourceLabel: { ...typography.label, fontSize: 12.5, color: colors.ink, textAlign: "center", flexShrink: 1 },
   retake: { marginTop: spacing.sm, alignSelf: "flex-start" },
-  retakeLabel: { ...typography.caption, color: colors.danger },
+  retakeLabel: { ...typography.label, fontSize: 12.5, color: colors.danger },
   errorText: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
-  submit: { marginTop: spacing.xl },
+  submit: { marginTop: spacing.lg },
+  doneContent: { justifyContent: "center", flexGrow: 1 },
+  successCard: { alignItems: "center", paddingVertical: spacing.lg, marginBottom: spacing.md },
+  successIcon: { marginBottom: spacing.md },
+  successTitle: { ...typography.h2, color: colors.ink, textAlign: "center", marginBottom: spacing.xs },
 });

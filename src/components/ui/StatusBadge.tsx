@@ -1,12 +1,18 @@
-import { StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing, typography } from "@/theme";
+import { StyleSheet, Text, View, ViewStyle } from "react-native";
+import { colors, radius } from "@/theme";
 
-type Tone = "success" | "warning" | "danger" | "neutral";
+/**
+ * success/warning/danger/neutral as before; "primary" = lime tint with olive
+ * text (e.g. "PIN", "Photo", "Holiday"); "ink" = ink with lime text.
+ */
+type Tone = "success" | "warning" | "danger" | "neutral" | "primary" | "ink";
 
-export function StatusBadge({ label, tone = "neutral" }: { label: string; tone?: Tone }) {
+export function StatusBadge({ label, tone = "neutral", style }: { label: string; tone?: Tone; style?: ViewStyle }) {
   return (
-    <View style={[styles.base, toneStyles[tone]]}>
-      <Text style={[styles.label, textToneStyles[tone]]}>{label}</Text>
+    <View style={[styles.base, toneStyles[tone], style]}>
+      <Text style={[styles.label, textToneStyles[tone]]} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -14,11 +20,11 @@ export function StatusBadge({ label, tone = "neutral" }: { label: string; tone?:
 const styles = StyleSheet.create({
   base: {
     alignSelf: "flex-start",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     borderRadius: radius.full,
   },
-  label: { ...typography.label },
+  label: { fontSize: 10.5, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });
 
 const toneStyles = StyleSheet.create({
@@ -26,6 +32,8 @@ const toneStyles = StyleSheet.create({
   warning: { backgroundColor: colors.warningMuted },
   danger: { backgroundColor: colors.dangerMuted },
   neutral: { backgroundColor: colors.surfaceMuted },
+  primary: { backgroundColor: colors.primaryMuted },
+  ink: { backgroundColor: colors.ink },
 });
 
 const textToneStyles = StyleSheet.create({
@@ -33,4 +41,6 @@ const textToneStyles = StyleSheet.create({
   warning: { color: colors.warning },
   danger: { color: colors.danger },
   neutral: { color: colors.textSecondary },
+  primary: { color: colors.limeDeep },
+  ink: { color: colors.lime },
 });

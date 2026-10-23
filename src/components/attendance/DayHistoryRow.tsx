@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from "react-native";
+import { StatusBadge } from "@/components/ui";
 import type { DaySummary } from "@/utils/attendanceGrouping";
 import { formatDuration } from "@/utils/attendanceGrouping";
-import { colors, spacing } from "@/theme";
+import { colors, spacing, typography } from "@/theme";
 
 function timeOf(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -9,7 +10,17 @@ function timeOf(iso: string) {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function DayHistoryRow({ day }: { day: DaySummary }) {
+interface DayHistoryRowProps {
+  day: DaySummary;
+  /**
+   * Inside a Card: `true` draws a hairline above the row (every row but the
+   * first), `false` none. Omitted (full-screen history list): a hairline
+   * below every row, as before.
+   */
+  divider?: boolean;
+}
+
+export function DayHistoryRow({ day, divider }: DayHistoryRowProps) {
   const dayNum = day.date.getDate();
   const dow = day.date.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase();
 
@@ -33,14 +44,21 @@ export function DayHistoryRow({ day }: { day: DaySummary }) {
   const widthPct = Math.max(2, Math.min(100 - leftPct, (spanMs / DAY_MS) * 100));
 
   return (
-    <View style={styles.row}>
+    <View
+      style={[
+        styles.row,
+        divider === undefined ? styles.dividerBottom : divider ? styles.dividerTop : null,
+      ]}
+    >
       <View style={styles.dateCol}>
         <Text style={styles.dayNum}>{dayNum}</Text>
         <Text style={styles.dow}>{dow}</Text>
       </View>
       <View style={styles.middleCol}>
         <View style={styles.spanRow}>
-          <Text style={styles.span}>{span}</Text>
+          <Text style={styles.span} numberOfLines={1}>
+            {span}
+          </Text>
           <Text style={styles.dur}>{dur}</Text>
         </View>
         <View style={styles.track}>
@@ -48,9 +66,7 @@ export function DayHistoryRow({ day }: { day: DaySummary }) {
         </View>
         {day.outsideMs ? <Text style={styles.outside}>Outside: {formatDuration(day.outsideMs)}</Text> : null}
       </View>
-      <View style={styles.tag}>
-        <Text style={styles.tagLabel}>{method}</Text>
-      </View>
+      <StatusBadge label={method} tone="primary" />
     </View>
   );
 }
@@ -59,18 +75,18 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.sm + 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    gap: spacing.sm + 4,
+    paddingVertical: spacing.sm + 3,
   },
-  dateCol: { width: 38, alignItems: "flex-start" },
-  dayNum: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, fontVariant: ["tabular-nums"] },
-  dow: { fontSize: 9, letterSpacing: 1, color: colors.textMuted, marginTop: 4, fontWeight: "600" },
+  dividerBottom: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  dividerTop: { borderTopWidth: 1, borderTopColor: colors.border },
+  dateCol: { width: 36, alignItems: "center" },
+  dayNum: { ...typography.number, fontSize: 17, color: colors.ink },
+  dow: { fontSize: 9.5, letterSpacing: 1, color: colors.textMuted, marginTop: 2, fontWeight: "600" },
   middleCol: { flex: 1, minWidth: 0 },
-  spanRow: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
-  span: { fontSize: 13, color: colors.textPrimary, fontVariant: ["tabular-nums"] },
-  dur: { fontSize: 11, color: colors.textSecondary },
+  spanRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
+  span: { ...typography.bodyStrong, fontSize: 13.5, color: colors.ink, fontVariant: ["tabular-nums"], flexShrink: 1 },
+  dur: { ...typography.number, fontSize: 13.5, color: colors.ink },
   track: {
     height: 5,
     borderRadius: 99,
@@ -79,13 +95,5 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   outside: { fontSize: 11, color: colors.warning, marginTop: spacing.xs },
-  fill: { position: "absolute", top: 0, bottom: 0, borderRadius: 99, backgroundColor: colors.primary },
-  tag: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 99,
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 4,
-  },
-  tagLabel: { fontSize: 9, letterSpacing: 1, color: colors.textSecondary, fontWeight: "600" },
+  fill: { position: "absolute", top: 0, bottom: 0, borderRadius: 99, backgroundColor: colors.ink },
 });

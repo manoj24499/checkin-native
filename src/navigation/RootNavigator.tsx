@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks";
 import { useSettingsStore } from "@/store/settingsStore";
 import { promptBiometricAuth, msSinceLastBiometricPrompt } from "@/services/biometrics";
 import { checkTrackingHealth, msSinceLocationTrackingStart } from "@/services/locationTracking";
-import { Screen, Button, LoadingView, TrackingReadinessSheet } from "@/components/ui";
+import { Screen, Button, IconTile, LoadingView, TrackingReadinessSheet } from "@/components/ui";
+import { LogoMark } from "@/components/branding/LogoMark";
 import { colors, spacing, typography } from "@/theme";
 import { AuthNavigator } from "./AuthNavigator";
 import { AppTabs } from "./AppTabs";
@@ -34,9 +35,13 @@ const TRACKING_START_GRACE_MS = 5000;
 
 function BiometricLockScreen({ onRetry }: { onRetry: () => void }) {
   return (
-    <Screen>
-      <Text style={styles.lockTitle}>Locked</Text>
-      <Text style={styles.lockMessage}>Unlock with Face ID / fingerprint to continue.</Text>
+    <Screen contentStyle={styles.lockContent}>
+      <LogoMark size={30} barColor={colors.ink} />
+      <View style={styles.lockBody}>
+        <IconTile icon="lock" tone="ink" size={76} radius={26} />
+        <Text style={styles.lockTitle}>Locked</Text>
+        <Text style={styles.lockMessage}>Unlock with Face ID / fingerprint to continue.</Text>
+      </View>
       <Button label="Try again" onPress={onRetry} style={styles.retry} />
     </Screen>
   );
@@ -110,7 +115,7 @@ export function RootNavigator() {
   }, [status]);
 
   if (status === "bootstrapping") {
-    return <LoadingView label="Signing you in…" animated />;
+    return <LoadingView label="Signing you in…" animated fullScreen />;
   }
 
   if (status !== "authenticated") {
@@ -154,7 +159,9 @@ export function RootNavigator() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   lockOverlay: { ...StyleSheet.absoluteFillObject },
-  lockTitle: { ...typography.h1, color: colors.textPrimary, marginBottom: spacing.sm },
-  lockMessage: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.lg },
-  retry: { alignSelf: "flex-start" },
+  lockContent: { justifyContent: "space-between", paddingVertical: spacing.lg },
+  lockBody: { alignItems: "center" },
+  lockTitle: { ...typography.h1, color: colors.ink, marginTop: spacing.lg, marginBottom: spacing.sm },
+  lockMessage: { ...typography.body, color: colors.textSecondary, textAlign: "center", maxWidth: 280 },
+  retry: { alignSelf: "stretch" },
 });

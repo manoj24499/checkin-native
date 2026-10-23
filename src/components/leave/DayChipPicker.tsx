@@ -71,21 +71,22 @@ export function DayChipPicker({ label, value, onChange, disabledBefore, holidayD
 }
 
 const styles = StyleSheet.create({
-  label: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600", marginBottom: spacing.sm },
-  row: { flexDirection: "row", gap: spacing.xs + 2, paddingVertical: 2 },
+  label: { ...typography.kicker, color: colors.textSecondary, marginBottom: spacing.sm },
+  row: { flexDirection: "row", gap: 7, paddingVertical: 2 },
+  // Same look as the shared `Chip`: muted fill; selected = lime tint with a 2px ink outline.
   chip: {
-    paddingHorizontal: spacing.sm + 4,
+    paddingHorizontal: spacing.sm + 5,
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "transparent",
+    backgroundColor: colors.surfaceMuted,
     alignItems: "center",
   },
-  chipSelected: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
+  chipSelected: { borderColor: colors.ink, backgroundColor: colors.primaryMuted },
   chipDisabled: { opacity: 0.35 },
-  chipLabel: { ...typography.bodyStrong, fontSize: 12.5, color: colors.textSecondary },
-  chipLabelSelected: { color: colors.primary },
+  chipLabel: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary },
+  chipLabelSelected: { color: colors.limeDeep, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   chipLabelDisabled: { color: colors.textMuted },
-  holidayTag: { fontSize: 9, color: colors.warning, marginTop: 2, fontWeight: "700" },
+  holidayTag: { fontSize: 9, color: colors.warning, marginTop: 2, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

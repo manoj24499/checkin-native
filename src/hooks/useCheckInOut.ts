@@ -4,6 +4,7 @@ import { attendanceService } from "@/api/services";
 import { startLocationTracking, stopLocationTracking } from "@/services/locationTracking";
 import { registerPushTokenBestEffort } from "@/services/notifications";
 import { rememberVerifiedPin } from "@/services/pinVerifier";
+import { saveTrackingToken } from "@/services/trackingTokens";
 import { enqueueOfflineAttempt, localSessionIdFor, type EnqueueInput } from "@/services/offlineQueue";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -20,6 +21,11 @@ export function useCheckInOut() {
       // The server just accepted this PIN — keep the local verifier current
       // so an offline attempt can catch a mistyped PIN right away.
       void rememberVerifiedPin(payload.employeeCode, payload.pin);
+
+      // Saved before tracking starts, so even the very first ping carries it.
+      if (result.type === "CHECK_IN" && result.trackingToken) {
+        await saveTrackingToken(result.id, result.trackingToken).catch(() => {});
+      }
 
       // Location tracking is best-effort: it can fail for reasons that have
       // nothing to do with whether the check-in/out itself succeeded (e.g.

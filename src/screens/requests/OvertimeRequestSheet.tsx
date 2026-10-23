@@ -96,9 +96,9 @@ export function OvertimeRequestSheet({ onDone }: { onDone: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  blurb: { ...typography.body, color: colors.textSecondary },
-  pickerBlock: { marginTop: spacing.lg },
-  pickerHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
-  reasonBlock: { marginTop: spacing.lg },
+  blurb: { ...typography.caption, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  pickerBlock: { marginTop: spacing.md + 4 },
+  pickerHint: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  reasonBlock: { marginTop: spacing.md + 4 },
   submit: { marginTop: spacing.lg },
 });

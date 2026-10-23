@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
 import { BottomSheet } from "./BottomSheet";
 import { Button } from "./Button";
+import { IconTile } from "./IconTile";
 import { useTrackingFixStore } from "@/store/trackingFixStore";
 import {
   checkTrackingReadiness,
@@ -16,9 +17,7 @@ import { colors, radius, spacing, typography } from "@/theme";
 function Row({ ok, title, hint, action }: { ok: boolean; title: string; hint: string; action?: React.ReactNode }) {
   return (
     <View style={styles.row}>
-      <View style={[styles.mark, ok ? styles.markOk : styles.markBad]}>
-        <Text style={styles.markText}>{ok ? "✓" : "!"}</Text>
-      </View>
+      {ok ? <IconTile icon="check" tone="success" size={36} /> : <IconTile glyph="!" tone="danger" size={36} />}
       <View style={styles.rowBody}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowHint}>{hint}</Text>
@@ -105,21 +104,17 @@ export function TrackingReadinessSheet() {
 
 const styles = StyleSheet.create({
   intro: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.md },
-  row: { flexDirection: "row", gap: spacing.sm + 2, marginBottom: spacing.md },
-  mark: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", marginTop: 2 },
-  markOk: { backgroundColor: colors.success },
-  markBad: { backgroundColor: colors.danger },
-  markText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  row: { flexDirection: "row", gap: spacing.sm + 4, marginBottom: spacing.md },
   rowBody: { flex: 1 },
-  rowTitle: { ...typography.bodyStrong, color: colors.textPrimary },
+  rowTitle: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
   rowHint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   rowAction: { marginTop: spacing.sm, alignSelf: "flex-start" },
   oem: {
     ...typography.caption,
     color: colors.textSecondary,
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.sm,
-    padding: spacing.sm + 2,
+    borderRadius: radius.input,
+    padding: spacing.sm + 4,
     marginBottom: spacing.md,
   },
   footer: { marginTop: spacing.xs },

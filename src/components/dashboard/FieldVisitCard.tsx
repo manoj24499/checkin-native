@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Button, Card, IconTile, Kicker, ListRow } from "@/components/ui";
 import { PhotoCaptureView } from "@/components/camera";
 import { useFieldSummary, useQueuedFieldVisit } from "@/hooks";
 import { getQuickPosition, formatDistance } from "@/utils/geo";
@@ -21,7 +21,7 @@ import { colors, radius, spacing, typography } from "@/theme";
  * rendered by DashboardScreen when the employee is on a Field day and
  * currently checked in.
  */
-export function FieldVisitCard() {
+export function FieldVisitCard({ openSignal }: { openSignal?: number } = {}) {
   const summaryQuery = useFieldSummary(true);
   const queue = useQueuedFieldVisit();
   const [expanded, setExpanded] = useState(false);
@@ -30,6 +30,14 @@ export function FieldVisitCard() {
   const [capturing, setCapturing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+
+  // Home's "Visit" quick-action tile bumps `openSignal` to open the form
+  // (same as tapping "Log a visit"); the initial value is ignored.
+  const lastSignal = useRef(openSignal);
+  useEffect(() => {
+    if (openSignal !== undefined && openSignal !== lastSignal.current) setExpanded(true);
+    lastSignal.current = openSignal;
+  }, [openSignal]);
 
   const summary = summaryQuery.data;
   const visits = summary?.active ? summary.visits : [];
@@ -89,9 +97,9 @@ export function FieldVisitCard() {
   }
 
   return (
-    <View style={styles.card}>
+    <Card style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.kicker}>FIELD DAY · {visits.length} STOP{visits.length === 1 ? "" : "S"} LOGGED</Text>
+        <Kicker style={styles.kicker}>{`Field day · ${visits.length} stop${visits.length === 1 ? "" : "s"} logged`}</Kicker>
         <Text style={styles.distance}>{formatDistance(distanceMeters)} travelled</Text>
       </View>
       <Text style={styles.blurb}>
@@ -105,162 +113,134 @@ export function FieldVisitCard() {
             onPress={() => setCapturing(true)}
             style={[styles.photoTile, photo && styles.photoTileFilled]}
           >
-            <Text style={styles.photoTileLabel}>{photo ? "Photo attached" : "Add a photo"}</Text>
-            <Text style={styles.photoTileHint}>
-              {photo ? "Tap to retake" : "One shot of the place — required"}
-            </Text>
+            {photo ? (
+              <Image source={{ uri: photo }} style={styles.photoThumb} />
+            ) : (
+              <IconTile icon="camera" tone="white" size={44} />
+            )}
+            <View style={styles.photoText}>
+              <Text style={styles.photoTileLabel}>{photo ? "Photo attached" : "Add a photo"}</Text>
+              <Text style={styles.photoTileHint}>
+                {photo ? "Tap to retake" : "One shot of the place — required"}
+              </Text>
+            </View>
           </Pressable>
           {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
           <View style={styles.formActions}>
-            <Pressable onPress={reset} style={styles.cancelButton}>
-              <Text style={styles.cancelButtonLabel}>Cancel</Text>
-            </Pressable>
-            <Pressable
+            <Button label="Cancel" variant="ghost" size="sm" onPress={reset} />
+            <Button
+              label="Save visit"
+              size="sm"
               onPress={handleSubmit}
               disabled={!canSubmit}
-              style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
-            >
-              {locating ? (
-                <ActivityIndicator color={colors.primaryDark} />
-              ) : (
-                <Text style={styles.submitButtonLabel}>Save visit</Text>
-              )}
-            </Pressable>
+              loading={locating}
+              style={styles.submitButton}
+            />
           </View>
         </View>
       ) : (
-        <Pressable onPress={() => setExpanded(true)} style={styles.logButton}>
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-            <Path d="M12 5v14M5 12h14" stroke={colors.primaryDark} strokeWidth={1.7} strokeLinecap="round" />
-          </Svg>
-          <Text style={styles.logButtonLabel}>Log a visit</Text>
-        </Pressable>
+        <Button
+          label="Log a visit"
+          icon="plus"
+          variant="secondary"
+          size="sm"
+          onPress={() => setExpanded(true)}
+          style={styles.logButton}
+        />
       )}
 
       {visits.length > 0 || queue.pending.length > 0 ? (
         <View style={styles.visitList}>
-          {queue.pending.map((p) => (
-            <View key={p.key} style={styles.visitRow}>
-              <View style={styles.visitPhoto}>
-                {p.status === "saving" ? (
-                  <ActivityIndicator color={colors.primary} />
+          {queue.pending.map((p, i) => (
+            <ListRow
+              key={p.key}
+              divider={i > 0}
+              leading={
+                p.status === "saving" ? (
+                  <View style={styles.savingTile}>
+                    <ActivityIndicator color={colors.ink} />
+                  </View>
                 ) : (
-                  <Text style={styles.visitPhotoLabel}>FAILED</Text>
-                )}
-              </View>
-              <View style={styles.visitInfo}>
-                <Text style={styles.visitName}>{p.name}</Text>
-                <Text style={[styles.visitMeta, p.status === "failed" && styles.pendingFailed]}>
-                  {p.status === "saving" ? "Saving…" : p.error ?? "Couldn't save"}
-                </Text>
-              </View>
-              {p.status === "failed" ? (
-                <View style={styles.pendingActions}>
-                  <Pressable onPress={() => queue.retry(p.key)} hitSlop={8}>
-                    <Text style={styles.pendingRetry}>Retry</Text>
-                  </Pressable>
-                  <Pressable onPress={() => queue.remove(p.key)} hitSlop={8}>
-                    <Text style={styles.pendingRemove}>Remove</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
+                  <IconTile glyph="!" tone="danger" />
+                )
+              }
+              title={p.name}
+              subtitle={p.status === "saving" ? "Saving…" : p.error ?? "Couldn't save"}
+              trailing={
+                p.status === "failed" ? (
+                  <View style={styles.pendingActions}>
+                    <Pressable onPress={() => queue.retry(p.key)} hitSlop={8}>
+                      <Text style={styles.pendingRetry}>Retry</Text>
+                    </Pressable>
+                    <Pressable onPress={() => queue.remove(p.key)} hitSlop={8}>
+                      <Text style={styles.pendingRemove}>Remove</Text>
+                    </Pressable>
+                  </View>
+                ) : undefined
+              }
+            />
           ))}
-          {visits.map((v) => (
-            <View key={v.id} style={styles.visitRow}>
-              <View style={styles.visitPhoto}>
-                <Text style={styles.visitPhotoLabel}>PHOTO</Text>
-              </View>
-              <View style={styles.visitInfo}>
-                <Text style={styles.visitName}>{v.name}</Text>
-                {v.description ? <Text style={styles.visitDescription}>{v.description}</Text> : null}
-                {v.contactName || v.contactPhone ? (
-                  <Text style={styles.visitDescription}>
-                    {[v.contactName, v.contactPhone].filter(Boolean).join(" · ")}
-                  </Text>
-                ) : null}
-                <Text style={styles.visitMeta}>
-                  {new Date(v.reachedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+          {visits.map((v, i) => (
+            <ListRow
+              key={v.id}
+              divider={queue.pending.length + i > 0}
+              icon="pin"
+              title={v.name}
+              subtitle={new Date(v.reachedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+              valueSub="Photo"
+            >
+              {v.description ? <Text style={styles.visitDescription}>{v.description}</Text> : null}
+              {v.contactName || v.contactPhone ? (
+                <Text style={styles.visitDescription}>
+                  {[v.contactName, v.contactPhone].filter(Boolean).join(" · ")}
                 </Text>
-              </View>
-            </View>
+              ) : null}
+            </ListRow>
           ))}
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginTop: spacing.sm + 3,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md - 2,
-  },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  kicker: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
-  distance: { ...typography.caption, color: colors.textSecondary, fontSize: 11.5 },
-  blurb: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs + 2 },
-  logButton: {
-    marginTop: spacing.sm + 3,
-    minHeight: 44,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.primary,
+  card: { marginTop: spacing.sm + 4 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  kicker: { marginBottom: 0, flexShrink: 1 },
+  distance: { ...typography.caption, color: colors.textSecondary, fontSize: 12 },
+  blurb: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  logButton: { marginTop: spacing.sm + 4 },
+  form: { marginTop: spacing.sm + 4, gap: spacing.sm },
+  photoTile: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xs + 2,
-  },
-  logButtonLabel: { ...typography.bodyStrong, color: colors.primaryDark },
-  form: { marginTop: spacing.sm + 3, gap: spacing.sm },
-  photoTile: {
-    borderRadius: radius.sm,
+    gap: spacing.sm + 4,
+    borderRadius: radius.tile,
     backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "rgba(14,36,16,0.3)",
     padding: spacing.sm + 2,
   },
-  photoTileFilled: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
-  photoTileLabel: { ...typography.bodyStrong, fontSize: 13, color: colors.textPrimary },
-  photoTileHint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  photoTileFilled: { borderStyle: "solid", borderColor: colors.ink, backgroundColor: colors.primaryMuted },
+  photoThumb: { width: 44, height: 44, borderRadius: 14 },
+  photoText: { flex: 1 },
+  photoTileLabel: { ...typography.bodyStrong, fontSize: 13.5, color: colors.ink },
+  photoTileHint: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   errorText: { ...typography.caption, color: colors.danger },
-  formActions: { flexDirection: "row", gap: spacing.sm, justifyContent: "flex-end" },
-  cancelButton: { minHeight: 40, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center" },
-  cancelButtonLabel: { ...typography.bodyStrong, color: colors.textSecondary },
-  submitButton: {
-    minHeight: 40,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  submitButtonDisabled: { opacity: 0.45 },
-  submitButtonLabel: { ...typography.bodyStrong, color: colors.primaryDark },
-  visitList: { marginTop: spacing.md, gap: spacing.sm + 2 },
-  visitRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 3 },
-  visitPhoto: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm - 2,
+  formActions: { flexDirection: "row", gap: spacing.sm, justifyContent: "flex-end", alignItems: "center" },
+  submitButton: { minWidth: 120 },
+  visitList: { marginTop: spacing.sm + 2 },
+  savingTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  visitPhotoLabel: { fontSize: 8, letterSpacing: 1, color: colors.textMuted, fontWeight: "600" },
-  visitInfo: { flex: 1 },
-  visitName: { ...typography.bodyStrong, fontSize: 13, color: colors.textPrimary },
   visitDescription: { ...typography.caption, color: colors.textSecondary, fontSize: 12, marginTop: 1 },
-  pendingFailed: { color: colors.danger },
   pendingActions: { gap: spacing.xs, alignItems: "flex-end" },
   pendingRetry: { ...typography.bodyStrong, fontSize: 12.5, color: colors.primaryDark },
   pendingRemove: { ...typography.caption, fontSize: 12, color: colors.textMuted },
-  visitMeta: { ...typography.caption, color: colors.textSecondary, fontSize: 11.5 },
 });

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, LayoutChangeEvent, PanResponder, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, spacing, typography } from "@/theme";
 
 const KNOB_WIDTH = 54;
-const KNOB_HEIGHT = 52;
+const KNOB_HEIGHT = 54;
 const TRACK_PADDING = 4;
 const TRACK_HEIGHT = 62;
 const CONFIRM_THRESHOLD = 0.9;
@@ -106,7 +106,7 @@ export function SlideToConfirmTrack({ title, kicker, helpText, disabled, onConfi
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
-        <Text style={[styles.kicker, { color: enabled ? colors.primary : colors.textMuted }]}>{kicker}</Text>
+        <Text style={[styles.kicker, { color: enabled ? colors.ink : colors.textMuted }]}>{kicker}</Text>
         <Text style={styles.hint}>{hint}</Text>
       </View>
 
@@ -119,7 +119,7 @@ export function SlideToConfirmTrack({ title, kicker, helpText, disabled, onConfi
           <Text
             style={[
               styles.title,
-              { color: enabled ? colors.textPrimary : colors.textMuted, opacity: labelOpacity },
+              { color: enabled ? colors.lime : colors.textMuted, opacity: labelOpacity },
             ]}
           >
             {title}
@@ -137,13 +137,13 @@ export function SlideToConfirmTrack({ title, kicker, helpText, disabled, onConfi
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Path
               d="M5 12h13"
-              stroke={enabled ? colors.primaryText : colors.textMuted}
+              stroke={enabled ? colors.ink : colors.textMuted}
               strokeWidth={2}
               strokeLinecap="round"
             />
             <Path
               d="m12 5 7 7-7 7"
-              stroke={enabled ? colors.primaryText : colors.textMuted}
+              stroke={enabled ? colors.ink : colors.textMuted}
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -165,18 +165,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: spacing.sm,
   },
-  kicker: { ...typography.label, letterSpacing: 1.5 },
-  hint: { fontSize: 10, color: colors.textMuted },
+  kicker: { ...typography.kicker },
+  hint: { fontSize: 11, color: colors.textSecondary },
   track: {
     position: "relative",
     height: TRACK_HEIGHT,
-    borderRadius: radius.sm,
+    borderRadius: TRACK_HEIGHT / 2,
     borderWidth: 1,
     overflow: "hidden",
   },
-  trackEnabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.primary },
+  // Ink track, lime label/knob (Lime theme). Disabled falls back to a muted track.
+  trackEnabled: { backgroundColor: colors.ink, borderColor: colors.ink },
   trackDisabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-  fill: { position: "absolute", top: 0, bottom: 0, left: 0, backgroundColor: colors.primaryMuted },
+  fill: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: TRACK_HEIGHT / 2,
+    backgroundColor: "rgba(216,242,94,0.18)",
+  },
   labelWrap: {
     position: "absolute",
     top: 0,
@@ -186,19 +194,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { ...typography.bodyStrong },
+  title: { ...typography.bodyStrong, fontSize: 14 },
   knob: {
     position: "absolute",
     top: TRACK_PADDING,
     width: KNOB_WIDTH,
     height: KNOB_HEIGHT,
-    borderRadius: 6, // matches the mockup's knob radius, distinct from the shared scale
+    borderRadius: KNOB_HEIGHT / 2, // round lime knob (Lime mockup)
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  knobEnabled: { backgroundColor: colors.primary, borderColor: colors.primary },
+  knobEnabled: { backgroundColor: colors.lime, borderColor: colors.lime },
   knobDisabled: { backgroundColor: colors.surface, borderColor: colors.border },
-  knobDragging: { shadowColor: colors.primary, shadowOpacity: 0.3, shadowRadius: 12, elevation: 4 },
+  knobDragging: { shadowColor: colors.lime, shadowOpacity: 0.5, shadowRadius: 12, elevation: 4 },
   help: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
 });

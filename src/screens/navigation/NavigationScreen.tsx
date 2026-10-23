@@ -6,7 +6,7 @@ import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import * as Location from "expo-location";
 import * as Speech from "expo-speech";
 import { useKeepAwake } from "expo-keep-awake";
-import { BottomSheet, Button } from "@/components/ui";
+import { BottomSheet, Button, Chip, Icon, Kicker } from "@/components/ui";
 import { PhotoCaptureView } from "@/components/camera";
 import {
   EMPTY_VISIT_FORM,
@@ -33,7 +33,7 @@ import {
   straightLine,
   type Guidance,
 } from "@/utils/navigation";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, radius, shadows, spacing, typography } from "@/theme";
 import type { AssignedPlace, PlannedPlace, RouteLeg, RoutePlan } from "@/types";
 import { NAV_MAP_HTML } from "./navMapHtml";
 
@@ -422,8 +422,8 @@ export function NavigationScreen() {
 
       {/* Instruction banner */}
       <View style={[styles.banner, { top: insets.top + spacing.sm }]}>
-        <Pressable onPress={close} hitSlop={10} style={styles.bannerClose}>
-          <Text style={styles.bannerCloseLabel}>✕</Text>
+        <Pressable onPress={close} hitSlop={10} style={styles.bannerClose} accessibilityLabel="Close navigation">
+          <Icon name="close" size={16} color={colors.textOnDark} strokeWidth={2} />
         </Pressable>
         {phase === "navigating" && upcoming && guidance ? (
           <View style={styles.bannerBody}>
@@ -440,8 +440,15 @@ export function NavigationScreen() {
             {phase === "arrived" ? "You have arrived" : phase === "done" ? "All places done" : phase === "error" ? "Can't navigate" : "Planning your route…"}
           </Text>
         )}
-        <Pressable onPress={() => setMuted((m) => !m)} hitSlop={10} style={styles.bannerMute}>
-          <Text style={styles.bannerCloseLabel}>{muted ? "🔇" : "🔊"}</Text>
+        <Pressable
+          onPress={() => setMuted((m) => !m)}
+          hitSlop={10}
+          style={styles.bannerMute}
+          accessibilityLabel={muted ? "Unmute voice guidance" : "Mute voice guidance"}
+        >
+          <Icon name="speaker" size={16} color={muted ? colors.textOnDarkMuted : colors.lime} strokeWidth={2} />
+          {/* Muted: a slash through the speaker. */}
+          {muted ? <View style={styles.muteSlash} /> : null}
         </Pressable>
       </View>
       {rerouting ? <Text style={[styles.pill, { top: insets.top + 92 }]}>Re-routing…</Text> : null}
@@ -474,7 +481,7 @@ export function NavigationScreen() {
       <View style={[styles.panel, { paddingBottom: spacing.md + insets.bottom }]}>
         {phase === "loading" ? (
           <View style={styles.center}>
-            <ActivityIndicator color={colors.primary} />
+            <ActivityIndicator color={colors.ink} />
             <Text style={styles.panelHint}>Working out the best order…</Text>
           </View>
         ) : null}
@@ -502,9 +509,9 @@ export function NavigationScreen() {
 
         {(phase === "navigating" || phase === "arrived") && target ? (
           <>
-            <Text style={styles.panelKicker}>
+            <Kicker style={styles.panelKicker}>
               {phase === "arrived" ? "ARRIVED" : `NEXT STOP · ${total} ${total === 1 ? "PLACE" : "PLACES"} LEFT`}
-            </Text>
+            </Kicker>
             <Text style={styles.panelTitle}>{target.name}</Text>
             {target.address ? <Text style={styles.panelHint} numberOfLines={1}>{target.address}</Text> : null}
             {phase === "navigating" && guidance ? (
@@ -540,8 +547,11 @@ export function NavigationScreen() {
       <BottomSheet visible={sheet === "visit"} onClose={() => setSheet(null)} kicker="ARRIVED" title={target?.name ?? "Log visit"}>
         <VisitFormFields values={form} onChange={setForm} />
         <Pressable onPress={() => setCapturing(true)} style={[styles.photoTile, photo && styles.photoTileFilled]}>
-          <Text style={styles.photoLabel}>{photo ? "Photo attached" : "Add a photo"}</Text>
-          <Text style={styles.photoHint}>{photo ? "Tap to retake" : "One shot of the place, required"}</Text>
+          <Icon name={photo ? "checkmark" : "camera"} size={22} color={colors.ink} />
+          <View style={styles.photoText}>
+            <Text style={styles.photoLabel}>{photo ? "Photo attached" : "Add a photo"}</Text>
+            <Text style={styles.photoHint}>{photo ? "Tap to retake" : "One shot of the place, required"}</Text>
+          </View>
         </Pressable>
         {sheetError ? <Text style={styles.sheetError}>{sheetError}</Text> : null}
         <Button label="Save and go to the next place" onPress={() => void submitVisit()} loading={busy} disabled={!photo || !form.name.trim()} style={styles.sheetButton} />
@@ -552,9 +562,7 @@ export function NavigationScreen() {
         <Text style={styles.panelHint}>Why couldn&apos;t you visit this place? Your admin will see it.</Text>
         <View style={styles.chips}>
           {SKIP_REASONS.map((r) => (
-            <Pressable key={r} onPress={() => setSkipReason(r)} style={[styles.chip, skipReason === r && styles.chipOn]}>
-              <Text style={[styles.chipLabel, skipReason === r && styles.chipLabelOn]}>{r}</Text>
-            </Pressable>
+            <Chip key={r} label={r} selected={skipReason === r} onPress={() => setSkipReason(r)} />
           ))}
         </View>
         <TextInput
@@ -577,111 +585,131 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   banner: {
     position: "absolute",
-    left: spacing.sm,
-    right: spacing.sm,
+    left: 12,
+    right: 12,
     minHeight: 76,
-    borderRadius: radius.md,
-    backgroundColor: colors.panelDark,
+    borderRadius: 20,
+    backgroundColor: "rgba(14,36,16,0.95)",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: spacing.sm + 2,
+    gap: spacing.sm + 2,
+    ...shadows.ink,
   },
-  bannerClose: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  bannerMute: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  bannerCloseLabel: { color: colors.textOnDark, fontSize: 18 },
+  bannerClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bannerMute: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  muteSlash: {
+    position: "absolute",
+    width: 20,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.textOnDarkMuted,
+    transform: [{ rotate: "-45deg" }],
+  },
   bannerBody: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm + 2 },
-  glyph: { color: colors.primarySoftText, fontSize: 40, width: 46, textAlign: "center" },
+  // Lime manoeuvre arrow on the ink banner.
+  glyph: { color: colors.lime, fontSize: 34, width: 40, textAlign: "center" },
   bannerText: { flex: 1 },
-  bannerDistance: { ...typography.h2, color: colors.textOnDark },
-  bannerInstruction: { ...typography.body, color: colors.textOnDarkMuted },
+  bannerDistance: { ...typography.h2, fontSize: 21, color: colors.textOnDark },
+  bannerInstruction: { ...typography.caption, fontSize: 13.5, color: colors.textOnDarkMuted, marginTop: 1 },
   bannerPlain: { ...typography.bodyStrong, color: colors.textOnDark, flex: 1, textAlign: "center" },
   pill: {
     position: "absolute",
-    alignSelf: "center",
+    left: 12,
     overflow: "hidden",
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.sm + 4,
-    paddingVertical: 4,
+    backgroundColor: "rgba(14,36,16,0.9)",
+    color: colors.textOnDark,
+    paddingHorizontal: spacing.sm + 3,
+    paddingVertical: 5,
     ...typography.caption,
+    fontSize: 12,
   },
-  pillWarn: { color: colors.danger },
+  pillWarn: { backgroundColor: colors.danger, color: colors.textInverse },
   pillBox: {
     position: "absolute",
-    alignSelf: "center",
+    left: 12,
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm + 4,
-    paddingVertical: 4,
+    backgroundColor: colors.warning,
+    paddingHorizontal: spacing.sm + 3,
+    paddingVertical: 5,
   },
-  pillWarnLabel: { ...typography.caption, color: colors.danger },
+  pillWarnLabel: { ...typography.caption, fontSize: 12, color: colors.textInverse },
   recenter: {
     position: "absolute",
-    right: spacing.md,
+    right: 14,
     borderRadius: radius.full,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 14,
     paddingVertical: spacing.sm,
+    ...shadows.card,
   },
-  recenterLabel: { ...typography.bodyStrong, color: colors.primaryDark, fontSize: 13 },
+  recenterLabel: { ...typography.bodyStrong, color: colors.ink, fontSize: 12.5 },
   panel: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    paddingHorizontal: 18,
+    paddingTop: spacing.md + 2,
     minHeight: 120,
+    ...shadows.card,
   },
   center: { alignItems: "center", paddingVertical: spacing.md, gap: spacing.sm },
-  panelKicker: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
-  panelTitle: { ...typography.h3, color: colors.textPrimary, marginTop: 2 },
-  panelHint: { ...typography.caption, color: colors.textSecondary, marginTop: 3 },
-  panelMeta: { ...typography.bodyStrong, color: colors.primaryDark, marginTop: spacing.xs },
-  panelNote: { ...typography.caption, color: colors.warning, marginTop: spacing.xs },
+  panelKicker: { marginBottom: 2 },
+  panelTitle: { ...typography.h3, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.ink, marginTop: 2 },
+  panelHint: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: 3 },
+  panelMeta: { ...typography.bodyStrong, fontSize: 13.5, color: colors.limeDeep, marginTop: spacing.xs },
+  panelNote: { ...typography.caption, fontSize: 12.5, fontStyle: "italic", color: colors.textSecondary, marginTop: spacing.xs },
   panelButton: { marginTop: spacing.md },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm + 2 },
+  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm + 4 },
   actionHalf: { flex: 1 },
   photoTile: {
-    borderRadius: radius.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm + 4,
+    borderRadius: 16,
     backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.sm + 2,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "rgba(14,36,16,0.3)",
+    padding: spacing.sm + 4,
     marginTop: spacing.sm,
   },
-  photoTileFilled: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
-  photoLabel: { ...typography.bodyStrong, fontSize: 13, color: colors.textPrimary },
-  photoHint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  photoTileFilled: { borderStyle: "solid", borderColor: colors.ink, backgroundColor: colors.primaryMuted },
+  photoText: { flex: 1 },
+  photoLabel: { ...typography.bodyStrong, fontSize: 13.5, color: colors.ink },
+  photoHint: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   sheetError: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
   sheetButton: { marginTop: spacing.md },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
-  chip: {
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-  },
-  chipOn: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
-  chipLabel: { ...typography.caption, color: colors.textSecondary },
-  chipLabelOn: { color: colors.primaryDark, fontWeight: "600" },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm + 2 },
   reasonInput: {
-    marginTop: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.sm,
-    color: colors.textPrimary,
+    marginTop: spacing.sm + 2,
+    borderRadius: radius.input,
+    borderWidth: 1.5,
+    borderColor: colors.inkBorder,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: spacing.sm + 4,
+    color: colors.ink,
     ...typography.body,
   },
 });

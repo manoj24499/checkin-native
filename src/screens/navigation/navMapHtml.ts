@@ -37,13 +37,13 @@ export const NAV_MAP_HTML = `<!DOCTYPE html>
       return L.divIcon({
         className: '',
         html: '<div style="width:38px;height:38px;transform:rotate(' + (h || 0) + 'deg)"><svg viewBox="0 0 24 24" width="38" height="38">' +
-          '<circle cx="12" cy="12" r="11" fill="rgba(239,108,0,.18)"/>' +
-          '<path d="M12 3 L18.5 19 L12 15.5 L5.5 19 Z" fill="${colors.primary}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></div>',
+          '<circle cx="12" cy="12" r="11" fill="rgba(216,242,94,.3)"/>' +
+          '<path d="M12 3 L18.5 19 L12 15.5 L5.5 19 Z" fill="${colors.lime}" stroke="${colors.ink}" stroke-width="1.6" stroke-linejoin="round"/></svg></div>',
         iconSize: [38, 38], iconAnchor: [19, 19]
       });
     }
-    function numIcon(n, color) {
-      return L.divIcon({ className: '', html: '<div class="num" style="background:' + color + '">' + n + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] });
+    function numIcon(n, color, text) {
+      return L.divIcon({ className: '', html: '<div class="num" style="background:' + color + ';color:' + (text || '#fff') + '">' + n + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] });
     }
 
     window.setPosition = function (lat, lng, heading) {
@@ -59,14 +59,15 @@ export const NAV_MAP_HTML = `<!DOCTYPE html>
       if (casing) { map.removeLayer(casing); casing = null; }
       if (line) { map.removeLayer(line); line = null; }
       if (!coords || coords.length < 2) return;
-      casing = L.polyline(coords, { color: '#ffffff', weight: 9, opacity: 0.9 }).addTo(map);
-      line = L.polyline(coords, { color: '${colors.primary}', weight: 5, opacity: 0.95 }).addTo(map);
+      // Lime line on an ink casing: reads on both light (streets) and dark (parks/water) tiles.
+      casing = L.polyline(coords, { color: '${colors.ink}', weight: 9, opacity: 0.85 }).addTo(map);
+      line = L.polyline(coords, { color: '${colors.lime}', weight: 5, opacity: 1 }).addTo(map);
       if (fit && !zoomed) { map.fitBounds(line.getBounds(), { padding: [60, 60] }); }
     };
     window.setDestination = function (lat, lng, n) {
       if (dest) { map.removeLayer(dest); dest = null; }
       if (lat === null || lat === undefined) return;
-      dest = L.marker([lat, lng], { icon: numIcon(n, '${colors.primaryDark}'), zIndexOffset: 900, interactive: false }).addTo(map);
+      dest = L.marker([lat, lng], { icon: numIcon(n, '${colors.lime}', '${colors.ink}'), zIndexOffset: 900, interactive: false }).addTo(map);
     };
     window.setOthers = function (list) {
       others.forEach(function (m) { map.removeLayer(m); });

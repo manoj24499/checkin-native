@@ -1,32 +1,47 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
-import { colors, radius, spacing, typography } from "@/theme";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { renderIcon, type IconSource } from "./Icon";
+import { colors, radius, shadows, spacing, typography } from "@/theme";
 
-type Variant = "primary" | "secondary" | "danger" | "ghost";
+type Variant = "primary" | "secondary" | "danger" | "ghost" | "lime";
 
 interface ButtonProps {
   label: string;
   onPress: () => void;
+  /**
+   * - primary (default): ink pill, lime label, soft ink shadow.
+   * - secondary: transparent, 1.5px ink outline, ink label.
+   * - danger: white pill, hairline border, red label (destructive actions).
+   * - ghost: no background/border, ink label (tertiary links/actions).
+   * - lime: lime pill, ink label — for use ON dark (ink) panels.
+   */
   variant?: Variant;
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
+  /** "md" (default) is 50 high; "sm" is 42 high with a smaller label. */
+  size?: "md" | "sm";
+  /** Optional leading icon (icon name or element), tinted like the label. */
+  icon?: IconSource;
 }
 
-const INDICATOR_COLOR: Record<Variant, string> = {
-  primary: colors.primary,
-  secondary: colors.textPrimary,
+const LABEL_COLOR: Record<Variant, string> = {
+  primary: colors.primaryText,
+  secondary: colors.ink,
   danger: colors.danger,
-  ghost: colors.primary,
+  ghost: colors.ink,
+  lime: colors.ink,
 };
 
-export function Button({ label, onPress, variant = "primary", loading, disabled, style }: ButtonProps) {
+export function Button({ label, onPress, variant = "primary", loading, disabled, style, size = "md", icon }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const labelColor = LABEL_COLOR[variant];
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
+        size === "sm" && styles.small,
         variantStyles[variant],
         isDisabled && styles.disabled,
         pressed && !isDisabled && styles.pressed,
@@ -34,9 +49,12 @@ export function Button({ label, onPress, variant = "primary", loading, disabled,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={INDICATOR_COLOR[variant]} />
+        <ActivityIndicator color={labelColor} />
       ) : (
-        <Text style={[styles.label, textVariantStyles[variant]]}>{label}</Text>
+        <View style={styles.inner}>
+          {icon ? renderIcon(icon, size === "sm" ? 16 : 18, labelColor) : null}
+          <Text style={[styles.label, size === "sm" && styles.labelSmall, { color: labelColor }]}>{label}</Text>
+        </View>
       )}
     </Pressable>
   );
@@ -45,28 +63,23 @@ export function Button({ label, onPress, variant = "primary", loading, disabled,
 const styles = StyleSheet.create({
   base: {
     minHeight: 50,
-    borderRadius: radius.sm,
+    borderRadius: radius.button,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
   },
-  pressed: { opacity: 0.7 },
-  disabled: { opacity: 0.5 },
+  small: { minHeight: 42, borderRadius: 21, paddingHorizontal: spacing.md },
+  inner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.45 },
   label: { ...typography.bodyStrong },
+  labelSmall: { fontSize: 13.5 },
 });
 
-// System rule: primary actions are outlined, not filled — the only solid
-// fill in the palette is reserved for dark "presence" panels, not buttons.
 const variantStyles = StyleSheet.create({
-  primary: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.primary },
-  secondary: { backgroundColor: colors.surfaceMuted },
-  danger: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.danger },
+  primary: { backgroundColor: colors.ink, ...shadows.ink },
+  secondary: { backgroundColor: "transparent", borderWidth: 1.5, borderColor: colors.ink },
+  danger: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   ghost: { backgroundColor: "transparent" },
-});
-
-const textVariantStyles = StyleSheet.create({
-  primary: { color: colors.primary },
-  secondary: { color: colors.textPrimary },
-  danger: { color: colors.danger },
-  ghost: { color: colors.primary },
+  lime: { backgroundColor: colors.lime },
 });

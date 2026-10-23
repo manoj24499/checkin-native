@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Button, ErrorView, LoadingView, Screen } from "@/components/ui";
+import { Button, Card, ErrorView, IconButton, Kicker, LoadingView, Screen } from "@/components/ui";
 import { useAssignedPlaces, useRoutePlanner } from "@/hooks";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { getQuickPosition } from "@/utils/geo";
@@ -72,13 +72,15 @@ export function TodaysPlacesScreen() {
 
   return (
     <Screen scroll refreshing={placesQuery.isRefetching || planning} onRefresh={() => void load()}>
-      <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.back}>
-        <Text style={styles.backLabel}>‹ Back</Text>
-      </Pressable>
-      <Text style={styles.title}>Today&apos;s places</Text>
-      <Text style={styles.subtitle}>
-        {pending.length} to visit · {visited.length} done{skipped.length > 0 ? ` · ${skipped.length} skipped` : ""}
-      </Text>
+      <View style={styles.header}>
+        <IconButton icon="back" onPress={() => navigation.goBack()} accessibilityLabel="Back" />
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Today&apos;s places</Text>
+          <Text style={styles.subtitle}>
+            {pending.length} to visit · {visited.length} done{skipped.length > 0 ? ` · ${skipped.length} skipped` : ""}
+          </Text>
+        </View>
+      </View>
 
       {!activeAttendanceId ? (
         <Text style={styles.warning}>You&apos;re not checked in. Check in with Field work before you log a visit.</Text>
@@ -93,7 +95,7 @@ export function TodaysPlacesScreen() {
       {pending.length > 0 ? (
         <>
           <View style={styles.startWrap}>
-            <Button label="Start navigation" onPress={() => navigation.navigate("Navigate")} />
+            <Button label="Start navigation" icon="navigate" onPress={() => navigation.navigate("Navigate")} />
           </View>
           {pending.map(({ place, planned }, i) => (
             <PlaceCard
@@ -112,11 +114,11 @@ export function TodaysPlacesScreen() {
         <Text style={styles.allDone}>No places are assigned for today.</Text>
       )}
 
-      {visited.length > 0 ? <Text style={styles.section}>DONE</Text> : null}
+      {visited.length > 0 ? <Kicker style={styles.section}>Done</Kicker> : null}
       {visited.map((p) => (
         <PlaceCard key={p.id} place={p} done />
       ))}
-      {skipped.length > 0 ? <Text style={styles.section}>SKIPPED</Text> : null}
+      {skipped.length > 0 ? <Kicker style={styles.section}>Skipped</Kicker> : null}
       {skipped.map((p) => (
         <PlaceCard key={p.id} place={p} skippedReason={p.skipReason ?? ""} />
       ))}
@@ -143,10 +145,12 @@ function PlaceCard({
 }) {
   const contact = [place.contactName, place.contactPhone].filter(Boolean).join(" · ");
   return (
-    <View style={[styles.card, (done || skippedReason !== undefined) && styles.cardMuted]}>
+    <Card style={[styles.card, (done || skippedReason !== undefined) && styles.cardMuted]}>
       <View style={styles.cardRow}>
         <View style={[styles.badge, done && styles.badgeDone, skippedReason !== undefined && styles.badgeSkipped]}>
-          <Text style={styles.badgeLabel}>{done ? "✓" : skippedReason !== undefined ? "–" : order}</Text>
+          <Text style={[styles.badgeLabel, (done || skippedReason !== undefined) && styles.badgeLabelMuted]}>
+            {done ? "✓" : skippedReason !== undefined ? "–" : order}
+          </Text>
         </View>
         <View style={styles.cardBody}>
           <Text style={styles.name}>{place.name}</Text>
@@ -167,44 +171,57 @@ function PlaceCard({
           {skippedReason !== undefined ? <Text style={styles.meta}>Skipped: {skippedReason}</Text> : null}
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { alignSelf: "flex-start", marginBottom: spacing.sm },
-  backLabel: { ...typography.bodyStrong, color: colors.primaryDark },
-  title: { ...typography.h2, color: colors.textPrimary },
-  subtitle: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  warning: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
-  note: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
-  startWrap: { marginTop: spacing.md, marginBottom: spacing.xs },
-  allDone: { ...typography.body, color: colors.textSecondary, marginTop: spacing.lg },
-  section: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600", marginTop: spacing.lg, marginBottom: spacing.xs },
-  card: {
-    marginTop: spacing.sm,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md - 2,
+  header: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 2, marginBottom: spacing.xs },
+  headerText: { flex: 1 },
+  title: { ...typography.h2, color: colors.ink },
+  subtitle: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: 1 },
+  warning: {
+    ...typography.caption,
+    color: colors.warningText,
+    backgroundColor: colors.warningMuted,
+    borderRadius: radius.input,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    marginTop: spacing.sm + 2,
+    overflow: "hidden",
   },
-  cardMuted: { backgroundColor: colors.surfaceMuted },
-  cardRow: { flexDirection: "row", gap: spacing.sm + 2 },
+  note: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.input,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    marginTop: spacing.sm + 2,
+    overflow: "hidden",
+  },
+  startWrap: { marginTop: spacing.md, marginBottom: spacing.xs },
+  allDone: { ...typography.body, color: colors.textSecondary, marginTop: spacing.lg, textAlign: "center" },
+  section: { marginTop: spacing.lg, marginBottom: 0 },
+  card: { marginTop: spacing.sm + 2, padding: 14 },
+  cardMuted: { opacity: 0.7 },
+  cardRow: { flexDirection: "row", gap: spacing.sm + 4 },
   cardBody: { flex: 1 },
   badge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeDone: { backgroundColor: colors.success },
-  badgeSkipped: { backgroundColor: colors.textMuted },
-  badgeLabel: { ...typography.bodyStrong, color: colors.primaryText, fontSize: 13 },
-  name: { ...typography.bodyStrong, color: colors.textPrimary },
-  detail: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  meta: { ...typography.caption, color: colors.primaryDark, marginTop: 3, fontSize: 12 },
-  notes: { ...typography.caption, color: colors.warning, marginTop: 3 },
+  badgeDone: { backgroundColor: colors.successMuted },
+  badgeSkipped: { backgroundColor: colors.surfaceMuted },
+  // Lime on the ink order badge; done/skipped badges are pale, so they get dark text.
+  badgeLabel: { ...typography.bodyStrong, color: colors.lime, fontSize: 13 },
+  badgeLabelMuted: { color: colors.textSecondary },
+  name: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
+  detail: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  meta: { ...typography.caption, color: colors.limeDeep, fontWeight: "600", fontFamily: "Inter_600SemiBold", marginTop: 3, fontSize: 12 },
+  notes: { ...typography.caption, fontSize: 12, fontStyle: "italic", color: colors.textSecondary, marginTop: 3 },
 });

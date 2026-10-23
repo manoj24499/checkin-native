@@ -151,6 +151,10 @@ export interface ScanResult {
   offlineOutsideArea?: boolean;
   // The same clientId had already been recorded (an earlier reply was lost).
   idempotentReplay?: boolean;
+  // Per-session secret for /api/kiosk/location uploads (sent as X-Tracking-Token).
+  // Returned only once, on the response that actually created a CHECK_IN — never
+  // on CHECK_OUT or an idempotentReplay. See services/trackingTokens.ts.
+  trackingToken?: string;
 }
 
 /** Sent only when uploading an attempt saved on the phone while offline. */

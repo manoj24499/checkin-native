@@ -19,10 +19,13 @@ interface LogoMarkProps {
   /** Bar color — pass colors.textOnDark on a dark panel (e.g. the login
    * hero), defaults to colors.textPrimary for light backgrounds. */
   barColor?: string;
+  /** Diagonal stroke colour. Defaults to the mid lime-green (`colors.limeMid`),
+   * which reads on both the pale background and the lime hero. */
+  accentColor?: string;
 }
 
 /**
- * The Inzivo "Z-gate" mark: a top bar, a bottom bar, and an orange diagonal
+ * The Inzivo "Z-gate" mark: a top bar, a bottom bar, and a lime-green diagonal
  * stroke between them, wiped into view top-to-bottom. Imported from the
  * "Inzivo Z-gate — Animated" Claude Design project.
  *
@@ -34,7 +37,12 @@ interface LogoMarkProps {
  * path — the same category of animation (Animated.Value + non-native-driver
  * layout property) already proven in SlideToConfirmTrack.tsx.
  */
-export function LogoMark({ animated = false, size = 96, barColor = colors.textPrimary }: LogoMarkProps) {
+export function LogoMark({
+  animated = false,
+  size = 96,
+  barColor = colors.textPrimary,
+  accentColor = colors.limeMid,
+}: LogoMarkProps) {
   const unit = size / GRID;
   const progress = useRef(new Animated.Value(animated ? 0 : 1)).current;
   const wipeProgress = useRef(new Animated.Value(animated ? 0 : 1)).current;
@@ -94,7 +102,7 @@ export function LogoMark({ animated = false, size = 96, barColor = colors.textPr
         />
         <Animated.View style={[styles.wipe, { width: size, height: wipeHeight }]}>
           <Svg width={size} height={size} viewBox={`0 0 ${GRID} ${GRID}`} fill="none">
-            <Path d="M88 16 L38 88 H16 L66 16 Z" fill={colors.primary} />
+            <Path d="M88 16 L38 88 H16 L66 16 Z" fill={accentColor} />
           </Svg>
         </Animated.View>
         <Animated.View

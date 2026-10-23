@@ -1,14 +1,24 @@
 import { useMemo } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadingView, ErrorView, EmptyState } from "@/components/ui";
+import {
+  LoadingView,
+  ErrorView,
+  EmptyState,
+  IconButton,
+  Kicker,
+  ScreenBackground,
+  ScreenTitle,
+} from "@/components/ui";
 import { DayHistoryRow } from "@/components/attendance";
 import { useAttendanceHistory } from "@/hooks";
 import { groupAttendanceByDay } from "@/utils/attendanceGrouping";
 import { getErrorMessage } from "@/utils/errors";
-import { colors, spacing, typography } from "@/theme";
+import { colors, radius, spacing } from "@/theme";
 
 export function AttendanceHistoryScreen() {
+  const navigation = useNavigation();
   const query = useAttendanceHistory();
 
   const days = useMemo(() => {
@@ -16,52 +26,78 @@ export function AttendanceHistoryScreen() {
     return groupAttendanceByDay(records);
   }, [query.data]);
 
-  if (query.isLoading) return <LoadingView label="Loading history…" />;
+  if (query.isLoading) return <LoadingView label="Loading history…" fullScreen />;
   if (query.isError) {
-    return <ErrorView message={getErrorMessage(query.error)} onRetry={() => query.refetch()} />;
+    return (
+      <ScreenBackground>
+        <ErrorView message={getErrorMessage(query.error)} onRetry={() => query.refetch()} />
+      </ScreenBackground>
+    );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Text style={styles.kicker}>ATTENDANCE</Text>
-      <Text style={styles.title}>History</Text>
-      <FlatList
-        data={days}
-        keyExtractor={(item) => item.dateKey}
-        renderItem={({ item }) => <DayHistoryRow day={item} />}
-        contentContainerStyle={styles.list}
-        onEndReachedThreshold={0.4}
-        onEndReached={() => {
-          if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
-        }}
-        refreshing={query.isRefetching}
-        onRefresh={() => query.refetch()}
-        ListEmptyComponent={
-          <EmptyState title="No attendance yet" message="Your check-ins and check-outs will show up here." />
-        }
-        ListFooterComponent={
-          query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} color={colors.primary} /> : null
-        }
-      />
-    </SafeAreaView>
+    <ScreenBackground>
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+        <View style={styles.header}>
+          {navigation.canGoBack() ? (
+            <IconButton icon="back" onPress={() => navigation.goBack()} accessibilityLabel="Back" />
+          ) : null}
+          <View>
+            <Kicker>Attendance</Kicker>
+            <ScreenTitle style={styles.title}>History</ScreenTitle>
+          </View>
+        </View>
+        <FlatList
+          data={days}
+          keyExtractor={(item) => item.dateKey}
+          // Rows read as one white card: the first/last rows round its corners.
+          renderItem={({ item, index }) => (
+            <View
+              style={[
+                styles.cardRow,
+                index === 0 && styles.cardTop,
+                index === days.length - 1 && styles.cardBottom,
+              ]}
+            >
+              <DayHistoryRow day={item} divider={index > 0} />
+            </View>
+          )}
+          contentContainerStyle={styles.list}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
+          }}
+          refreshing={query.isRefetching}
+          onRefresh={() => query.refetch()}
+          ListEmptyComponent={
+            <EmptyState
+              icon="history"
+              title="No attendance yet"
+              message="Your check-ins and check-outs will show up here."
+            />
+          }
+          ListFooterComponent={
+            query.isFetchingNextPage ? <ActivityIndicator style={styles.footer} color={colors.ink} /> : null
+          }
+        />
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  kicker: {
-    ...typography.label,
-    letterSpacing: 2,
-    color: colors.textSecondary,
+  safeArea: { flex: 1, backgroundColor: "transparent" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm + 2,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
   },
-  title: {
-    ...typography.h1,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.xs,
-  },
+  title: { fontSize: 22 },
   list: { padding: spacing.md, flexGrow: 1 },
+  cardRow: { backgroundColor: colors.surface, paddingHorizontal: 14 },
+  cardTop: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, paddingTop: spacing.xs },
+  cardBottom: { borderBottomLeftRadius: radius.card, borderBottomRightRadius: radius.card, paddingBottom: spacing.xs },
   footer: { marginVertical: spacing.md },
 });

@@ -79,7 +79,7 @@ export function PermissionRequestSheet({ onDone }: { onDone: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  blurb: { ...typography.body, color: colors.textSecondary },
-  pickerBlock: { marginTop: spacing.lg },
+  blurb: { ...typography.caption, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  pickerBlock: { marginTop: spacing.md + 4 },
   submit: { marginTop: spacing.lg },
 });

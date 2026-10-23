@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing, typography } from "@/theme";
+import { Card, IconTile, ListRow, StatusBadge } from "@/components/ui";
+import { colors, spacing, typography } from "@/theme";
 import type { TimedPermission } from "@/types";
 
 function formatTime(iso: string) {
@@ -14,60 +15,51 @@ const STATUS_LABEL: Record<TimedPermission["status"], string> = {
   resolved: "Resolved",
 };
 
+interface PermissionStatusCardProps {
+  permission: TimedPermission;
+  /** Render as a ListRow (Home's "Today" card) instead of a standalone card. */
+  asRow?: boolean;
+  /** Hairline above the row (every row but the first in a card). */
+  divider?: boolean;
+}
+
 /** Mirrors PresenceCard/LateNoticeCard's warning-tone convention — a self-
  * declared permission window is informational, not an error, but shares the
  * same "this affects your work time" visual weight as those. A declined
  * request gets the danger tone instead, since it's a rejection, not a
  * neutral/in-progress state. */
-export function PermissionStatusCard({ permission }: { permission: TimedPermission }) {
+export function PermissionStatusCard({ permission, asRow, divider }: PermissionStatusCardProps) {
   const isActive = permission.status === "active";
   const isRejected = permission.status === "rejected";
+  const tone = isRejected ? "danger" : "warning";
+  const badge = (
+    <StatusBadge label={STATUS_LABEL[permission.status]} tone={isActive ? "ink" : tone} />
+  );
+  const range = `${formatTime(permission.startTime)} – ${formatTime(permission.endTime)}`;
+
+  if (asRow) {
+    return <ListRow icon="clock" title="Timed permission" subtitle={range} trailing={badge} divider={divider} />;
+  }
+
   return (
-    <View style={[styles.card, isRejected && styles.cardRejected]}>
+    <Card tone={tone} style={styles.card}>
       <View style={styles.row}>
-        <Text style={[styles.headline, isRejected && styles.headlineRejected]}>Timed permission</Text>
-        <View style={[styles.badge, isActive && styles.badgeActive, isRejected && styles.badgeRejected]}>
-          <Text
-            style={[
-              styles.badgeLabel,
-              isActive && styles.badgeLabelActive,
-              isRejected && styles.badgeLabelRejected,
-            ]}
-          >
-            {STATUS_LABEL[permission.status]}
-          </Text>
+        <IconTile icon="clock" tone={tone} />
+        <View style={styles.text}>
+          <Text style={[styles.headline, isRejected && styles.headlineRejected]}>Timed permission</Text>
+          <Text style={styles.subline}>{range}</Text>
         </View>
+        {badge}
       </View>
-      <Text style={styles.subline}>
-        {formatTime(permission.startTime)} – {formatTime(permission.endTime)}
-      </Text>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: "rgba(184,134,11,0.35)",
-    backgroundColor: colors.warningMuted,
-    padding: spacing.sm + 4,
-    marginTop: spacing.md,
-  },
-  cardRejected: { borderColor: "rgba(179,69,63,0.35)", backgroundColor: colors.dangerMuted },
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  card: { marginTop: spacing.sm + 4, padding: spacing.sm + 6 },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 4 },
+  text: { flex: 1, minWidth: 0 },
   headline: { ...typography.bodyStrong, fontSize: 14.5, color: colors.warning },
   headlineRejected: { color: colors.danger },
   subline: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
-  },
-  badgeActive: { backgroundColor: colors.warning },
-  badgeRejected: { backgroundColor: colors.danger },
-  badgeLabel: { fontSize: 10, fontWeight: "700", color: colors.warning },
-  badgeLabelActive: { color: colors.textInverse },
-  badgeLabelRejected: { color: colors.textInverse },
 });

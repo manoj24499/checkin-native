@@ -3,6 +3,7 @@ import { Controller, useForm } from "react-hook-form";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
 import { TextField, Button } from "@/components/ui";
 import { BarSpark } from "@/components/dashboard";
 import { LogoMark } from "@/components/branding/LogoMark";
@@ -10,7 +11,7 @@ import { useAuth, useActivityPattern } from "@/hooks";
 import { useSettingsStore } from "@/store/settingsStore";
 import { env } from "@/config/env";
 import { getErrorMessage } from "@/utils/errors";
-import { colors, spacing, typography } from "@/theme";
+import { colors, gradients, radius, spacing, typography } from "@/theme";
 
 interface LoginFormValues {
   organizationCode: string;
@@ -63,19 +64,22 @@ export function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      <SafeAreaView edges={["top"]} style={styles.hero}>
-        <View style={styles.logoRow}>
-          <LogoMark animated size={28} barColor={colors.textOnDark} />
-        </View>
-        <Text style={styles.headline}>Check-in Application.</Text>
-        <Text style={styles.heroSubtitle}>
-          Check in, share your dot while you work, check out. Nothing more.
-        </Text>
-        <View style={styles.sparkRow}>
-          <BarSpark values={spark} color={colors.primary} height={30} />
-        </View>
-      </SafeAreaView>
+      <StatusBar style="dark" />
+      <LinearGradient colors={gradients.hero} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={styles.heroShell}>
+        <View pointerEvents="none" style={styles.heroGlow} />
+        <SafeAreaView edges={["top"]} style={styles.hero}>
+          <View style={styles.logoRow}>
+            <LogoMark animated size={28} barColor={colors.ink} accentColor={colors.limeDeep} />
+          </View>
+          <Text style={styles.headline}>Check-in Application.</Text>
+          <Text style={styles.heroSubtitle}>
+            Check in, share your dot while you work, check out. Nothing more.
+          </Text>
+          <View style={styles.sparkRow}>
+            <BarSpark values={spark} color={colors.ink} height={30} />
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
 
       <ScrollView
         contentContainerStyle={styles.formContent}
@@ -88,6 +92,7 @@ export function LoginScreen() {
           render={({ field: { onChange, onBlur, value } }) => (
             <TextField
               label="Organization code"
+              icon="shield"
               placeholder="acme-corp"
               autoCapitalize="none"
               autoCorrect={false}
@@ -106,6 +111,7 @@ export function LoginScreen() {
           render={({ field: { onChange, onBlur, value } }) => (
             <TextField
               label="Employee code"
+              icon="id"
               placeholder="EMP001"
               autoCapitalize="characters"
               autoCorrect={false}
@@ -127,6 +133,7 @@ export function LoginScreen() {
           render={({ field: { onChange, onBlur, value } }) => (
             <TextField
               label="PIN"
+              icon="lock"
               placeholder="••••••"
               secureTextEntry
               keyboardType="number-pad"
@@ -161,8 +168,21 @@ export function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  heroShell: {
+    borderBottomLeftRadius: radius.hero,
+    borderBottomRightRadius: radius.hero,
+    overflow: "hidden",
+  },
+  heroGlow: {
+    position: "absolute",
+    right: -70,
+    top: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
   hero: {
-    backgroundColor: colors.panelDark,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
   },
@@ -171,24 +191,26 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "300",
     lineHeight: 39,
-    color: colors.textOnDark,
-    marginTop: spacing.md - 2,
+    letterSpacing: -0.8,
+    color: colors.ink,
+    marginTop: spacing.lg - 2,
     maxWidth: 260,
   },
   heroSubtitle: {
     ...typography.body,
-    color: colors.textOnDarkMuted,
+    fontSize: 14,
+    color: colors.inkMuted,
     marginTop: spacing.sm + 2,
     maxWidth: 280,
   },
-  sparkRow: { marginTop: spacing.lg + 2 },
-  formContent: { padding: spacing.md, paddingTop: spacing.lg },
+  sparkRow: { marginTop: spacing.lg - 2 },
+  formContent: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.lg, paddingBottom: spacing.xl },
   error: {
     ...typography.caption,
     color: colors.danger,
     marginBottom: spacing.md,
   },
-  submit: { marginTop: spacing.xs },
+  submit: { marginTop: spacing.sm },
   footer: {
     flexDirection: "row",
     alignItems: "center",

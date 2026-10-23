@@ -4,7 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import { BarSpark } from "@/components/dashboard/BarSpark";
-import { Card, Button } from "@/components/ui";
+import { Card, Button, Icon, IconButton, IconTile, Kicker } from "@/components/ui";
 import {
   EMPTY_VISIT_FORM,
   VisitFormFields,
@@ -64,9 +64,11 @@ const SMOOTHING_FACTOR = 0.35;
 // only ever sees "Low" from the two one-time initial fixes on mount, which
 // aren't filtered.
 const ACCURACY_TIERS = {
-  high: { maxMeters: 15, label: "High accuracy", color: colors.success },
-  medium: { maxMeters: MIN_ACCURACY_METERS, label: "Medium accuracy", color: colors.warning },
-  low: { maxMeters: Infinity, label: "Low accuracy", color: colors.danger },
+  // Bright variants: these sit on the dark (ink) header panel, where the
+  // theme's success/warning/danger text colours are too dark to read.
+  high: { maxMeters: 15, label: "High accuracy", color: "#4ADE80" },
+  medium: { maxMeters: MIN_ACCURACY_METERS, label: "Medium accuracy", color: "#FBBF24" },
+  low: { maxMeters: Infinity, label: "Low accuracy", color: "#F87171" },
 } as const;
 
 function accuracyTier(meters: number) {
@@ -96,21 +98,24 @@ function buildMapHtml(
 
   const userMarker = userCoords
     ? `L.circleMarker([${userCoords.latitude}, ${userCoords.longitude}], {
-        radius: 8, color: "${colors.primary}", fillColor: "${colors.primary}", fillOpacity: 1, weight: 2
+        radius: 8, color: "#FFFFFF", fillColor: "${colors.lime}", fillOpacity: 1, weight: 3
       }).addTo(map).bindPopup("You");`
     : "";
 
   const targetMarkers = target
     ? `L.marker([${target.latitude}, ${target.longitude}]).addTo(map).bindPopup("Office / Home");
       L.circle([${target.latitude}, ${target.longitude}], {
-        radius: ${target.radiusMeters}, color: "#2E6F52", fillColor: "#2E6F52", fillOpacity: 0.08, weight: 1
+        radius: ${target.radiusMeters}, color: "#4ADE80", fillColor: "#4ADE80", fillOpacity: 0.1, weight: 1.5, dashArray: "4 4"
       }).addTo(map);`
     : "";
 
   const routeLine =
     route.length > 1
       ? `L.polyline(${JSON.stringify(route.map((p) => [p.latitude, p.longitude]))}, {
-          color: "${colors.primary}", weight: 3, opacity: 0.65
+          color: "${colors.ink}", weight: 8, opacity: 0.8
+        }).addTo(map);
+        L.polyline(${JSON.stringify(route.map((p) => [p.latitude, p.longitude]))}, {
+          color: "${colors.lime}", weight: 4.5, opacity: 1
         }).addTo(map);`
       : "";
 
@@ -368,14 +373,14 @@ export function LiveMapScreen() {
 
         {!userCoords && !locationError && (
           <View style={styles.loadingPill} pointerEvents="none">
-            <ActivityIndicator color={colors.primary} size="small" />
+            <ActivityIndicator color={colors.lime} size="small" />
             <Text style={styles.loadingPillLabel}>Getting your location…</Text>
           </View>
         )}
 
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.kicker}>{isFieldDay ? "FIELD DAY" : "LIVE LOCATION"}</Text>
+            <Kicker color={colors.textOnDarkMuted}>{isFieldDay ? "FIELD DAY" : "LIVE LOCATION"}</Kicker>
             <Text style={styles.title}>{locationLabel}</Text>
             <Text style={styles.subtitle}>{subtitle}</Text>
             {accuracyMeters != null &&
@@ -389,31 +394,35 @@ export function LiveMapScreen() {
                 );
               })()}
           </View>
-          <Pressable onPress={() => navigation.goBack()} style={styles.closeButton}>
-            <Text style={styles.closeGlyph}>✕</Text>
-          </Pressable>
+          <IconButton icon="close" variant="dark" onPress={() => navigation.goBack()} accessibilityLabel="Close map" />
         </View>
 
         {!isFieldDay && (
           <View style={styles.pingPanel}>
             <View style={styles.pingPanelHeader}>
-              <Text style={styles.pingPanelLabel}>{isTracking ? "SHARING LIVE" : "NOT SHARING"}</Text>
+              <Text style={[styles.pingPanelLabel, isTracking && styles.pingPanelLabelLive]}>
+                {isTracking ? "Sharing live" : "Not sharing"}
+              </Text>
               <Text style={styles.pingPanelInterval}>every 2 min</Text>
             </View>
-            <BarSpark values={pings} color={colors.primary} height={44} />
+            <BarSpark values={pings} color={colors.lime} height={44} />
           </View>
         )}
       </View>
 
       {isFieldDay && (
         <ScrollView style={styles.fieldPanel} contentContainerStyle={styles.fieldPanelContent}>
-          <Text style={styles.sectionLabel}>LOGGED LOCATIONS</Text>
+          <Kicker>Logged locations</Kicker>
 
-          {queue.pending.map((p) => (
-            <View key={p.key} style={styles.visitRow}>
-              <View style={[styles.visitThumb, styles.pendingThumb]}>
-                {p.status === "saving" ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.pendingFailedGlyph}>!</Text>}
-              </View>
+          {queue.pending.map((p, i) => (
+            <View key={p.key} style={[styles.visitRow, i > 0 && styles.visitRowDivider]}>
+              {p.status === "saving" ? (
+                <View style={[styles.visitThumb, styles.pendingThumb]}>
+                  <ActivityIndicator color={colors.lime} />
+                </View>
+              ) : (
+                <IconTile glyph="!" tone="danger" size={44} radius={14} />
+              )}
               <View style={styles.visitInfo}>
                 <Text style={styles.visitName}>{p.name}</Text>
                 <Text style={[styles.visitTime, p.status === "failed" && { color: colors.danger }]}>
@@ -436,8 +445,8 @@ export function LiveMapScreen() {
           {visits.length === 0 && queue.pending.length === 0 ? (
             <Text style={styles.emptyVisits}>Nothing logged yet — add the places you visit as you go.</Text>
           ) : (
-            visits.map((visit) => (
-              <View key={visit.id} style={styles.visitRow}>
+            visits.map((visit, i) => (
+              <View key={visit.id} style={[styles.visitRow, (i > 0 || queue.pending.length > 0) && styles.visitRowDivider]}>
                 <Image
                   source={{
                     uri: `${env.apiUrl}${endpoints.fieldVisitPhoto(visit.id)}`,
@@ -467,7 +476,7 @@ export function LiveMapScreen() {
                 {visitPhotoDataUrl ? (
                   <Image source={{ uri: visitPhotoDataUrl }} style={styles.photoTileImage} />
                 ) : (
-                  <Text style={styles.photoGlyph}>⌾</Text>
+                  <Icon name="camera" size={22} color={colors.ink} />
                 )}
                 <Text style={styles.photoTileLabel}>{visitPhotoDataUrl ? "PHOTO READY" : "SITE PHOTO"}</Text>
               </Pressable>
@@ -498,9 +507,7 @@ export function LiveMapScreen() {
               </View>
             </Card>
           ) : (
-            <Pressable onPress={() => setAddingVisit(true)} style={styles.addVisitTrigger}>
-              <Text style={styles.addVisitTriggerLabel}>+ Add a location</Text>
-            </Pressable>
+            <Button label="Add a location" icon="plus" variant="secondary" onPress={() => setAddingVisit(true)} />
           )}
         </ScrollView>
       )}
@@ -511,136 +518,112 @@ export function LiveMapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.panelDarker },
   mapArea: { flex: 1, position: "relative" },
-  mapAreaSplit: { flex: 0.42 },
+  mapAreaSplit: { flex: 0.44 },
   loadingPill: {
     position: "absolute",
     top: "45%",
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
-    backgroundColor: "rgba(26,21,18,0.72)",
-    borderWidth: 1,
-    borderColor: "rgba(247,243,239,0.16)",
+    gap: spacing.xs + 2,
+    backgroundColor: "rgba(14,36,16,0.9)",
     borderRadius: 99,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: spacing.xs + 3,
   },
-  loadingPillLabel: { ...typography.caption, color: colors.textOnDarkMuted },
+  loadingPillLabel: { ...typography.caption, color: colors.textOnDark },
   header: {
     position: "absolute",
     top: 64,
-    left: 16,
-    right: 16,
+    left: 14,
+    right: 14,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: spacing.sm,
   },
   // Sits directly on top of the raw map tiles with nothing else behind it —
   // without its own background, light-colored text here is only readable
   // by coincidence, wherever the map tile underneath happens to be dark.
-  // Same translucent scrim `pingPanel` below already uses, so text stays
+  // Same near-opaque ink scrim `pingPanel` below uses, so text stays
   // legible over any tile color (roads, buildings, green space, ...).
   headerText: {
-    flex: 1,
-    backgroundColor: "rgba(26,21,18,0.62)",
-    borderWidth: 1,
-    borderColor: "rgba(247,243,239,0.12)",
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    flexShrink: 1,
+    maxWidth: "80%",
+    backgroundColor: "rgba(14,36,16,0.9)",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: spacing.sm + 4,
   },
-  kicker: { ...typography.label, letterSpacing: 2, color: colors.primarySoftText },
-  title: { ...typography.h2, color: colors.textOnDark, marginTop: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textOnDarkMuted, marginTop: 4 },
-  accuracyRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  title: { ...typography.section, color: colors.textOnDark },
+  subtitle: { ...typography.caption, fontSize: 12, color: colors.textOnDarkMuted, marginTop: 2 },
+  accuracyRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 6 },
   accuracyDot: { width: 6, height: 6, borderRadius: 99 },
-  accuracyText: { ...typography.caption },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: "rgba(247,243,239,0.28)",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.panelDarker,
-  },
-  closeGlyph: { color: colors.textOnDarkMuted, fontSize: 15 },
+  accuracyText: { fontSize: 11, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   pingPanel: {
     position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 40,
-    backgroundColor: "rgba(26,21,18,0.62)",
-    borderWidth: 1,
-    borderColor: "rgba(247,243,239,0.12)",
-    borderRadius: 18,
-    padding: spacing.md,
+    left: 14,
+    right: 14,
+    bottom: 20,
+    backgroundColor: "rgba(14,36,16,0.94)",
+    borderRadius: 22,
+    padding: 14,
   },
   pingPanelHeader: {
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm + 2,
   },
-  pingPanelLabel: { ...typography.label, letterSpacing: 2, color: colors.textOnDarkMuted },
-  pingPanelInterval: { ...typography.caption, color: colors.primarySoftText },
+  pingPanelLabel: { ...typography.bodyStrong, fontSize: 14, color: colors.textOnDarkMuted },
+  pingPanelLabelLive: { color: colors.lime },
+  pingPanelInterval: { ...typography.caption, fontSize: 12, color: colors.textOnDarkMuted },
 
-  fieldPanel: { flex: 0.58, backgroundColor: colors.background },
-  fieldPanelContent: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.sm },
-  sectionLabel: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
-  emptyVisits: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  // White sheet rising over the bottom of the map (rounded top corners).
+  fieldPanel: {
+    flex: 0.56,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    marginTop: -24,
+  },
+  fieldPanelContent: { padding: spacing.md, paddingTop: spacing.md + 4, paddingBottom: spacing.xxl, gap: spacing.xs },
+  emptyVisits: { ...typography.body, fontSize: 14, color: colors.textSecondary, marginVertical: spacing.xs },
   visitRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.sm,
+    gap: spacing.sm + 4,
+    paddingVertical: spacing.sm + 2,
   },
-  visitThumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceMuted },
+  visitRowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  visitThumb: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.surfaceMuted },
   visitInfo: { flex: 1 },
-  pendingThumb: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceMuted },
-  pendingFailedGlyph: { color: colors.danger, fontSize: 18, fontWeight: "700" },
+  pendingThumb: { alignItems: "center", justifyContent: "center", backgroundColor: colors.ink },
   pendingRow: { flexDirection: "row", gap: spacing.md, marginTop: 2 },
   pendingRetry: { ...typography.bodyStrong, fontSize: 12.5, color: colors.primaryDark },
-  visitName: { ...typography.bodyStrong, color: colors.textPrimary },
-  visitTime: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  visitName: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
+  visitTime: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
-  addVisitTrigger: {
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: "center",
-  },
-  addVisitTriggerLabel: { ...typography.bodyStrong, color: colors.primary },
-  addVisitCard: { gap: spacing.sm },
+  addVisitCard: { gap: spacing.sm, marginTop: spacing.sm },
   addVisitButtonRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
   addVisitButtonHalf: { flex: 1 },
-  cardLabel: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
-  meta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  meta: { ...typography.body, fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
   errorText: { ...typography.caption, color: colors.danger },
   photoTile: {
     alignSelf: "flex-start",
     width: 96,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: "rgba(134,119,111,0.55)",
-    borderRadius: 14,
+    borderColor: "rgba(14,36,16,0.3)",
+    borderRadius: 16,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     overflow: "hidden",
   },
   photoTileReady: { borderStyle: "solid", borderColor: colors.success },
   photoTileImage: { width: 56, height: 56, borderRadius: 99 },
-  photoGlyph: { color: colors.textSecondary, fontSize: 13 },
   photoTileLabel: { fontSize: 9.5, letterSpacing: 0.5, color: colors.textSecondary, textAlign: "center" },
 });

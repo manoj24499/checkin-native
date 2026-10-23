@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Circle, Path } from "react-native-svg";
+import { StyleSheet, Text, View } from "react-native";
+import { Button, HeroCard, Pill, QuickActions, type ActionTileProps } from "@/components/ui";
 import { PING_INTERVAL_MS } from "@/services/locationTracking";
 import { useTrackingFixStore } from "@/store/trackingFixStore";
 import { formatElapsed, formatDuration, computeWorkedMs } from "@/utils/attendanceGrouping";
-import { colors, radius, spacing, typography, fontFamily } from "@/theme";
+import { formatDistance } from "@/utils/geo";
+import { colors, radius, spacing, typography } from "@/theme";
 import type { AttendancePauseInterval } from "@/types";
 
 interface PresenceCardProps {
@@ -23,22 +23,39 @@ interface PresenceCardProps {
    * permissions existed). */
   pauseReason?: "geofence" | "permission";
   trackingWarning?: string | null;
-  onViewMap: () => void;
   /** Present only when checked in but not currently tracking — lets the
    * employee (re)start sharing without checking out (which would end
    * today's attendance for good). */
   onEnableSharing?: () => void;
   enablingSharing?: boolean;
   /** Whether today's session is currently open (checked in, not checked
-   * out) — drives the primary action's label ("Check in now" / "Check
-   * out") and the big-clock caption. */
+   * out) — drives the primary tile's label ("Check in" / "Check out")
+   * and the big-clock caption. */
   checkedIn: boolean;
   onPrimaryAction: () => void;
   /** Today's check-in only exists on this phone so far (saved offline, see
    * services/offlineQueue.ts) — `checkInAt` is its capture time. */
   pendingSync?: boolean;
+  /** Field days: today's tracked distance. When set (and checked in) the
+   * hero's big value is the distance, with the worked time as its suffix. */
+  distanceMeters?: number | null;
+  /** Faded text after the worked-time value (e.g. "of 9h" from the shift). */
+  valueSuffix?: string;
+  /** Extra white "glass" chips after the status/check-in chips ("Office · 42 m"). */
+  chips?: string[];
+  /** The three quick-action tiles after the primary Check in/out tile. */
+  actions?: (ActionTileProps & { key?: string })[];
 }
 
+function formatClock(ms: number) {
+  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * Home's lime hero: worked time (or distance, on a Field day), status chips,
+ * every presence state (not checked in, sharing live/off, pending sync,
+ * paused with outside counters, tracking warning) and the quick-action row.
+ */
 export function PresenceCard({
   isTracking,
   checkInAt,
@@ -46,12 +63,15 @@ export function PresenceCard({
   pauses = [],
   pauseReason = "geofence",
   trackingWarning,
-  onViewMap,
   onEnableSharing,
   enablingSharing,
   checkedIn,
   onPrimaryAction,
   pendingSync,
+  distanceMeters,
+  valueSuffix,
+  chips = [],
+  actions = [],
 }: PresenceCardProps) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -78,17 +98,24 @@ export function PresenceCard({
       ? Math.floor((PING_INTERVAL_MS - ((now - checkInMs) % PING_INTERVAL_MS)) / 1000)
       : null;
 
-  const statusKicker = isPaused
-    ? pauseReason === "permission"
-      ? "PAUSED — ON PERMISSION"
-      : "PAUSED — OUTSIDE RANGE"
-    : checkedIn
-      ? pendingSync
-        ? "CHECKED IN · PENDING SYNC"
-        : isTracking
-        ? "CHECKED IN · SHARING LIVE"
-        : "CHECKED IN · SHARING OFF"
-      : "NOT CHECKED IN";
+  // Status chip — same states as the old "CHECKED IN · SHARING LIVE" kicker.
+  const statusPill = isPaused ? (
+    <Pill
+      variant="warning"
+      dot
+      label={pauseReason === "permission" ? "Paused · on permission" : "Paused · outside range"}
+    />
+  ) : checkedIn ? (
+    pendingSync ? (
+      <Pill variant="white" dot={colors.warning} label="Pending sync" />
+    ) : isTracking ? (
+      <Pill variant="success" dot label="Live" />
+    ) : (
+      <Pill variant="glass" dot={colors.textMuted} label="Sharing off" />
+    )
+  ) : (
+    <Pill variant="glass" label="Not checked in" />
+  );
 
   const caption = isPaused
     ? pauseReason === "permission"
@@ -100,41 +127,42 @@ export function PresenceCard({
         : "Worked so far today. Stops the moment you check out."
       : "Check in when you arrive.";
 
-  return (
-    <LinearGradient
-      colors={["#FFF1E4", "#FFF8F2", "#FFFFFF"]}
-      locations={[0, 0.55, 1]}
-      start={{ x: 0.15, y: 0 }}
-      end={{ x: 0.75, y: 1 }}
-      style={styles.card}
-    >
-      {/* Decorative glow blob — an approximation of the mockup's radial
-       * gradient (RN's LinearGradient can't do radial), a soft translucent
-       * circle reads close enough at this size. */}
-      <View pointerEvents="none" style={styles.glow} />
+  const showDistance = checkedIn && distanceMeters != null;
+  const label = showDistance ? "Distance today" : "Worked today";
+  const value = showDistance ? formatDistance(distanceMeters) : checkedIn ? formatElapsed(elapsedMs) : "—";
+  const suffix = showDistance ? `${formatDuration(elapsedMs)} worked` : checkedIn ? valueSuffix : undefined;
 
-      <View style={styles.row}>
-        <View style={styles.statusRow}>
-          <View style={[styles.dot, (isPaused || !checkedIn) && styles.dotMuted]} />
-          <Text style={styles.statusLabel}>{statusKicker}</Text>
-        </View>
-        <Text style={styles.pingLabel}>
-          {nextPingSec !== null
-            ? `next ping ${Math.floor(nextPingSec / 60)}:${String(nextPingSec % 60).padStart(2, "0")}`
-            : "idle"}
-        </Text>
+  const pingLabel =
+    nextPingSec !== null
+      ? `next ping ${Math.floor(nextPingSec / 60)}:${String(nextPingSec % 60).padStart(2, "0")}`
+      : "idle";
+
+  return (
+    <HeroCard
+      label={label}
+      labelRight={<Text style={styles.pingLabel}>{pingLabel}</Text>}
+      value={value}
+      valueSuffix={suffix}
+      notch
+      style={styles.hero}
+    >
+      <View style={styles.chipRow}>
+        {statusPill}
+        {checkedIn && checkInMs ? <Pill variant="glass" label={`In ${formatClock(checkInMs)}`} /> : null}
+        {chips.map((c) => (
+          <Pill key={c} variant="glass" label={c} />
+        ))}
       </View>
 
-      <Text style={styles.elapsed}>{checkedIn ? formatElapsed(elapsedMs) : "—"}</Text>
       <Text style={styles.caption}>{caption}</Text>
 
       {isPaused && openPause ? (
-        <View style={styles.outsideRow}>
-          <View style={styles.outsideDot} />
-          <Text style={styles.outsideLabel}>
-            {pauseReason === "permission" ? "On permission" : "Outside"}: {formatElapsed(outsideMs)}
-          </Text>
-        </View>
+        <Pill
+          variant="white"
+          dot={colors.warning}
+          label={`${pauseReason === "permission" ? "On permission" : "Outside"}: ${formatElapsed(outsideMs)}`}
+          style={styles.outsidePill}
+        />
       ) : null}
 
       {/* Persists after returning in-range, unlike the live line above —
@@ -148,147 +176,63 @@ export function PresenceCard({
         <View style={styles.warningBox}>
           <Text style={styles.warningTitle}>Location sharing has stopped</Text>
           <Text style={styles.warningText}>{trackingWarning}</Text>
-          <Pressable onPress={() => useTrackingFixStore.getState().show()} style={styles.warningButton}>
-            <Text style={styles.warningButtonLabel}>Fix now</Text>
-          </Pressable>
+          <Button
+            label="Fix now"
+            size="sm"
+            onPress={() => useTrackingFixStore.getState().show()}
+            style={styles.warningButton}
+          />
         </View>
       ) : null}
 
-      <View style={styles.actionRow}>
-        <Pressable
-          onPress={onPrimaryAction}
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-        >
-          <Text style={styles.primaryButtonLabel}>{checkedIn ? "Check out" : "Check in now"}</Text>
-        </Pressable>
-        <Pressable
-          onPress={onViewMap}
-          style={({ pressed }) => [styles.mapButton, pressed && styles.mapButtonPressed]}
-        >
-          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Path
-              d="M12 21s-7-5.4-7-11a7 7 0 0 1 14 0c0 5.6-7 11-7 11z"
-              stroke={colors.textSecondary}
-              strokeWidth={1.6}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <Circle cx={12} cy={10} r={2.5} stroke={colors.textSecondary} strokeWidth={1.6} />
-          </Svg>
-        </Pressable>
-      </View>
-
       {onEnableSharing ? (
-        <Pressable
-          onPress={onEnableSharing}
-          disabled={enablingSharing}
-          style={({ pressed }) => [styles.enableButton, pressed && styles.enableButtonPressed]}
-        >
-          <Text style={styles.enableButtonLabel}>
-            {enablingSharing ? "Starting…" : "Turn on live sharing"}
-          </Text>
-        </Pressable>
+        <Pill
+          variant="ink"
+          icon="refresh"
+          label={enablingSharing ? "Starting…" : "Turn on live sharing"}
+          onPress={enablingSharing ? undefined : onEnableSharing}
+          style={styles.enablePill}
+        />
       ) : null}
-    </LinearGradient>
+
+      <QuickActions
+        style={styles.actions}
+        actions={[
+          {
+            key: "primary",
+            icon: checkedIn ? "logout" : "check",
+            // Short tile label; same action as the old "Check in now" button.
+            label: checkedIn ? "Check out" : "Check in",
+            onPress: onPrimaryAction,
+          },
+          ...actions,
+        ]}
+      />
+    </HeroCard>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginTop: spacing.md,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.primaryMuted,
-    padding: spacing.md + 2,
-    overflow: "hidden",
-  },
-  glow: {
-    position: "absolute",
-    top: -40,
-    right: -30,
-    width: 150,
-    height: 150,
-    borderRadius: 999,
-    backgroundColor: "rgba(239,108,0,0.10)",
-  },
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs + 1 },
-  dot: { width: 9, height: 9, borderRadius: 99, backgroundColor: colors.primary },
-  dotMuted: { backgroundColor: colors.textMuted },
-  statusLabel: { ...typography.label, letterSpacing: 2, color: colors.primaryDark, fontSize: 10 },
-  pingLabel: { fontSize: 10, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
-  elapsed: {
-    fontSize: 42,
-    fontFamily: fontFamily.regular,
-    fontWeight: "300",
-    color: colors.textPrimary,
-    marginTop: spacing.md,
-    fontVariant: ["tabular-nums"],
-    letterSpacing: -0.5,
-  },
-  caption: { ...typography.caption, color: colors.primaryDark, marginTop: spacing.xs },
-  outsideRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs + 2,
-    marginTop: spacing.sm,
-  },
-  outsideDot: { width: 6, height: 6, borderRadius: 99, backgroundColor: colors.warning },
-  outsideLabel: {
-    ...typography.bodyStrong,
-    fontSize: 12.5,
-    color: colors.warning,
-    fontVariant: ["tabular-nums"],
-  },
+  hero: { marginTop: spacing.md },
+  pingLabel: { fontSize: 11, color: colors.onLimeSecondary, fontVariant: ["tabular-nums"] },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm - 2, marginTop: spacing.sm + 2 },
+  caption: { ...typography.caption, fontSize: 12, color: colors.onLimeSecondary, marginTop: spacing.sm },
+  outsidePill: { marginTop: spacing.sm },
   outsideTotalLabel: {
     ...typography.caption,
     fontSize: 11.5,
-    color: colors.textSecondary,
+    color: colors.inkMuted,
     marginTop: spacing.xs + 2,
   },
   warningBox: {
-    backgroundColor: colors.warningMuted,
-    borderWidth: 1,
-    borderColor: "rgba(184,134,11,0.35)",
-    borderRadius: radius.sm,
-    padding: spacing.sm + 2,
-    marginTop: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.tile,
+    padding: spacing.sm + 4,
+    marginTop: spacing.sm + 2,
   },
-  warningText: { ...typography.caption, color: colors.warning },
-  warningTitle: { ...typography.bodyStrong, color: colors.warning, marginBottom: 2 },
-  warningButton: {
-    alignSelf: "flex-start",
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.warning,
-  },
-  warningButtonLabel: { ...typography.bodyStrong, color: colors.warning, fontSize: 13 },
-  actionRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  primaryButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryButtonPressed: { backgroundColor: colors.primaryMuted },
-  primaryButtonLabel: { ...typography.bodyStrong, color: colors.primaryDark },
-  mapButton: {
-    width: 44,
-    minHeight: 44,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.primaryMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mapButtonPressed: { backgroundColor: colors.primaryMuted },
-  enableButton: { alignSelf: "flex-start", marginTop: spacing.sm },
-  enableButtonPressed: { opacity: 0.6 },
-  enableButtonLabel: { ...typography.bodyStrong, color: colors.primaryDark, fontSize: 12.5 },
+  warningTitle: { ...typography.bodyStrong, fontSize: 14, color: colors.warning, marginBottom: 2 },
+  warningText: { ...typography.caption, color: colors.textSecondary },
+  warningButton: { alignSelf: "flex-start", marginTop: spacing.sm },
+  enablePill: { marginTop: spacing.sm + 2 },
+  actions: { marginTop: spacing.md },
 });

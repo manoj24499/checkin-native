@@ -192,8 +192,11 @@ export async function flushPendingLocations(): Promise<void> {
         const status = httpStatusOf(error);
         // The server understood the request and will never accept it (unknown session, bad data):
         // drop that session's samples instead of retrying forever. Anything else (no signal,
-        // timeout, 5xx, rate limit) keeps them for the next attempt.
-        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+        // timeout, 5xx, rate limit) keeps them for the next attempt — and so do 401 (the login
+        // expired and no tracking token was accepted) and 403 (not allowed for this session right
+        // now, e.g. its tracking token isn't saved yet): those can clear up, so retry later.
+        const retryLater = status === 401 || status === 403 || status === 408 || status === 429;
+        if (status && status >= 400 && status < 500 && !retryLater) {
           outbox = outbox.filter((s) => s.a !== attendanceId);
           saveOutbox();
           continue;

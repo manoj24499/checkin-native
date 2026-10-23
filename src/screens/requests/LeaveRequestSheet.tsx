@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, TextField, IssueDialog } from "@/components/ui";
+import { StyleSheet, Text, View } from "react-native";
+import { Button, Chip, TextField, IssueDialog } from "@/components/ui";
 import { DayChipPicker } from "@/components/leave";
 import { useHolidays, useLeaveRequests, useRequestLeave } from "@/hooks";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
@@ -85,15 +85,13 @@ export function LeaveRequestSheet({ onDone }: { onDone: () => void }) {
 
       <View style={styles.typeRow}>
         {TYPE_OPTIONS.map((opt) => (
-          <Pressable
+          <Chip
             key={opt.value}
+            label={opt.label}
+            selected={type === opt.value}
             onPress={() => setType(opt.value)}
-            style={[styles.typeChip, type === opt.value && styles.typeChipActive]}
-          >
-            <Text style={[styles.typeChipLabel, type === opt.value && styles.typeChipLabelActive]}>
-              {opt.label}
-            </Text>
-          </Pressable>
+            style={styles.typeChip}
+          />
         ))}
       </View>
       {balance ? (
@@ -116,7 +114,7 @@ export function LeaveRequestSheet({ onDone }: { onDone: () => void }) {
       </View>
 
       {startDay && endDay ? (
-        <Text style={exceedsBalance ? styles.daysPreviewWarn : styles.daysPreview}>
+        <Text style={[styles.note, exceedsBalance ? styles.daysPreviewWarn : styles.daysPreview]}>
           {days === 0
             ? "Every day in this range is a public holiday — nothing to request."
             : exceedsBalance
@@ -156,24 +154,22 @@ export function LeaveRequestSheet({ onDone }: { onDone: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  blurb: { ...typography.body, color: colors.textSecondary },
+  blurb: { ...typography.caption, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
   typeRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  typeChip: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: "center",
+  typeChip: { flex: 1, alignItems: "center", paddingVertical: spacing.sm + 2 },
+  balanceHint: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  pickerBlock: { marginTop: spacing.md + 4 },
+  note: {
+    ...typography.caption,
+    lineHeight: 18,
+    borderRadius: radius.input,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    marginTop: spacing.md,
+    overflow: "hidden",
   },
-  typeChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
-  typeChipLabel: { ...typography.bodyStrong, fontSize: 13, color: colors.textSecondary },
-  typeChipLabelActive: { color: colors.primaryDark },
-  balanceHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
-  pickerBlock: { marginTop: spacing.lg },
-  daysPreview: { ...typography.caption, color: colors.primaryDark, marginTop: spacing.sm },
-  daysPreviewWarn: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
-  reasonBlock: { marginTop: spacing.lg },
+  daysPreview: { color: colors.textSecondary, backgroundColor: colors.surfaceMuted },
+  daysPreviewWarn: { color: colors.danger, backgroundColor: colors.dangerMuted },
+  reasonBlock: { marginTop: spacing.md + 4 },
   submit: { marginTop: spacing.lg },
 });

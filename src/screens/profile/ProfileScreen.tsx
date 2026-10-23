@@ -4,7 +4,20 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Notifications from "expo-notifications";
 import * as ImagePicker from "expo-image-picker";
-import { Screen, Button, Toggle, BottomSheet, IssueDialog } from "@/components/ui";
+import {
+  Screen,
+  Button,
+  Toggle,
+  BottomSheet,
+  IssueDialog,
+  Card,
+  Icon,
+  IconButton,
+  IconTile,
+  Kicker,
+  ListRow,
+  ScreenTitle,
+} from "@/components/ui";
 import { PhotoCaptureView } from "@/components/camera";
 import { useAuth, useAttendanceStatus, useBiometricAuth, useUploadProfilePhoto } from "@/hooks";
 import { formatSlotLabel } from "@/components/checkin";
@@ -51,11 +64,13 @@ interface SettingsRowProps {
   value: boolean;
   disabled?: boolean;
   onValueChange: (value: boolean) => void;
+  /** Hairline above the row (every row but the first in its card). */
+  divider?: boolean;
 }
 
-function SettingsRow({ label, help, value, disabled, onValueChange }: SettingsRowProps) {
+function SettingsRow({ label, help, value, disabled, onValueChange, divider }: SettingsRowProps) {
   return (
-    <View style={styles.settingsRow}>
+    <View style={[styles.settingsRow, divider && styles.settingsRowDivider]}>
       <View style={styles.settingsRowText}>
         <Text style={styles.settingsLabel}>{label}</Text>
         <Text style={styles.settingsHelp}>{help}</Text>
@@ -228,100 +243,113 @@ export function ProfileScreen() {
 
   return (
     <Screen scroll>
-      <Text style={styles.kicker}>ACCOUNT</Text>
+      <Kicker>Account</Kicker>
+      <ScreenTitle>Profile</ScreenTitle>
 
-      <View style={styles.identityRow}>
-        <Pressable
-          onPress={() => (user?.hasProfilePhoto ? setViewingPhoto(true) : setAvatarSheetOpen(true))}
-          style={styles.avatarWrapper}
-        >
-          {user?.hasProfilePhoto ? (
-            <Image
-              source={{
-                uri: `${env.apiUrl}${endpoints.profilePhoto}?v=${photoNonce}`,
-                headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-              }}
-              style={styles.avatarImage}
-            />
-          ) : (
-            <View style={styles.avatar}>
-              <Text style={styles.avatarLabel}>{initials}</Text>
+      <Card style={styles.identityCard}>
+        <View style={styles.identityRow}>
+          <Pressable
+            onPress={() => (user?.hasProfilePhoto ? setViewingPhoto(true) : setAvatarSheetOpen(true))}
+            style={styles.avatarWrapper}
+            accessibilityLabel="Profile photo"
+          >
+            {user?.hasProfilePhoto ? (
+              <Image
+                source={{
+                  uri: `${env.apiUrl}${endpoints.profilePhoto}?v=${photoNonce}`,
+                  headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+                }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarLabel}>{initials}</Text>
+              </View>
+            )}
+            <View style={styles.avatarEditBadge}>
+              <Icon name="camera" size={11} color={colors.ink} strokeWidth={2.2} />
             </View>
-          )}
-          <View style={styles.avatarEditBadge}>
-            <Text style={styles.avatarEditGlyph}>📷</Text>
+          </Pressable>
+          <View style={styles.identityText}>
+            <Text style={styles.name}>{user?.name}</Text>
+            <Text style={styles.meta}>
+              {user?.employeeCode} · {user?.email}
+            </Text>
           </View>
-        </Pressable>
-        <View style={styles.identityText}>
-          <Text style={styles.name}>{user?.name}</Text>
-          <Text style={styles.meta}>
-            {user?.employeeCode} · {user?.email}
-          </Text>
         </View>
-      </View>
+      </Card>
 
       <View style={styles.statRow}>
         <View style={styles.statCell}>
           <Text style={styles.statLabel}>WORK MODE</Text>
           <Text style={styles.statValue}>{WORK_MODE_LABEL[user?.workMode ?? "OFFICE"]}</Text>
         </View>
-        <View style={styles.statCell}>
+        <View style={[styles.statCell, styles.statCellDivider]}>
           <Text style={styles.statLabel}>SHIFT TIMING</Text>
           <Text style={styles.statValue}>{shiftTimingLabel}</Text>
         </View>
       </View>
 
-      <View style={styles.divider} />
+      <Card style={styles.groupCard}>
+        <SettingsRow
+          label="Biometric unlock"
+          help={
+            biometricAvailable
+              ? "Face ID / fingerprint to unlock the app. If that fails, your phone's own lock code works too — not your employee PIN."
+              : "Not available on this device"
+          }
+          value={biometricUnlockEnabled}
+          disabled={!biometricAvailable}
+          onValueChange={handleBiometricToggle}
+        />
+        {biometricError ? <Text style={styles.errorText}>Biometric error: {biometricError}</Text> : null}
+        <SettingsRow
+          label="Shift reminders"
+          help="A nudge to check out ~10 minutes before your shift (or approved overtime) ends"
+          value={shiftRemindersEnabled}
+          onValueChange={handleShiftRemindersToggle}
+          divider
+        />
+        {shiftRemindersError ? <Text style={styles.errorText}>{shiftRemindersError}</Text> : null}
+        <SettingsRow
+          label="Live location"
+          help="Only ever on while checked in"
+          value={liveLocationEnabled}
+          onValueChange={setLiveLocationEnabled}
+          divider
+        />
+      </Card>
 
-      <SettingsRow
-        label="Biometric unlock"
-        help={
-          biometricAvailable
-            ? "Face ID / fingerprint to unlock the app. If that fails, your phone's own lock code works too — not your employee PIN."
-            : "Not available on this device"
-        }
-        value={biometricUnlockEnabled}
-        disabled={!biometricAvailable}
-        onValueChange={handleBiometricToggle}
-      />
-      {biometricError ? <Text style={styles.errorText}>Biometric error: {biometricError}</Text> : null}
-      <SettingsRow
-        label="Shift reminders"
-        help="A nudge to check out ~10 minutes before your shift (or approved overtime) ends"
-        value={shiftRemindersEnabled}
-        onValueChange={handleShiftRemindersToggle}
-      />
-      {shiftRemindersError ? <Text style={styles.errorText}>{shiftRemindersError}</Text> : null}
-      <SettingsRow
-        label="Live location"
-        help="Only ever on while checked in"
-        value={liveLocationEnabled}
-        onValueChange={setLiveLocationEnabled}
-      />
-
-      <View style={styles.linkGroup}>
-        <Pressable style={styles.linkRow} onPress={() => navigation.navigate("History")}>
-          <Text style={styles.linkLabel}>History</Text>
-          <Text style={styles.linkChevron}>›</Text>
-        </Pressable>
-
-        <Pressable style={styles.linkRow} onPress={() => navigation.navigate("ChangePin")}>
-          <Text style={styles.linkLabel}>Change PIN</Text>
-          <Text style={styles.linkChevron}>›</Text>
-        </Pressable>
-
-        <Pressable style={[styles.linkRow, styles.linkRowLast]} onPress={() => navigation.navigate("ReportIssue")}>
-          <View style={styles.linkTextGroup}>
-            <Text style={styles.linkLabel}>Help & report an issue</Text>
-            <Text style={styles.linkSub}>Wrong hours, geofence trouble, PIN reset</Text>
-          </View>
-          <Text style={styles.linkChevron}>›</Text>
-        </Pressable>
-      </View>
+      <Card style={styles.groupCard}>
+        <ListRow
+          icon="history"
+          title="History"
+          subtitle="Past check-ins and hours"
+          onPress={() => navigation.navigate("History")}
+          trailing={<Icon name="chevronRight" size={18} color={colors.textMuted} />}
+        />
+        <ListRow
+          icon="lock"
+          title="Change PIN"
+          subtitle="Keep it private"
+          onPress={() => navigation.navigate("ChangePin")}
+          trailing={<Icon name="chevronRight" size={18} color={colors.textMuted} />}
+          divider
+        />
+        <ListRow
+          icon="help"
+          title="Help & report an issue"
+          subtitle="Wrong hours, geofence trouble, PIN reset"
+          onPress={() => navigation.navigate("ReportIssue")}
+          trailing={<Icon name="chevronRight" size={18} color={colors.textMuted} />}
+          divider
+        />
+      </Card>
 
       <Button
         label="Log out"
         variant="danger"
+        icon="logout"
         onPress={() => (unsentCount > 0 ? setConfirmLogoutOpen(true) : void signOut())}
         style={styles.logout}
       />
@@ -334,13 +362,13 @@ export function ProfileScreen() {
         onRequestClose={() => setViewingPhoto(false)}
       >
         <View style={styles.viewerBackdrop}>
-          <Pressable
+          <IconButton
+            icon="close"
+            variant="dark"
             onPress={() => setViewingPhoto(false)}
+            accessibilityLabel="Close photo"
             style={styles.viewerCloseButton}
-            hitSlop={12}
-          >
-            <Text style={styles.viewerCloseGlyph}>✕</Text>
-          </Pressable>
+          />
 
           <Image
             source={{
@@ -375,9 +403,11 @@ export function ProfileScreen() {
           }}
           style={styles.avatarSheetOption}
         >
+          <IconTile icon="camera" />
           <Text style={styles.avatarSheetOptionLabel}>Take a photo</Text>
         </Pressable>
         <Pressable onPress={pickAvatarFromGallery} style={[styles.avatarSheetOption, styles.avatarSheetOptionLast]}>
+          <IconTile icon="image" />
           <Text style={styles.avatarSheetOptionLabel}>Choose from gallery</Text>
         </Pressable>
       </BottomSheet>
@@ -406,21 +436,20 @@ export function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary },
-  identityRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.md },
+  identityCard: { marginTop: spacing.md },
+  identityRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 4 },
   avatarWrapper: { width: 60, height: 60 },
+  // Ink circle with lime initials (mockup's avatar).
   avatar: {
     width: 60,
     height: 60,
     borderRadius: 99,
-    backgroundColor: colors.primaryMuted,
-    borderWidth: 1,
-    borderColor: colors.primaryMuted,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarImage: { width: 60, height: 60, borderRadius: 99 },
-  avatarLabel: { ...typography.h3, color: colors.primaryDark },
+  avatarImage: { width: 60, height: 60, borderRadius: 99, backgroundColor: colors.surfaceMuted },
+  avatarLabel: { ...typography.h3, fontSize: 20, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.lime },
   avatarEditBadge: {
     position: "absolute",
     right: -2,
@@ -428,20 +457,22 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 99,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.lime,
     borderWidth: 2,
-    borderColor: colors.background,
+    borderColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarEditGlyph: { fontSize: 10 },
   avatarSheetOption: {
-    paddingVertical: spacing.sm + 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm + 4,
+    paddingVertical: spacing.sm + 4,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   avatarSheetOptionLast: { borderBottomWidth: 0 },
-  avatarSheetOptionLabel: { ...typography.bodyStrong, color: colors.textPrimary },
+  avatarSheetOptionLabel: { ...typography.bodyStrong, color: colors.ink },
   viewerBackdrop: {
     flex: 1,
     backgroundColor: "black",
@@ -449,66 +480,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.lg,
   },
-  viewerCloseButton: {
-    position: "absolute",
-    top: 56,
-    right: spacing.lg,
-    width: 36,
-    height: 36,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: "rgba(247,243,239,0.28)",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1,
-  },
-  viewerCloseGlyph: { color: colors.textOnDarkMuted, fontSize: 16 },
-  viewerImage: { width: "100%", aspectRatio: 1, borderRadius: radius.sm },
+  viewerCloseButton: { position: "absolute", top: 56, right: spacing.lg, zIndex: 1 },
+  viewerImage: { width: "100%", aspectRatio: 1, borderRadius: radius.lg },
   viewerChangeButton: { marginTop: spacing.xl, alignSelf: "stretch" },
   identityText: { flex: 1, minWidth: 0 },
-  name: { ...typography.h2, color: colors.textPrimary },
-  meta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  name: { ...typography.section, color: colors.ink },
+  meta: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
   statRow: {
     flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  statCell: {
-    flex: 1,
-    borderRadius: radius.sm,
+    marginTop: spacing.sm + 4,
+    borderRadius: 22,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.sm + 3,
+    overflow: "hidden",
   },
-  statLabel: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
-  statValue: { ...typography.bodyStrong, color: colors.textPrimary, marginTop: 4 },
-  divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.lg },
+  statCell: { flex: 1, paddingHorizontal: spacing.sm + 4, paddingVertical: 11 },
+  statCellDivider: { borderLeftWidth: 1, borderLeftColor: colors.border },
+  statLabel: { ...typography.kicker, fontSize: 9, letterSpacing: 1.3, color: colors.textMuted },
+  statValue: { ...typography.bodyStrong, fontSize: 14, color: colors.ink, marginTop: 3 },
+  groupCard: { marginTop: spacing.sm + 4, paddingVertical: spacing.xs, paddingHorizontal: 14 },
   settingsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    paddingVertical: spacing.sm + 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: spacing.sm + 3,
   },
+  settingsRowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
   settingsRowText: { flex: 1, minWidth: 0 },
-  settingsLabel: { ...typography.bodyStrong, color: colors.textPrimary },
-  settingsHelp: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
-  errorText: { ...typography.caption, color: colors.danger, marginTop: -spacing.xs, marginBottom: spacing.sm },
-  linkGroup: { marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: spacing.sm + 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  linkRowLast: { borderBottomWidth: 0 },
-  linkTextGroup: { flex: 1, minWidth: 0 },
-  linkLabel: { ...typography.bodyStrong, color: colors.textPrimary },
-  linkSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  linkChevron: { ...typography.h3, color: colors.textMuted },
-  logout: { marginTop: spacing.xl },
+  settingsLabel: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
+  settingsHelp: { ...typography.caption, fontSize: 12, lineHeight: 17, color: colors.textSecondary, marginTop: 2 },
+  errorText: { ...typography.caption, fontSize: 12, color: colors.danger, marginTop: -spacing.xs, marginBottom: spacing.sm },
+  logout: { marginTop: spacing.lg },
 });

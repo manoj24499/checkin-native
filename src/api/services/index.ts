@@ -7,3 +7,4 @@ export { assignedPlacesService } from "./assignedPlaces.service";
 export { leaveService } from "./leave.service";
 export { workSegmentService } from "./workSegment.service";
 export { supportService } from "./support.service";
+export { reimbursementService } from "./reimbursement.service";

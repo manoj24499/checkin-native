@@ -7,32 +7,24 @@ interface ToggleProps {
   disabled?: boolean;
 }
 
+/** On = ink track with a lime knob; off = muted track with a white knob. */
 export function Toggle({ value, onValueChange, disabled }: ToggleProps) {
   return (
     <Pressable
       onPress={() => !disabled && onValueChange(!value)}
       disabled={disabled}
-      style={[
-        styles.track,
-        {
-          backgroundColor: value ? colors.primaryMuted : colors.surfaceMuted,
-          borderColor: value ? colors.primary : colors.border,
-        },
-        disabled && styles.disabled,
-      ]}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled: !!disabled }}
+      hitSlop={6}
+      style={[styles.track, { backgroundColor: value ? colors.ink : "#D5DEC4" }, disabled && styles.disabled]}
     >
-      <View
-        style={[
-          styles.knob,
-          { left: value ? 22 : 3, backgroundColor: value ? colors.primary : colors.textMuted },
-        ]}
-      />
+      <View style={[styles.knob, { left: value ? 22 : 4, backgroundColor: value ? colors.lime : colors.surface }]} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  track: { width: 44, height: 26, borderRadius: 99, borderWidth: 1, justifyContent: "center" },
-  knob: { position: "absolute", top: 3, width: 18, height: 18, borderRadius: 99 },
+  track: { width: 44, height: 26, borderRadius: 13, justifyContent: "center" },
+  knob: { position: "absolute", top: 4, width: 18, height: 18, borderRadius: 99 },
   disabled: { opacity: 0.5 },
 });

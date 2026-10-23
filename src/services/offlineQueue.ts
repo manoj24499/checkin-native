@@ -13,6 +13,7 @@ import {
   startLocationTracking,
   stopLocationTracking,
 } from "@/services/locationTracking";
+import { saveTrackingToken } from "@/services/trackingTokens";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -523,6 +524,11 @@ async function runSync(): Promise<void> {
       continue;
     }
 
+    // Under the REAL attendance id, and before linkRecordedCheckIn remaps the outbox and flushes it,
+    // so the backlog upload already carries the token.
+    if (item.action === "CHECK_IN" && result.trackingToken) {
+      await saveTrackingToken(result.id, result.trackingToken).catch(() => {});
+    }
     await setItems(getItems().filter((i) => i.clientId !== item.clientId));
     await deleteSecrets(item.clientId);
     if (item.action === "CHECK_IN") await linkRecordedCheckIn(item, result.id, result.timestamp);

@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { StatusBadge } from "@/components/ui";
+import { Card, Kicker, StatusBadge } from "@/components/ui";
 import { useOfflineQueueStore, type OfflineQueueItem } from "@/store/offlineQueueStore";
 import { cancelOfflineItem, dismissOfflineItem, syncOfflineQueue } from "@/services/offlineQueue";
 import { useSettingsStore } from "@/store/settingsStore";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, spacing, typography } from "@/theme";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -34,9 +34,9 @@ export function PendingSyncCard({ employeeCode }: { employeeCode: string | undef
   const hasPending = items.some((i) => i.status === "pending");
 
   return (
-    <View style={styles.card}>
+    <Card style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.cardLabel}>PENDING SYNC</Text>
+        <Kicker style={styles.cardLabel}>Pending sync</Kicker>
         {hasPending ? (
           <Pressable onPress={() => void syncOfflineQueue()} hitSlop={8}>
             <Text style={styles.link}>Send now</Text>
@@ -90,37 +90,29 @@ export function PendingSyncCard({ employeeCode }: { employeeCode: string | undef
           </View>
         );
       })}
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginTop: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
+  card: { marginTop: spacing.sm + 4, gap: spacing.sm },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  cardLabel: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600" },
-  link: { ...typography.bodyStrong, color: colors.primary, fontSize: 13 },
+  cardLabel: { marginBottom: 0 },
+  link: { ...typography.bodyStrong, color: colors.primaryDark, fontSize: 13 },
   noticeRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   noticeText: { ...typography.caption, color: colors.success, flex: 1 },
   noticeTextWarn: { color: colors.warning },
   itemRow: {
     flexDirection: "row",
     gap: spacing.sm,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.sm + 2,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   itemText: { flex: 1 },
-  itemTitle: { ...typography.bodyStrong, color: colors.textPrimary, fontSize: 14 },
-  itemMeta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  itemTitle: { ...typography.bodyStrong, color: colors.ink, fontSize: 14 },
+  itemMeta: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   itemMetaError: { color: colors.danger },
-  itemSide: { alignItems: "flex-end", gap: spacing.xs },
-  sideLink: { ...typography.bodyStrong, color: colors.textSecondary, fontSize: 12.5 },
+  itemSide: { alignItems: "flex-end", gap: spacing.xs + 2 },
+  sideLink: { ...typography.bodyStrong, color: colors.primaryDark, fontSize: 12.5 },
 });

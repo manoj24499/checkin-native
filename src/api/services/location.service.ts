@@ -1,5 +1,6 @@
 import { apiClient } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
+import { getTrackingToken } from "@/services/trackingTokens";
 import type { LocationPingRequest, LocationPingResponse, OfficeLocation } from "@/types";
 
 export const locationService = {
@@ -9,9 +10,16 @@ export const locationService = {
       .then((r) => r.data.officeLocation);
   },
 
-  sendPing(payload: LocationPingRequest) {
+  async sendPing(payload: LocationPingRequest) {
+    // The session's tracking token is the primary proof for this endpoint (it outlives the
+    // 15-minute access token); without one the server falls back to the bearer token.
+    const trackingToken = await getTrackingToken(payload.attendanceId).catch(() => null);
     return apiClient
-      .post<LocationPingResponse>(endpoints.kioskLocation, payload)
+      .post<LocationPingResponse>(
+        endpoints.kioskLocation,
+        payload,
+        trackingToken ? { headers: { "X-Tracking-Token": trackingToken } } : undefined,
+      )
       .then((r) => r.data);
   },
 };

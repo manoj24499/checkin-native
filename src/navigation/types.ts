@@ -10,6 +10,9 @@ export type DashboardStackParamList = {
   // Places an admin assigned for today, and the turn-by-turn screen that guides the worker to them.
   TodaysPlaces: undefined;
   Navigate: undefined;
+  // Field employees' travel reimbursement (distance x rate per month). The
+  // entry point (Home's ReimbursementCard) is only shown to FIELD employees.
+  Reimbursement: undefined;
 };
 
 export type ProfileStackParamList = {
@@ -25,6 +28,8 @@ export type ProfileStackParamList = {
 
 export type AppTabParamList = {
   Dashboard: NavigatorScreenParams<DashboardStackParamList> | undefined;
+  // Same LiveMapScreen as the Dashboard stack's `LiveMap` modal, as a tab.
+  Map: undefined;
   CheckIn: undefined;
   // Replaces the old top-level History tab — Leave, Permission and Overtime
   // consolidated into one tabbed screen (see RequestsScreen). `tab` lets a

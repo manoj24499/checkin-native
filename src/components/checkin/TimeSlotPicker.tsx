@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, spacing, typography } from "@/theme";
 
 // "HH:mm", 24-hour, matching Shift.startTime/endTime's format on the backend.
 const SLOT_START_MINUTES = 6 * 60; // 06:00
@@ -64,19 +64,19 @@ export function TimeSlotPicker({ label, value, onChange, disabledAtOrBefore }: T
 }
 
 const styles = StyleSheet.create({
-  label: { fontSize: 9, letterSpacing: 1.5, color: colors.textMuted, fontWeight: "600", marginBottom: spacing.sm },
+  label: { ...typography.kicker, fontSize: 10, color: colors.textSecondary, marginBottom: spacing.sm },
   row: { flexDirection: "row", gap: spacing.xs + 2, paddingVertical: 2 },
   chip: {
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "transparent",
+    backgroundColor: colors.surfaceMuted,
   },
-  chipSelected: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
+  chipSelected: { borderColor: colors.ink, backgroundColor: colors.primaryMuted },
   chipDisabled: { opacity: 0.35 },
-  chipLabel: { ...typography.bodyStrong, fontSize: 13, color: colors.textSecondary },
-  chipLabelSelected: { color: colors.primary },
+  chipLabel: { ...typography.bodyStrong, fontSize: 12.5, color: colors.textSecondary },
+  chipLabelSelected: { color: colors.limeDeep },
   chipLabelDisabled: { color: colors.textMuted },
 });

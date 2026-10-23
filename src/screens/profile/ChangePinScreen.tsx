@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Screen, TextField, Button } from "@/components/ui";
+import { Screen, TextField, Button, Card, IconButton, IconTile, ScreenTitle } from "@/components/ui";
 import { useChangePin } from "@/hooks";
 import { getErrorMessage } from "@/utils/errors";
-import { colors, spacing, typography } from "@/theme";
+import { colors, radius, spacing, typography } from "@/theme";
 
 interface ChangePinFormValues {
   currentPin: string;
@@ -40,8 +40,11 @@ export function ChangePinScreen() {
   if (success) {
     return (
       <Screen contentStyle={styles.content}>
-        <Text style={styles.title}>PIN updated</Text>
-        <Text style={styles.subtitle}>Use your new PIN the next time you sign in.</Text>
+        <Card style={styles.successCard}>
+          <IconTile icon="checkmark" size={64} radius={32} style={styles.successIcon} />
+          <Text style={styles.successTitle}>PIN updated</Text>
+          <Text style={[styles.subtitle, styles.centered]}>Use your new PIN the next time you sign in.</Text>
+        </Card>
         <Button label="Done" onPress={() => navigation.goBack()} style={styles.submit} />
       </Screen>
     );
@@ -49,13 +52,12 @@ export function ChangePinScreen() {
 
   return (
     <Screen scroll contentStyle={styles.content}>
-      <Pressable onPress={() => navigation.goBack()} style={styles.closeButton} hitSlop={12}>
-        <Text style={styles.closeGlyph}>✕</Text>
-      </Pressable>
+      <IconButton icon="close" onPress={() => navigation.goBack()} accessibilityLabel="Close" style={styles.closeButton} />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Change PIN</Text>
-        <Text style={styles.subtitle}>Choose a PIN only you know — 4 to 10 digits.</Text>
+        <ScreenTitle style={styles.title}>Change PIN</ScreenTitle>
+        {/* Matches the 6-10 digit rule enforced below (the old copy said 4). */}
+        <Text style={styles.subtitle}>Choose a PIN only you know — 6 to 10 digits.</Text>
       </View>
 
       <Controller
@@ -65,6 +67,7 @@ export function ChangePinScreen() {
         render={({ field: { onChange, onBlur, value } }) => (
           <TextField
             label="Current PIN"
+            icon="lock"
             placeholder="••••••"
             secureTextEntry
             keyboardType="number-pad"
@@ -86,6 +89,7 @@ export function ChangePinScreen() {
         render={({ field: { onChange, onBlur, value } }) => (
           <TextField
             label="New PIN"
+            icon="lock"
             placeholder="••••••"
             secureTextEntry
             keyboardType="number-pad"
@@ -107,6 +111,7 @@ export function ChangePinScreen() {
         render={({ field: { onChange, onBlur, value } }) => (
           <TextField
             label="Confirm new PIN"
+            icon="lock"
             placeholder="••••••"
             secureTextEntry
             keyboardType="number-pad"
@@ -127,21 +132,23 @@ export function ChangePinScreen() {
 
 const styles = StyleSheet.create({
   content: { justifyContent: "center", flexGrow: 1 },
-  closeButton: {
-    alignSelf: "flex-end",
-    width: 34,
-    height: 34,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
+  closeButton: { alignSelf: "flex-end", marginBottom: spacing.md },
+  header: { marginBottom: spacing.lg },
+  title: { marginBottom: spacing.xs },
+  subtitle: { ...typography.caption, fontSize: 13.5, lineHeight: 19, color: colors.textSecondary },
+  centered: { textAlign: "center" },
+  error: {
+    ...typography.caption,
+    color: colors.danger,
+    backgroundColor: colors.dangerMuted,
+    borderRadius: radius.input,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
     marginBottom: spacing.md,
+    overflow: "hidden",
   },
-  closeGlyph: { color: colors.textSecondary, fontSize: 15 },
-  header: { marginBottom: spacing.xl },
-  title: { ...typography.h1, color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textSecondary },
-  error: { ...typography.caption, color: colors.danger, marginBottom: spacing.md },
   submit: { marginTop: spacing.sm },
+  successCard: { alignItems: "center", paddingVertical: spacing.lg, marginBottom: spacing.md },
+  successIcon: { marginBottom: spacing.md },
+  successTitle: { ...typography.h2, color: colors.ink, marginBottom: spacing.xs },
 });

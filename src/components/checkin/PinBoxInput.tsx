@@ -46,20 +46,20 @@ export function PinBoxInput({ value, onChange, maxLength = 6 }: PinBoxInputProps
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", gap: spacing.sm, position: "relative" },
+  row: { flexDirection: "row", gap: spacing.sm - 1, position: "relative" },
   box: {
     flex: 1,
     height: 52,
-    borderRadius: radius.sm,
+    borderRadius: radius.input - 2,
     backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
-  boxFilled: { borderColor: colors.primary },
-  boxNext: { borderWidth: 2, borderColor: colors.primaryMuted },
-  dot: { width: 10, height: 10, borderRadius: 99, backgroundColor: colors.primaryDark },
+  boxFilled: { borderColor: colors.ink, backgroundColor: colors.surface },
+  boxNext: { borderColor: "rgba(14,36,16,0.4)" },
+  dot: { width: 10, height: 10, borderRadius: 99, backgroundColor: colors.ink },
   hiddenInput: {
     position: "absolute",
     top: 0,

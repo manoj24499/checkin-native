@@ -1,5 +1,6 @@
-import Svg, { Circle, Path } from "react-native-svg";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
+import { Button } from "./Button";
+import { IconTile } from "./IconTile";
 import { colors, radius, spacing, typography } from "@/theme";
 
 interface IssueDialogProps {
@@ -39,15 +40,9 @@ export function IssueDialog({
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
           <View style={styles.headerRow}>
-            <View style={styles.iconWrap}>
-              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-                <Path d="M12 8v5" stroke={colors.primary} strokeWidth={1.9} strokeLinecap="round" />
-                <Path d="M12 16.5v.5" stroke={colors.primary} strokeWidth={1.9} strokeLinecap="round" />
-                <Circle cx={12} cy={12} r={9.5} stroke={colors.primary} strokeWidth={1.9} />
-              </Svg>
-            </View>
+            <IconTile icon="alert" tone="warning" size={40} radius={20} />
             <View style={styles.headerText}>
-              <Text style={styles.kicker}>{kicker}</Text>
+              <Text style={styles.kicker}>{kicker.toUpperCase()}</Text>
               <Text style={styles.title}>{title}</Text>
             </View>
           </View>
@@ -56,13 +51,9 @@ export function IssueDialog({
 
           <View style={styles.actionRow}>
             {secondaryLabel && onSecondary ? (
-              <Pressable onPress={onSecondary} style={styles.secondaryButton}>
-                <Text style={styles.secondaryLabel}>{secondaryLabel}</Text>
-              </Pressable>
+              <Button label={secondaryLabel} onPress={onSecondary} variant="secondary" size="sm" style={styles.action} />
             ) : null}
-            <Pressable onPress={onPrimary} style={styles.primaryButton}>
-              <Text style={styles.primaryLabel}>{primaryLabel}</Text>
-            </Pressable>
+            <Button label={primaryLabel} onPress={onPrimary} size="sm" style={styles.action} />
           </View>
         </View>
       </View>
@@ -76,43 +67,14 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.md + 2,
+    borderRadius: radius.card,
+    padding: spacing.md + 4,
   },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 3 },
-  iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 99,
-    backgroundColor: colors.primaryMuted,
-    borderWidth: 1,
-    borderColor: colors.primaryMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 4 },
   headerText: { flex: 1, minWidth: 0 },
-  kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary, fontSize: 9.5 },
-  title: { ...typography.h3, color: colors.textPrimary, marginTop: 3 },
-  body: { ...typography.body, color: colors.textPrimary, marginTop: spacing.sm + 3, lineHeight: 20 },
-  actionRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md + 2 },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 46,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.textMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryLabel: { ...typography.bodyStrong, fontSize: 13.5, color: colors.textPrimary },
-  primaryButton: {
-    flex: 1,
-    minHeight: 46,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryLabel: { ...typography.bodyStrong, fontSize: 13.5, color: colors.primaryDark },
+  kicker: { ...typography.kicker, color: colors.textSecondary, fontSize: 9.5 },
+  title: { ...typography.h3, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.ink, marginTop: 2 },
+  body: { ...typography.body, fontSize: 14, color: colors.textPrimary, marginTop: spacing.md, lineHeight: 20 },
+  actionRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg - 4 },
+  action: { flex: 1 },
 });

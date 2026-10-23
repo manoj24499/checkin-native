@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen, Card, Button } from "@/components/ui";
+import { LinearGradient } from "expo-linear-gradient";
+import { Screen, Card, Button, Icon, Kicker } from "@/components/ui";
 import { PhotoCaptureView } from "@/components/camera";
 import { useAuth, useFaceEnroll } from "@/hooks";
 import { getErrorMessage } from "@/utils/errors";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, gradients, radius, spacing, typography } from "@/theme";
 
 /**
  * Mandatory, blocking screen shown by RootNavigator whenever an
@@ -85,7 +86,7 @@ export function FaceEnrollmentScreen() {
 
   return (
     <Screen scroll contentStyle={styles.content}>
-      <Text style={styles.kicker}>ONE-TIME SETUP</Text>
+      <Kicker>ONE-TIME SETUP</Kicker>
       <Text style={styles.title}>Set up face verification</Text>
       <Text style={styles.subtitle}>
         Before you can check in, we need a clear photo of your face on file. This is used to confirm it's really
@@ -96,15 +97,29 @@ export function FaceEnrollmentScreen() {
         {photoDataUrl ? (
           <Image source={{ uri: photoDataUrl }} style={styles.preview} />
         ) : (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderGlyph}>⌾</Text>
-          </View>
+          <LinearGradient
+            colors={gradients.placeholder}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={styles.placeholder}
+          >
+            <Icon name="user" size={56} color={colors.textSecondary} strokeWidth={1.5} />
+            {/* Face-frame corner brackets. */}
+            <View pointerEvents="none" style={styles.frame}>
+              <View style={[styles.corner, styles.cornerTL]} />
+              <View style={[styles.corner, styles.cornerTR]} />
+              <View style={[styles.corner, styles.cornerBL]} />
+              <View style={[styles.corner, styles.cornerBR]} />
+            </View>
+          </LinearGradient>
         )}
 
         {rejection ? (
-          <Text style={rejection.kind === "failed" ? styles.errorText : styles.warningText}>
-            {rejection.message}
-          </Text>
+          <View style={rejection.kind === "failed" ? styles.errorNote : styles.warningNote}>
+            <Text style={rejection.kind === "failed" ? styles.errorText : styles.warningText}>
+              {rejection.message}
+            </Text>
+          </View>
         ) : null}
 
         <Button
@@ -124,41 +139,58 @@ export function FaceEnrollmentScreen() {
         {faceEnroll.isPending && !rejection ? <Text style={styles.pendingText}>Checking your photo…</Text> : null}
       </Card>
 
-      <Pressable onPress={() => void checkAgain()} disabled={checkingAgain} hitSlop={12} style={styles.logoutLink}>
-        <Text style={styles.logoutText}>{checkingAgain ? "Checking…" : "An admin fixed this? Check again"}</Text>
-      </Pressable>
+      <View style={styles.links}>
+        <Pressable onPress={() => void checkAgain()} disabled={checkingAgain} hitSlop={12}>
+          <Text style={styles.linkText}>{checkingAgain ? "Checking…" : "An admin fixed this? Check again"}</Text>
+        </Pressable>
 
-      <Pressable onPress={() => void logout()} hitSlop={12} style={styles.logoutLink}>
-        <Text style={styles.logoutText}>Not you? Log out</Text>
-      </Pressable>
+        <Pressable onPress={() => void logout()} hitSlop={12}>
+          <Text style={styles.linkText}>Not you? Log out</Text>
+        </Pressable>
+      </View>
     </Screen>
   );
 }
 
+const CORNER = 24;
+
 const styles = StyleSheet.create({
   content: { justifyContent: "center", flexGrow: 1 },
-  kicker: { ...typography.label, letterSpacing: 2, color: colors.textSecondary },
-  title: { ...typography.h1, color: colors.textPrimary, marginTop: spacing.xs, marginBottom: spacing.sm },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.lg },
+  title: { ...typography.h1, fontSize: 26, color: colors.ink, marginTop: 2, marginBottom: spacing.sm },
+  subtitle: { ...typography.body, fontSize: 14, lineHeight: 20, color: colors.textSecondary, marginBottom: spacing.lg },
   card: { alignItems: "stretch", gap: spacing.sm },
   preview: { width: "100%", height: 220, borderRadius: radius.lg, marginBottom: spacing.xs },
   placeholder: {
     width: "100%",
     height: 220,
     borderRadius: radius.lg,
-    borderWidth: 1,
+    borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: "rgba(134,119,111,0.55)",
-    backgroundColor: colors.surfaceMuted,
+    borderColor: "rgba(14,36,16,0.3)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.xs,
+    overflow: "hidden",
   },
-  placeholderGlyph: { fontSize: 40, color: colors.textSecondary },
+  frame: { position: "absolute", width: 120, height: 150 },
+  corner: { position: "absolute", width: CORNER, height: CORNER, borderColor: colors.ink },
+  cornerTL: { left: 0, top: 0, borderLeftWidth: 3, borderTopWidth: 3, borderTopLeftRadius: 10 },
+  cornerTR: { right: 0, top: 0, borderRightWidth: 3, borderTopWidth: 3, borderTopRightRadius: 10 },
+  cornerBL: { left: 0, bottom: 0, borderLeftWidth: 3, borderBottomWidth: 3, borderBottomLeftRadius: 10 },
+  cornerBR: { right: 0, bottom: 0, borderRightWidth: 3, borderBottomWidth: 3, borderBottomRightRadius: 10 },
   actionButton: { marginTop: spacing.xs },
   pendingText: { ...typography.caption, color: colors.textSecondary, textAlign: "center" },
-  errorText: { ...typography.caption, color: colors.danger },
-  warningText: { ...typography.caption, color: colors.warning },
-  logoutLink: { alignSelf: "center", marginTop: spacing.xl },
-  logoutText: { ...typography.bodyStrong, color: colors.textSecondary, fontSize: 13 },
+  errorNote: { backgroundColor: colors.dangerMuted, borderRadius: radius.input, padding: spacing.sm + 4 },
+  warningNote: { backgroundColor: colors.warningMuted, borderRadius: radius.input, padding: spacing.sm + 4 },
+  errorText: { ...typography.caption, lineHeight: 18, color: colors.danger },
+  warningText: { ...typography.caption, lineHeight: 18, color: colors.warningText },
+  links: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    columnGap: spacing.lg - 6,
+    rowGap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  linkText: { ...typography.bodyStrong, color: colors.primaryDark, fontSize: 13 },
 });

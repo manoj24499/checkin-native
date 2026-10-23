@@ -1,5 +1,6 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { LogoMark } from "@/components/branding/LogoMark";
+import { ScreenBackground } from "./ScreenBackground";
 import { colors, spacing, typography } from "@/theme";
 
 interface LoadingViewProps {
@@ -10,16 +11,21 @@ interface LoadingViewProps {
    * or History tab, a status refetch), where replaying the ~1.1s animation
    * every time would just be repetitive; those get the static logo. */
   animated?: boolean;
+  /** Paint the lime screen background behind it — for the app-level gates
+   * (sign-in bootstrap) that render outside any Screen. Default false
+   * (transparent), since it's also used inline inside scroll content. */
+  fullScreen?: boolean;
 }
 
-export function LoadingView({ label = "Loading…", animated = false }: LoadingViewProps) {
-  return (
+export function LoadingView({ label = "Loading…", animated = false, fullScreen = false }: LoadingViewProps) {
+  const content = (
     <View style={styles.container}>
-      <LogoMark animated={animated} size={40} barColor={colors.textPrimary} />
-      <ActivityIndicator color={colors.primary} size="large" style={styles.spinner} />
+      <LogoMark animated={animated} size={40} barColor={colors.ink} />
+      <ActivityIndicator color={colors.ink} size="large" style={styles.spinner} />
       <Text style={styles.label}>{label}</Text>
     </View>
   );
+  return fullScreen ? <ScreenBackground>{content}</ScreenBackground> : content;
 }
 
 const styles = StyleSheet.create({
