@@ -24,6 +24,7 @@ export const endpoints = {
   routeLeg: "/api/mobile/me/route-leg",
   support: "/api/mobile/support",
   reimbursements: "/api/mobile/me/reimbursements",
+  lateArrivals: "/api/mobile/me/late-arrivals",
 
   kioskScan: "/api/kiosk/scan",
   kioskStatus: "/api/kiosk/status",

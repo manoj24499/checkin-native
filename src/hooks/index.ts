@@ -30,3 +30,4 @@ export { useSubmitSupportTicket } from "./useSubmitSupportTicket";
 export { useUploadProfilePhoto } from "./useUploadProfilePhoto";
 export { useQueuedFieldVisit } from "./useQueuedFieldVisit";
 export { useReimbursements } from "./useReimbursements";
+export { useLateArrivals } from "./useLateArrivals";

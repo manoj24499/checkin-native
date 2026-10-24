@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
-import { useLogFieldVisit } from "@/hooks/useLogFieldVisit";
-import { getErrorMessage } from "@/utils/errors";
+import { useCallback, useMemo } from "react";
+import { useAuthStore } from "@/store/authStore";
+import { useVisitQueueStore } from "@/store/visitQueueStore";
+import { enqueueVisit, removeVisit, retryVisit, syncAllQueues } from "@/services/visitQueue";
 import type { FieldVisitRequest } from "@/types";
 
 export interface PendingVisit {
@@ -8,65 +9,54 @@ export interface PendingVisit {
   name: string;
   status: "saving" | "failed";
   error?: string;
+  /** The visit as typed. `photo` is empty here — it's kept in its own storage row (see services/visitQueue.ts). */
   payload: FieldVisitRequest;
 }
 
 /**
  * Saves a field visit in the background. The form closes the instant the
- * employee taps Save and the visit appears in the list as "Saving…" — the
- * photo upload and server work happen behind it, so nothing blocks the screen.
- * If it fails (no signal in the field is common), the entry stays as "Failed"
- * with Retry/Remove instead of the data being lost.
+ * employee taps Save and the visit appears in the list as "Saving…". It is
+ * saved on the phone first (services/visitQueue.ts), so it survives no signal,
+ * leaving the screen and the app being closed, and is sent automatically when
+ * possible (see useOfflineQueueSync). Every screen using this hook sees the
+ * same list. A visit the server rejects for good shows as "Failed" with
+ * Retry/Remove.
  */
 export function useQueuedFieldVisit() {
-  const logVisit = useLogFieldVisit();
-  const [pending, setPending] = useState<PendingVisit[]>([]);
+  const employeeCode = useAuthStore((s) => s.user?.employeeCode);
+  const items = useVisitQueueStore((s) => s.items);
 
-  const send = useCallback(
-    async (item: PendingVisit) => {
-      try {
-        await logVisit.mutateAsync(item.payload);
-        setPending((list) => list.filter((p) => p.key !== item.key));
-      } catch (error) {
-        setPending((list) =>
-          list.map((p) =>
-            p.key === item.key
-              ? { ...p, status: "failed", error: getErrorMessage(error, "Couldn't save this visit.") }
-              : p,
-          ),
-        );
-      }
-    },
-    [logVisit],
+  const pending = useMemo<PendingVisit[]>(
+    () =>
+      items
+        .filter((i) => i.employeeCode === employeeCode)
+        .map((i) => ({
+          key: i.key,
+          name: i.name,
+          status: i.status,
+          error: i.error,
+          payload: { ...i.payload, photo: "", clientId: i.clientId, reachedAt: i.reachedAt },
+        })),
+    [items, employeeCode],
   );
 
   const submit = useCallback(
     (payload: FieldVisitRequest) => {
-      const item: PendingVisit = {
-        key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: payload.name,
-        status: "saving",
-        payload,
-      };
-      setPending((list) => [...list, item]);
-      void send(item);
+      void enqueueVisit(payload, employeeCode ?? "")
+        .then(() => syncAllQueues())
+        .catch(() => {});
     },
-    [send],
+    [employeeCode],
   );
 
-  const retry = useCallback(
-    (key: string) => {
-      const item = pending.find((p) => p.key === key);
-      if (!item) return;
-      const next: PendingVisit = { ...item, status: "saving", error: undefined };
-      setPending((list) => list.map((p) => (p.key === key ? next : p)));
-      void send(next);
-    },
-    [pending, send],
-  );
+  const retry = useCallback((key: string) => {
+    void retryVisit(key)
+      .then(() => syncAllQueues())
+      .catch(() => {});
+  }, []);
 
   const remove = useCallback((key: string) => {
-    setPending((list) => list.filter((p) => p.key !== key));
+    void removeVisit(key);
   }, []);
 
   return { pending, submit, retry, remove };

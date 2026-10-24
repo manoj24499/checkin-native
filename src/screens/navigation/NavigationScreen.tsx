@@ -363,7 +363,7 @@ export function NavigationScreen() {
     }
     Alert.alert(
       "Visits still saving",
-      `${uploading} ${uploading === 1 ? "visit is" : "visits are"} still being saved. If you leave now they may be lost if the connection fails.`,
+      `${uploading} ${uploading === 1 ? "visit is" : "visits are"} waiting to be sent. They are kept on this phone and sent when there is a connection, so leaving now is safe.`,
       [
         { text: "Stay", style: "cancel" },
         { text: "Leave anyway", style: "destructive", onPress: () => navigation.goBack() },

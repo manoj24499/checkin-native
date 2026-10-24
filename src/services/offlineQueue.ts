@@ -65,7 +65,7 @@ export function localDateKey(date: Date): string {
 
 // UUID v4 shape. Math.random is fine here: this is an idempotency key, not a
 // secret (no crypto module is installed).
-function newClientId(): string {
+export function newClientId(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);

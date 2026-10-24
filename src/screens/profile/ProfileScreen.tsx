@@ -26,6 +26,8 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { useAuthStore } from "@/store/authStore";
 import { useOfflineQueueStore } from "@/store/offlineQueueStore";
 import { discardOfflineQueue } from "@/services/offlineQueue";
+import { countWaitingVisits, discardVisitQueue } from "@/services/visitQueue";
+import { useVisitQueueStore } from "@/store/visitQueueStore";
 import { forgetVerifiedPin } from "@/services/pinVerifier";
 import { promptBiometricAuth, getLastBiometricError } from "@/services/biometrics";
 import { registerPushTokenBestEffort } from "@/services/notifications";
@@ -131,16 +133,20 @@ export function ProfileScreen() {
   // means losing them — warn first. Signing out always wipes the queue (PINs
   // and photos included) and the local PIN verifier, so nothing of this
   // employee's stays on a possibly shared phone.
-  const unsentCount = useOfflineQueueStore(
+  const unsentCheckIns = useOfflineQueueStore(
     (s) =>
       s.items.filter(
         (i) => i.employeeCode === user?.employeeCode && (i.status === "pending" || i.status === "syncing"),
       ).length,
   );
+  // Field visits saved on the phone and not sent yet (services/visitQueue.ts) — same deal.
+  const unsentVisits = useVisitQueueStore((s) => countWaitingVisits(s.items, user?.employeeCode));
+  const unsentCount = unsentCheckIns + unsentVisits;
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const signOut = async () => {
     setConfirmLogoutOpen(false);
     await discardOfflineQueue();
+    await discardVisitQueue();
     if (user) await forgetVerifiedPin(user.employeeCode);
     await logout();
   };
@@ -423,8 +429,14 @@ export function ProfileScreen() {
 
       <IssueDialog
         visible={confirmLogoutOpen}
-        kicker="UNSENT CHECK-INS"
-        title={`You have ${unsentCount} unsent ${unsentCount === 1 ? "check-in" : "check-ins"}`}
+        kicker="UNSENT ITEMS"
+        title={
+          unsentVisits === 0
+            ? `You have ${unsentCount} unsent ${unsentCount === 1 ? "check-in" : "check-ins"}`
+            : unsentCheckIns === 0
+              ? `You have ${unsentCount} unsent ${unsentCount === 1 ? "visit" : "visits"}`
+              : `You have ${unsentCount} unsent check-ins and visits`
+        }
         body="They're saved on this phone and will be sent when you're back online. If you log out now, they'll be deleted and won't be recorded."
         primaryLabel="Stay signed in"
         onPrimary={() => setConfirmLogoutOpen(false)}

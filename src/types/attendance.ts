@@ -266,6 +266,10 @@ export interface FieldVisitRequest {
   longitude: number;
   /** Set when this visit completes a place the admin assigned. */
   assignedPlaceId?: string;
+  /** Idempotency key (16-64 chars [A-Za-z0-9-]): a resend with the same id never creates a second visit. */
+  clientId?: string;
+  /** ISO time the worker reached the place (tapped Save), for visits sent later from the queue. */
+  reachedAt?: string;
 }
 
 // A place an admin assigned to this field worker for a day (see /api/mobile/me/assigned-places).

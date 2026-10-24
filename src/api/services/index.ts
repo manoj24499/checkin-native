@@ -8,3 +8,4 @@ export { leaveService } from "./leave.service";
 export { workSegmentService } from "./workSegment.service";
 export { supportService } from "./support.service";
 export { reimbursementService } from "./reimbursement.service";
+export { lateArrivalService } from "./lateArrival.service";

@@ -22,6 +22,7 @@ import {
   useCancelLeaveRequest,
   useTimedPermissions,
   useOvertimeStatus,
+  useLateArrivals,
 } from "@/hooks";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, radius, shadows, spacing, typography } from "@/theme";
@@ -35,6 +36,7 @@ import type {
   OvertimeRequestStatus,
   TimeOffType,
   PublicHoliday,
+  LateArrival,
 } from "@/types";
 
 type ReqTab = "leave" | "permission" | "overtime";
@@ -110,6 +112,7 @@ export function RequestsScreen() {
   const cancelLeave = useCancelLeaveRequest();
   const permissionsQuery = useTimedPermissions(true);
   const overtimeQuery = useOvertimeStatus(true);
+  const lateArrivalsQuery = useLateArrivals(true);
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -122,6 +125,7 @@ export function RequestsScreen() {
 
   const permissions = permissionsQuery.data ?? [];
   const overtimeRequests = overtimeQuery.data ?? [];
+  const lateArrivals = lateArrivalsQuery.data ?? [];
 
   const handleCancelLeave = async (id: string) => {
     setCancellingId(id);
@@ -272,6 +276,36 @@ export function RequestsScreen() {
               ))}
             </View>
           )}
+
+          {lateArrivals.length > 0 ? (
+            <>
+              <Kicker style={styles.sectionLabel}>Late arrivals</Kicker>
+              <Text style={styles.lateNote}>
+                Marked automatically when you check in after your shift starts. This is only a record: it doesn't
+                pause your work clock and needs nothing from you.
+              </Text>
+              <View style={styles.list}>
+                {lateArrivals.map((a: LateArrival) => (
+                  <View key={a.id} style={styles.rowWrap}>
+                    <View style={styles.row}>
+                      <View style={styles.rowText}>
+                        <Text style={styles.rowTitle}>
+                          {a.lateMinutes ? `Late by ${a.lateMinutes} min` : "Late arrival"}
+                        </Text>
+                        <Text style={styles.rowMeta}>
+                          {formatDateWithWeekday(a.timestamp)} · checked in {formatTime(a.timestamp)}
+                        </Text>
+                      </View>
+                      <StatusBadge
+                        label={a.leaveType === "HALF_DAY" ? "Half-day leave" : "Permission"}
+                        tone={a.leaveType === "HALF_DAY" ? "danger" : "warning"}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -348,6 +382,7 @@ const styles = StyleSheet.create({
   sectionLabel: { marginTop: spacing.lg, marginBottom: spacing.sm },
   errorText: { ...typography.caption, color: colors.danger, marginBottom: spacing.sm },
   list: { gap: spacing.sm + 2 },
+  lateNote: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
   rowWrap: {
     borderRadius: radius.tile,
     backgroundColor: colors.surface,
