@@ -1,7 +1,9 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
 export type AuthStackParamList = {
-  Login: undefined;
+  // Set after a successful PIN reset so the sign-in form is pre-filled and says what happened.
+  Login: { organizationCode?: string; employeeCode?: string; notice?: string } | undefined;
+  ResetPin: { organizationCode?: string; employeeCode?: string } | undefined;
 };
 
 export type DashboardStackParamList = {

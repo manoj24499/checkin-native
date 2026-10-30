@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Controller, useForm } from "react-hook-form";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,6 +14,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { env } from "@/config/env";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, gradients, radius, spacing, typography } from "@/theme";
+import type { AuthStackParamList } from "@/navigation/types";
 
 interface LoginFormValues {
   organizationCode: string;
@@ -21,6 +24,9 @@ interface LoginFormValues {
 
 export function LoginScreen() {
   const { login } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList, "Login">>();
+  const route = useRoute<RouteProp<AuthStackParamList, "Login">>();
+  const notice = route.params?.notice ?? null;
   const lastOrganizationCode = useSettingsStore((s) => s.lastOrganizationCode);
   const setLastOrganizationCode = useSettingsStore((s) => s.setLastOrganizationCode);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -43,6 +49,13 @@ export function LoginScreen() {
     if (lastOrganizationCode) setValue("organizationCode", lastOrganizationCode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastOrganizationCode]);
+
+  // Arriving from a finished PIN reset: fill in who they are so only the new PIN is left to type.
+  useEffect(() => {
+    if (route.params?.organizationCode) setValue("organizationCode", route.params.organizationCode);
+    if (route.params?.employeeCode) setValue("employeeCode", route.params.employeeCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.organizationCode, route.params?.employeeCode]);
 
   const organizationCode = watch("organizationCode");
   const employeeCode = watch("employeeCode");
@@ -145,6 +158,21 @@ export function LoginScreen() {
           )}
         />
 
+        <Pressable
+          onPress={() =>
+            navigation.navigate("ResetPin", {
+              organizationCode: organizationCode.trim() || undefined,
+              employeeCode: employeeCode.trim().toUpperCase() || undefined,
+            })
+          }
+          hitSlop={8}
+          style={styles.forgot}
+          accessibilityRole="button"
+        >
+          <Text style={styles.forgotText}>Forgot PIN?</Text>
+        </Pressable>
+
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
         {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
 
         <Button
@@ -211,6 +239,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   submit: { marginTop: spacing.sm },
+  forgot: { alignSelf: "flex-end", marginBottom: spacing.md, marginTop: -spacing.xs },
+  forgotText: { ...typography.bodyStrong, fontSize: 13, color: colors.primaryDark },
+  notice: {
+    ...typography.caption,
+    color: colors.success,
+    marginBottom: spacing.md,
+  },
   footer: {
     flexDirection: "row",
     alignItems: "center",

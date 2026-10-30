@@ -12,6 +12,22 @@ export interface LoginResponse {
   user: EmployeeSummary;
 }
 
+export interface PinResetVerifyRequest {
+  organizationCode: string;
+  employeeCode: string;
+  code: string;
+}
+
+export interface PinResetVerifyResponse {
+  resetToken: string;
+  name: string;
+}
+
+export interface PinResetCompleteRequest {
+  resetToken: string;
+  newPin: string;
+}
+
 export interface RefreshResponse {
   accessToken: string;
   refreshToken: string;

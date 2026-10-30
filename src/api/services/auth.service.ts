@@ -1,10 +1,27 @@
 import { apiClient } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
-import type { LoginRequest, LoginResponse, RefreshResponse } from "@/types";
+import type {
+  LoginRequest,
+  LoginResponse,
+  PinResetCompleteRequest,
+  PinResetVerifyRequest,
+  PinResetVerifyResponse,
+  RefreshResponse,
+} from "@/types";
 
 export const authService = {
   login(payload: LoginRequest) {
     return apiClient.post<LoginResponse>(endpoints.mobileLogin, payload).then((r) => r.data);
+  },
+
+  // Forgot-PIN flow: the admin hands out a one-time code; verifying it returns a short-lived token that
+  // lets the employee choose a new PIN. Neither call is signed in, and neither returns login tokens.
+  verifyPinResetCode(payload: PinResetVerifyRequest) {
+    return apiClient.post<PinResetVerifyResponse>(endpoints.pinResetVerify, payload).then((r) => r.data);
+  },
+
+  completePinReset(payload: PinResetCompleteRequest) {
+    return apiClient.post<{ success: true }>(endpoints.pinResetComplete, payload).then((r) => r.data);
   },
 
   refresh(refreshToken: string) {
