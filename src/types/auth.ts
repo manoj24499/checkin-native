@@ -12,6 +12,13 @@ export interface LoginResponse {
   user: EmployeeSummary;
 }
 
+export interface SetInitialPinRequest {
+  organizationCode: string;
+  employeeCode: string;
+  tempPin: string;
+  newPin: string;
+}
+
 export interface PinResetVerifyRequest {
   organizationCode: string;
   employeeCode: string;

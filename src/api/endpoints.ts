@@ -1,5 +1,6 @@
 export const endpoints = {
   mobileLogin: "/api/mobile/login",
+  setInitialPin: "/api/mobile/set-initial-pin",
   pinResetVerify: "/api/mobile/pin-reset/verify",
   pinResetComplete: "/api/mobile/pin-reset/complete",
   mobileRefresh: "/api/mobile/refresh",

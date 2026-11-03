@@ -7,11 +7,17 @@ import type {
   PinResetVerifyRequest,
   PinResetVerifyResponse,
   RefreshResponse,
+  SetInitialPinRequest,
 } from "@/types";
 
 export const authService = {
   login(payload: LoginRequest) {
     return apiClient.post<LoginResponse>(endpoints.mobileLogin, payload).then((r) => r.data);
+  },
+
+  // First sign-in with an admin-generated PIN: swaps it for one the employee chooses. Not signed in.
+  setInitialPin(payload: SetInitialPinRequest) {
+    return apiClient.post<{ success: true }>(endpoints.setInitialPin, payload).then((r) => r.data);
   },
 
   // Forgot-PIN flow: the admin hands out a one-time code; verifying it returns a short-lived token that

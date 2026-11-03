@@ -12,6 +12,7 @@ import { LogoMark } from "@/components/branding/LogoMark";
 import { useAuth, useActivityPattern } from "@/hooks";
 import { useSettingsStore } from "@/store/settingsStore";
 import { env } from "@/config/env";
+import { AxiosError } from "axios";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, gradients, radius, spacing, typography } from "@/theme";
 import type { AuthStackParamList } from "@/navigation/types";
@@ -71,6 +72,15 @@ export function LoginScreen() {
       // might just be a typo, not the device's real org.
       setLastOrganizationCode(organizationCode);
     } catch (error) {
+      // Signed in with the temporary PIN an admin generated: off to choose their own, with the fields filled in.
+      if (error instanceof AxiosError && (error.response?.data as { code?: string } | undefined)?.code === "PIN_CHANGE_REQUIRED") {
+        navigation.navigate("SetupPin", {
+          organizationCode,
+          employeeCode: values.employeeCode.trim().toUpperCase(),
+          tempPin: values.pin.trim(),
+        });
+        return;
+      }
       setSubmitError(getErrorMessage(error, "Invalid organization code, employee code, or PIN."));
     }
   };
@@ -183,6 +193,22 @@ export function LoginScreen() {
           style={styles.submit}
         />
 
+        <Pressable
+          onPress={() =>
+            navigation.navigate("SetupPin", {
+              organizationCode: organizationCode.trim() || undefined,
+              employeeCode: employeeCode.trim().toUpperCase() || undefined,
+            })
+          }
+          hitSlop={8}
+          style={styles.firstTime}
+          accessibilityRole="button"
+        >
+          <Text style={styles.firstTimeText}>
+            First time here? <Text style={styles.forgotText}>Set up your PIN</Text>
+          </Text>
+        </Pressable>
+
         <View style={styles.footer}>
           <View style={styles.footerDot} />
           <Text style={styles.footerText}>
@@ -240,6 +266,8 @@ const styles = StyleSheet.create({
   },
   submit: { marginTop: spacing.sm },
   forgot: { alignSelf: "flex-end", marginBottom: spacing.md, marginTop: -spacing.xs },
+  firstTime: { alignSelf: "center", marginTop: spacing.md },
+  firstTimeText: { ...typography.caption, fontSize: 13, color: colors.textSecondary },
   forgotText: { ...typography.bodyStrong, fontSize: 13, color: colors.primaryDark },
   notice: {
     ...typography.caption,
