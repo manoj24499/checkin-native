@@ -43,7 +43,7 @@ export function HeroCard({
   contentStyle,
   children,
 }: HeroCardProps) {
-  const notchContent = notch === true ? <Icon name="chevronDown" size={16} color={colors.ink} /> : notch;
+  const notchContent = notch === true ? <Icon name="chevronDown" size={16} color={colors.onAccent} /> : notch;
   return (
     <View style={style}>
       <View style={styles.shadowWrap}>
@@ -80,7 +80,7 @@ export function HeroCard({
 }
 
 const styles = StyleSheet.create({
-  shadowWrap: { borderRadius: radius.hero, backgroundColor: "#D3EC55", ...shadows.hero },
+  shadowWrap: { borderRadius: radius.hero, backgroundColor: "#D9480A", ...shadows.hero },
   card: {
     borderTopLeftRadius: radius.hero,
     borderTopRightRadius: radius.hero,
@@ -97,17 +97,17 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.28)",
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   label: { fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.onLimeSecondary },
-  value: { ...typography.display, color: colors.ink, marginTop: spacing.sm + 4 },
+  value: { ...typography.display, color: colors.onAccent, marginTop: spacing.sm + 4 },
   suffix: {
     fontSize: 15,
     fontWeight: "500",
     fontFamily: "Inter_500Medium",
     letterSpacing: 0,
-    color: colors.inkMuted,
+    color: colors.onAccentMuted,
   },
   notch: {
     alignSelf: "center",

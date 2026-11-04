@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: "rgba(14,36,16,0.3)",
+    borderColor: "rgba(255,255,255,0.28)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.xs,

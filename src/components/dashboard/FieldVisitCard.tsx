@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: "rgba(14,36,16,0.3)",
+    borderColor: "rgba(255,255,255,0.28)",
     padding: spacing.sm + 2,
   },
   photoTileFilled: { borderStyle: "solid", borderColor: colors.ink, backgroundColor: colors.primaryMuted },

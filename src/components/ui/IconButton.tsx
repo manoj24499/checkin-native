@@ -6,9 +6,9 @@ type IconButtonVariant = "white" | "ink" | "dark" | "muted";
 
 const VARIANTS: Record<IconButtonVariant, { bg: string; fg: string }> = {
   white: { bg: colors.surface, fg: colors.ink },
-  ink: { bg: colors.ink, fg: colors.lime },
+  ink: { bg: colors.surfaceMuted, fg: colors.lime },
   // Translucent ink — for buttons floating over a map.
-  dark: { bg: "rgba(14,36,16,0.92)", fg: colors.lime },
+  dark: { bg: "rgba(15,15,15,0.92)", fg: colors.lime },
   muted: { bg: colors.surfaceMuted, fg: colors.ink },
 };
 

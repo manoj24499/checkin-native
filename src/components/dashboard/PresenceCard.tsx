@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   outsideTotalLabel: {
     ...typography.caption,
     fontSize: 11.5,
-    color: colors.inkMuted,
+    color: colors.onAccentMuted,
     marginTop: spacing.xs + 2,
   },
   warningBox: {

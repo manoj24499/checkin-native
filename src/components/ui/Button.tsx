@@ -25,11 +25,11 @@ interface ButtonProps {
 }
 
 const LABEL_COLOR: Record<Variant, string> = {
-  primary: colors.primaryText,
+  primary: colors.onAccent,
   secondary: colors.ink,
   danger: colors.danger,
   ghost: colors.ink,
-  lime: colors.ink,
+  lime: colors.onAccent,
 };
 
 export function Button({ label, onPress, variant = "primary", loading, disabled, style, size = "md", icon }: ButtonProps) {
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
 });
 
 const variantStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.ink, ...shadows.ink },
+  primary: { backgroundColor: colors.limeStrong, ...shadows.ink },
   secondary: { backgroundColor: "transparent", borderWidth: 1.5, borderColor: colors.ink },
   danger: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   ghost: { backgroundColor: "transparent" },

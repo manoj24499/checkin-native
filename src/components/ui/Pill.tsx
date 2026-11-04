@@ -7,8 +7,8 @@ export type PillVariant = "lime" | "white" | "glass" | "ink" | "outline" | "mute
 const PILL: Record<PillVariant, { bg: string; fg: string; border?: string }> = {
   lime: { bg: colors.primaryMuted, fg: colors.limeDeep },
   white: { bg: colors.surface, fg: colors.ink },
-  glass: { bg: colors.glass, fg: colors.ink },
-  ink: { bg: colors.ink, fg: colors.lime },
+  glass: { bg: colors.glass, fg: colors.onAccent },
+  ink: { bg: colors.surfaceRaised, fg: colors.limeDeep },
   outline: { bg: "transparent", fg: colors.ink, border: colors.ink },
   muted: { bg: colors.surfaceMuted, fg: colors.textSecondary },
   success: { bg: colors.surface, fg: colors.success },

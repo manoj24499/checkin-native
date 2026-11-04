@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   boxFilled: { borderColor: colors.ink, backgroundColor: colors.surface },
-  boxNext: { borderColor: "rgba(14,36,16,0.4)" },
+  boxNext: { borderColor: "rgba(247,243,239,0.4)" },
   dot: { width: 10, height: 10, borderRadius: 99, backgroundColor: colors.ink },
   hiddenInput: {
     position: "absolute",

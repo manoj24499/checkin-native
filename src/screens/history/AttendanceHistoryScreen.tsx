@@ -16,8 +16,10 @@ import { useAttendanceHistory } from "@/hooks";
 import { groupAttendanceByDay } from "@/utils/attendanceGrouping";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, radius, spacing } from "@/theme";
+import { useTabBarClearance } from "@/navigation/tabBarClearance";
 
 export function AttendanceHistoryScreen() {
+  const tabClearance = useTabBarClearance();
   const navigation = useNavigation();
   const query = useAttendanceHistory();
 
@@ -62,7 +64,7 @@ export function AttendanceHistoryScreen() {
               <DayHistoryRow day={item} divider={index > 0} />
             </View>
           )}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.md + tabClearance }]}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();

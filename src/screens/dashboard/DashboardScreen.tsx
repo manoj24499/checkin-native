@@ -49,6 +49,7 @@ import { getErrorMessage } from "@/utils/errors";
 import { formatDistance } from "@/utils/geo";
 import { colors, shadows, spacing, typography } from "@/theme";
 import type { AppTabParamList, DashboardStackParamList } from "@/navigation/types";
+import { useTabBarClearance } from "@/navigation/tabBarClearance";
 import type { WorkSegmentMode } from "@/types";
 
 type Nav = NativeStackNavigationProp<DashboardStackParamList, "DashboardHome">;
@@ -84,6 +85,7 @@ function shiftLengthLabel(start: string | null, end: string | null) {
 }
 
 export function DashboardScreen() {
+  const tabClearance = useTabBarClearance();
   const { user } = useAuth();
   const navigation = useNavigation<Nav>();
   const isTracking = useAttendanceSessionStore((s) => s.isTracking);
@@ -287,10 +289,10 @@ export function DashboardScreen() {
   const pendingLeave = (leaveQuery.data?.requests ?? []).some((r) => r.status === "PENDING");
 
   return (
-    <Screen contentStyle={styles.screenContent}>
+    <Screen contentStyle={styles.screenContent} tabBarClearance={false}>
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.lg + tabClearance }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -448,7 +450,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarLabel: { ...typography.bodyStrong, fontSize: 14, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.lime },
-  greetingKicker: { ...typography.caption, fontSize: 12, color: colors.onLimeSecondary },
+  greetingKicker: { ...typography.caption, fontSize: 12, color: colors.textSecondary },
   greeting: { ...typography.section, color: colors.ink },
   listCard: { paddingVertical: spacing.xs + 2, paddingHorizontal: spacing.md - 2 },
   statGrid: {

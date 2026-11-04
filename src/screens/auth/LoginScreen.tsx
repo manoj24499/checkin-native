@@ -87,19 +87,19 @@ export function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <LinearGradient colors={gradients.hero} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={styles.heroShell}>
         <View pointerEvents="none" style={styles.heroGlow} />
         <SafeAreaView edges={["top"]} style={styles.hero}>
           <View style={styles.logoRow}>
-            <LogoMark animated size={28} barColor={colors.ink} accentColor={colors.limeDeep} />
+            <LogoMark animated size={28} barColor={colors.onAccent} accentColor="#1B1B1B" />
           </View>
           <Text style={styles.headline}>Check-in Application.</Text>
           <Text style={styles.heroSubtitle}>
             Check in, share your dot while you work, check out. Nothing more.
           </Text>
           <View style={styles.sparkRow}>
-            <BarSpark values={spark} color={colors.ink} height={30} />
+            <BarSpark values={spark} color={colors.onAccent} height={30} />
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -246,14 +246,14 @@ const styles = StyleSheet.create({
     fontWeight: "300",
     lineHeight: 39,
     letterSpacing: -0.8,
-    color: colors.ink,
+    color: colors.onAccent,
     marginTop: spacing.lg - 2,
     maxWidth: 260,
   },
   heroSubtitle: {
     ...typography.body,
     fontSize: 14,
-    color: colors.inkMuted,
+    color: colors.onAccentMuted,
     marginTop: spacing.sm + 2,
     maxWidth: 280,
   },

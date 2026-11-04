@@ -30,7 +30,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <NavigationContainer>
-            <StatusBar style="dark" />
+            <StatusBar style="light" />
             {children}
           </NavigationContainer>
         </QueryClientProvider>

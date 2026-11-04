@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(14,36,16,0.72)",
+    backgroundColor: "rgba(26,21,18,0.72)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingTop: spacing.lg,
     alignItems: "center",
-    backgroundColor: "rgba(14,36,16,0.35)",
+    backgroundColor: "rgba(26,21,18,0.35)",
   },
   ring: {
     width: RING_SIZE,

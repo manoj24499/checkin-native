@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { renderIcon, type IconSource } from "./Icon";
-import { colors, shadows, spacing } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 export interface ActionTileProps {
   /** Icon name or element (drawn lime on the ink tile). */
@@ -30,7 +30,7 @@ export function ActionTile({ icon, label, onPress, disabled, badge, size = 58, s
       style={({ pressed }) => [styles.wrap, disabled && styles.disabled, pressed && styles.pressed, style]}
     >
       <View style={[styles.tile, { width: size, height: size, borderRadius: Math.round(size * 0.33) }]}>
-        {renderIcon(icon, Math.round(size * 0.38), colors.lime)}
+        {renderIcon(icon, Math.round(size * 0.38), colors.onAccent)}
         {badge ? <View style={styles.badge} /> : null}
       </View>
       <Text style={styles.label} numberOfLines={1}>
@@ -66,10 +66,9 @@ export function QuickActions({ actions, style }: QuickActionsProps) {
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", gap: 7 },
   tile: {
-    backgroundColor: colors.ink,
+    backgroundColor: "rgba(255,255,255,0.22)",
     alignItems: "center",
     justifyContent: "center",
-    ...shadows.ink,
   },
   badge: {
     position: "absolute",
@@ -78,11 +77,11 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 99,
-    backgroundColor: colors.lime,
+    backgroundColor: colors.onAccent,
     borderWidth: 1.5,
-    borderColor: colors.ink,
+    borderColor: "#D9480A",
   },
-  label: { fontSize: 11.5, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.ink },
+  label: { fontSize: 11.5, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.onAccent },
   pressed: { opacity: 0.85, transform: [{ scale: 0.96 }] },
   disabled: { opacity: 0.4 },
   row: { flexDirection: "row", gap: spacing.sm },

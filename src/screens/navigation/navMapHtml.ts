@@ -37,7 +37,7 @@ export const NAV_MAP_HTML = `<!DOCTYPE html>
       return L.divIcon({
         className: '',
         html: '<div style="width:38px;height:38px;transform:rotate(' + (h || 0) + 'deg)"><svg viewBox="0 0 24 24" width="38" height="38">' +
-          '<circle cx="12" cy="12" r="11" fill="rgba(216,242,94,.3)"/>' +
+          '<circle cx="12" cy="12" r="11" fill="rgba(239,108,0,.3)"/>' +
           '<path d="M12 3 L18.5 19 L12 15.5 L5.5 19 Z" fill="${colors.lime}" stroke="${colors.ink}" stroke-width="1.6" stroke-linejoin="round"/></svg></div>',
         iconSize: [38, 38], iconAnchor: [19, 19]
       });

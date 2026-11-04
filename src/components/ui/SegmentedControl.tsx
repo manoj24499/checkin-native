@@ -51,7 +51,7 @@ export function SegmentedControl<K extends string>({
               style={[
                 styles.label,
                 active && styles.labelActive,
-                active && variant === "ink" && { color: colors.lime },
+                active && variant === "ink" && { color: colors.onAccent },
               ]}
               numberOfLines={1}
             >
@@ -81,8 +81,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: 13,
   },
-  activeWhite: { backgroundColor: colors.surface, ...shadows.soft },
-  activeInk: { backgroundColor: colors.ink },
+  activeWhite: { backgroundColor: colors.surfaceRaised, ...shadows.soft },
+  activeInk: { backgroundColor: colors.limeStrong },
   disabled: { opacity: 0.4 },
   label: { fontSize: 13, fontFamily: "Inter_500Medium", fontWeight: "500", color: colors.textSecondary },
   labelActive: { fontFamily: "Inter_600SemiBold", fontWeight: "600", color: colors.ink },
@@ -91,9 +91,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     height: 16,
     borderRadius: 99,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.limeStrong,
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeLabel: { fontSize: 10, fontWeight: "700", color: colors.lime },
+  badgeLabel: { fontSize: 10, fontWeight: "700", color: colors.onAccent },
 });

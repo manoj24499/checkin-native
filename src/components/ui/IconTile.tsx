@@ -25,7 +25,7 @@ export interface IconTileProps {
 }
 
 const TONES: Record<IconTileTone, { bg: string; fg: string }> = {
-  ink: { bg: colors.ink, fg: colors.lime },
+  ink: { bg: colors.surfaceMuted, fg: colors.lime },
   lime: { bg: colors.primaryMuted, fg: colors.limeDeep },
   muted: { bg: colors.surfaceMuted, fg: colors.textSecondary },
   white: { bg: colors.surface, fg: colors.ink },

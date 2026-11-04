@@ -16,9 +16,9 @@ export function Toggle({ value, onValueChange, disabled }: ToggleProps) {
       accessibilityRole="switch"
       accessibilityState={{ checked: value, disabled: !!disabled }}
       hitSlop={6}
-      style={[styles.track, { backgroundColor: value ? colors.ink : "#D5DEC4" }, disabled && styles.disabled]}
+      style={[styles.track, { backgroundColor: value ? colors.limeStrong : "#4A413B" }, disabled && styles.disabled]}
     >
-      <View style={[styles.knob, { left: value ? 22 : 4, backgroundColor: value ? colors.lime : colors.surface }]} />
+      <View style={[styles.knob, { left: value ? 22 : 4, backgroundColor: value ? "#FFFFFF" : "#9A8D85" }]} />
     </Pressable>
   );
 }

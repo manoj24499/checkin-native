@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: "rgba(14,36,16,0.3)",
+    borderColor: "rgba(255,255,255,0.28)",
     borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",

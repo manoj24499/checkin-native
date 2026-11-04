@@ -3,6 +3,8 @@ import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from "react-nat
 import { createBottomTabNavigator, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { DashboardNavigator } from "./DashboardNavigator";
 import { MapTabScreen } from "./MapTabScreen";
 import { CheckInOutScreen } from "@/screens/checkin/CheckInOutScreen";
@@ -17,11 +19,7 @@ const Tab = createBottomTabNavigator<AppTabParamList>();
 
 const ICON_SIZE = 21;
 const ICON_STROKE_WIDTH = 1.75;
-const BAR_HEIGHT = 64;
-const FAB_SIZE = 64;
-const FAB_RING = 4;
-// How far the centre button rises above the bar's top edge.
-const FAB_RISE = 24;
+const BAR_HEIGHT = 66;
 
 // Full-screen flows where the bar would only get in the way (mockup: no tab
 // bar on turn-by-turn navigation).
@@ -29,7 +27,8 @@ const HIDE_BAR_ON: string[] = ["Navigate"];
 
 type TabRouteName = keyof AppTabParamList;
 
-const TAB_ICONS: Record<Exclude<TabRouteName, "CheckIn">, IconName> = {
+const TAB_ICONS: Record<TabRouteName, IconName> = {
+  CheckIn: "check",
   Dashboard: "home",
   Map: "pin",
   Requests: "requests",
@@ -65,94 +64,75 @@ function RequestsIcon({ color }: { color: string }) {
 }
 
 /**
- * Lime pill tab bar with a raised ink Check-in button in the middle (Lime
- * redesign). Laid out in normal flow (not floating over the screens) so no
- * screen needs extra bottom padding; the strip above the pill leaves room
- * for the raised button so its whole surface stays tappable on Android.
- * Tab press/long-press events are emitted exactly like the stock bar, so
- * nested stacks still pop-to-top when their tab is re-pressed.
+ * Floating "liquid glass" tab bar: a blurred, translucent pill hovering above the screens with a soft
+ * specular highlight along its top edge. The active tab expands into an orange pill showing its label; the
+ * rest are icon-only. It is absolutely positioned (screens scroll underneath it), so screens add
+ * `useTabBarClearance()` of bottom padding. Tab press/long-press events are emitted exactly like the stock
+ * bar, so nested stacks still pop-to-top when their tab is re-pressed.
  */
-function LimeTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const keyboardVisible = useAndroidKeyboardVisible();
   const focusedRoute = state.routes[state.index];
   const nestedName = getFocusedRouteNameFromRoute(focusedRoute);
   if (nestedName && HIDE_BAR_ON.includes(nestedName)) return null;
-  // The bar is taller than the stock one (room for the raised button); on
-  // Android the window resizes for the keyboard, which would park it right
-  // above the keys and squeeze forms like the check-in PIN. Same effect as
-  // the stock bar's tabBarHideOnKeyboard.
+  // On Android the window resizes for the keyboard, which would park the bar right above the keys and
+  // squeeze forms like the check-in PIN. Same effect as the stock bar's tabBarHideOnKeyboard.
   if (keyboardVisible) return null;
 
-  // Same contract as the stock tab bar: emit tabPress (lets a focused nested
-  // stack pop to top), then navigate unless already focused or prevented.
+  // Same contract as the stock tab bar: emit tabPress (lets a focused nested stack pop to top), then
+  // navigate unless already focused or prevented.
   const pressTab = (key: string, name: string, params: object | undefined, focused: boolean) => {
     const event = navigation.emit({ type: "tabPress", target: key, canPreventDefault: true });
     if (!focused && !event.defaultPrevented) navigation.navigate(name, params);
   };
-  const checkInIndex = state.routes.findIndex((r) => r.name === "CheckIn");
-  const checkInRoute = checkInIndex >= 0 ? state.routes[checkInIndex] : null;
-  const checkInFocused = state.index === checkInIndex;
 
   return (
-    <View style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View pointerEvents="box-none" style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 10) + 4 }]}>
       <View style={styles.bar}>
-        {state.routes.map((route, index) => {
-          const name = route.name as TabRouteName;
-          const { options } = descriptors[route.key];
-          const focused = state.index === index;
-          const label = options.title ?? route.name;
-
-          const onPress = () => pressTab(route.key, route.name, route.params, focused);
-          const onLongPress = () => navigation.emit({ type: "tabLongPress", target: route.key });
-
-          // Placeholder keeping the bar's 5-slot rhythm; the raised button
-          // itself is drawn below, outside the bar, so its top half (above
-          // the bar's edge) is still inside a parent's bounds and tappable on
-          // Android.
-          if (name === "CheckIn") return <View key={route.key} style={styles.fabSlot} />;
-
-          const color = focused ? colors.ink : colors.tabInactive;
-          return (
-            <Pressable
-              key={route.key}
-              onPress={onPress}
-              onLongPress={onLongPress}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: focused }}
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-              style={[styles.tab, focused && styles.tabActive]}
-            >
-              {name === "Requests" ? (
-                <RequestsIcon color={color} />
-              ) : (
-                <Icon name={TAB_ICONS[name]} size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
-              )}
-              <Text style={[styles.label, { color }, focused && styles.labelActive]} numberOfLines={1}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      {checkInRoute ? (
-        <View pointerEvents="box-none" style={styles.fabLayer}>
-          <Pressable
-            onPress={() => pressTab(checkInRoute.key, checkInRoute.name, checkInRoute.params, checkInFocused)}
-            onLongPress={() => navigation.emit({ type: "tabLongPress", target: checkInRoute.key })}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: checkInFocused }}
-            accessibilityLabel={
-              descriptors[checkInRoute.key].options.tabBarAccessibilityLabel ??
-              descriptors[checkInRoute.key].options.title ??
-              checkInRoute.name
-            }
-            style={({ pressed }) => [styles.fab, checkInFocused && styles.fabActive, pressed && styles.fabPressed]}
-          >
-            <Icon name="check" size={28} color={colors.lime} strokeWidth={1.8} />
-          </Pressable>
+        <BlurView intensity={60} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tint]} />
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(255,255,255,0.22)", "rgba(255,255,255,0.03)", "rgba(255,255,255,0.08)"]}
+          locations={[0, 0.55, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        <View pointerEvents="none" style={styles.edgeLight} />
+        <View style={styles.row}>
+          {state.routes.map((route, index) => {
+            const name = route.name as TabRouteName;
+            const { options } = descriptors[route.key];
+            const focused = state.index === index;
+            const label = options.title ?? route.name;
+            const color = focused ? colors.onAccent : "rgba(255,255,255,0.78)";
+            return (
+              <Pressable
+                key={route.key}
+                onPress={() => pressTab(route.key, route.name, route.params, focused)}
+                onLongPress={() => navigation.emit({ type: "tabLongPress", target: route.key })}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+                style={[styles.slot, { flex: focused ? 2.15 : 1 }]}
+              >
+                <View style={[styles.item, focused ? styles.itemActive : styles.itemIdle]}>
+                  {name === "Requests" ? (
+                    <RequestsIcon color={color} />
+                  ) : (
+                    <Icon name={TAB_ICONS[name]} size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
+                  )}
+                  {focused ? (
+                    <Text style={styles.label} numberOfLines={1}>
+                      {label}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
-      ) : null}
+      </View>
     </View>
   );
 }
@@ -160,7 +140,7 @@ function LimeTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 export function AppTabs() {
   return (
     <Tab.Navigator
-      tabBar={(props) => <LimeTabBar {...props} />}
+      tabBar={(props) => <GlassTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.background },
@@ -176,59 +156,46 @@ export function AppTabs() {
 }
 
 const styles = StyleSheet.create({
-  outer: {
-    backgroundColor: colors.background,
-    paddingHorizontal: 10,
-    paddingTop: FAB_RISE + 2,
-  },
+  outer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16 },
   bar: {
     height: BAR_HEIGHT,
-    borderRadius: 30,
-    backgroundColor: colors.limePale,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingHorizontal: 6,
+    borderRadius: BAR_HEIGHT / 2,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(20,20,20,0.55)",
     ...shadows.tabBar,
   },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    paddingVertical: 6,
+  tint: { backgroundColor: "rgba(34,34,34,0.38)" },
+  // Thin bright line along the top edge: the "glass catches the light" cue.
+  edgeLight: { position: "absolute", top: 0, left: 22, right: 22, height: 1, backgroundColor: "rgba(255,255,255,0.4)" },
+  row: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 8 },
+  slot: { alignItems: "center", justifyContent: "center" },
+  item: { height: 48, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
+  itemIdle: { width: 48, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.07)" },
+  itemActive: {
+    alignSelf: "stretch",
     marginHorizontal: 2,
-    borderRadius: 16,
+    borderRadius: 24,
+    backgroundColor: colors.limeStrong,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    shadowColor: colors.limeStrong,
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  tabActive: { backgroundColor: colors.glassStrong },
-  label: { fontSize: 10, letterSpacing: 0.3, fontWeight: "500", fontFamily: "Inter_500Medium" },
-  labelActive: { fontWeight: "700", fontFamily: "Inter_700Bold" },
+  label: { fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold", color: colors.onAccent, flexShrink: 1 },
   pendingDot: {
     position: "absolute",
-    top: -1,
-    right: -2,
+    top: -2,
+    right: -3,
     width: 8,
     height: 8,
     borderRadius: 99,
     backgroundColor: colors.ink,
     borderWidth: 1.5,
-    borderColor: colors.limePale,
+    borderColor: "#262626",
   },
-  fabSlot: { width: FAB_SIZE + FAB_RING * 2 + 4, height: BAR_HEIGHT },
-  // Spans the outer container; the button sits FAB_RISE above the bar's top edge.
-  fabLayer: { position: "absolute", top: 2, left: 0, right: 0, alignItems: "center" },
-  fab: {
-    width: FAB_SIZE + FAB_RING * 2,
-    height: FAB_SIZE + FAB_RING * 2,
-    borderRadius: (FAB_SIZE + FAB_RING * 2) / 2,
-    backgroundColor: colors.ink,
-    borderWidth: FAB_RING,
-    borderColor: colors.background, // pale ring separating it from the bar
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadows.fab,
-    elevation: 10, // above the bar's own elevation on Android
-  },
-  fabActive: { borderColor: colors.limeStrong },
-  fabPressed: { transform: [{ scale: 0.95 }] },
 });

@@ -31,15 +31,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: "rgba(14,36,16,0.06)",
+    borderColor: colors.border,
   },
 });
 
 const toneStyles = StyleSheet.create({
   default: {},
   muted: { backgroundColor: colors.surfaceMuted, borderColor: "transparent" },
-  lime: { backgroundColor: colors.primaryMuted, borderColor: "rgba(160,200,30,0.35)" },
-  success: { backgroundColor: colors.successMuted, borderColor: "rgba(31,122,70,0.3)" },
-  warning: { backgroundColor: colors.warningMuted, borderColor: "rgba(154,107,0,0.3)" },
-  danger: { backgroundColor: colors.dangerMuted, borderColor: "rgba(179,69,63,0.3)" },
+  lime: { backgroundColor: colors.primaryMuted, borderColor: "rgba(239,108,0,0.35)" },
+  success: { backgroundColor: colors.successMuted, borderColor: "rgba(76,195,138,0.3)" },
+  warning: { backgroundColor: colors.warningMuted, borderColor: "rgba(229,181,74,0.3)" },
+  danger: { backgroundColor: colors.dangerMuted, borderColor: "rgba(240,116,109,0.3)" },
 });

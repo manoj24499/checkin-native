@@ -41,7 +41,7 @@ export function WeeklyHoursChart({ days }: { days: DaySummary[] }) {
             <View style={styles.barTrack}>
               {d.hoursMs > 0 ? (
                 <LinearGradient
-                  colors={[colors.lime, "#7FAE12"]}
+                  colors={[colors.lime, "#C25200"]}
                   style={[styles.bar, { height: `${Math.max(4, (d.hoursMs / maxMs) * 100)}%` }]}
                 />
               ) : (

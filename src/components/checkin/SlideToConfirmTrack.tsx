@@ -137,13 +137,13 @@ export function SlideToConfirmTrack({ title, kicker, helpText, disabled, onConfi
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Path
               d="M5 12h13"
-              stroke={enabled ? colors.ink : colors.textMuted}
+              stroke={enabled ? colors.onAccent : colors.textMuted}
               strokeWidth={2}
               strokeLinecap="round"
             />
             <Path
               d="m12 5 7 7-7 7"
-              stroke={enabled ? colors.ink : colors.textMuted}
+              stroke={enabled ? colors.onAccent : colors.textMuted}
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   // Ink track, lime label/knob (Lime theme). Disabled falls back to a muted track.
-  trackEnabled: { backgroundColor: colors.ink, borderColor: colors.ink },
+  trackEnabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.limeStrong },
   trackDisabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
   fill: {
     position: "absolute",
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: "rgba(216,242,94,0.18)",
+    backgroundColor: "rgba(239,108,0,0.18)",
   },
   labelWrap: {
     position: "absolute",

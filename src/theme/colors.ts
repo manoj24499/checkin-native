@@ -1,72 +1,65 @@
-// "Lime" light theme (see the Lime redesign brief): a soft lime gradient at
-// the top of each screen fading into a pale lime-white background, a
-// dark green-black "ink" for text, primary buttons and icon tiles, and a
-// bright lime accent used on ink (button labels, icon glyphs) or as a fill
-// behind ink (hero cards, the tab bar). Every token name from the previous
-// orange theme is kept so unrelated code still compiles; only values moved,
-// plus a handful of new lime/ink tokens at the bottom.
+// Dark theme: warm near-black background with slightly lighter cards, light "ink" text, and brand orange
+// (#ef6c00) as the accent. Token names are kept from the earlier light/lime themes so components still
+// compile; `ink` is now the LIGHT text colour, and `onAccent` is the dark colour for text/glyphs that sit
+// ON an orange fill (hero card, primary buttons).
 export const colors = {
-  background: "#F5F9E8",
-  surface: "#FFFFFF",
-  surfaceMuted: "#EAF2D2",
-  border: "rgba(14,36,16,0.08)",
+  background: "#0A0A0A",
+  surface: "#1B1B1B",
+  surfaceMuted: "#262626",
+  /** Raised element on a muted track (active segment). */
+  surfaceRaised: "#363636",
+  border: "rgba(255,255,255,0.08)",
 
-  // Action colour (buttons, links, active states) is ink now, not orange:
-  // a filled primary button is ink with lime text (`primaryText`).
-  primary: "#0E2410",
-  primaryDark: "#2E5A12", // text-on-light accent (links, active chip labels)
-  primaryMuted: "rgba(201,230,67,0.32)", // lime tint behind active chips/badges
-  primaryText: "#D8F25E", // text/glyphs ON a `primary` (ink) fill
-  primarySoftText: "#D8F25E", // accent text legible on dark (ink) panels
+  primary: "#ef6c00",
+  primaryDark: "#FF8A3D", // accent text on dark (links, active chip labels)
+  primaryMuted: "rgba(239,108,0,0.18)", // orange tint behind active chips/badges
+  primaryText: "#FFFFFF", // text/glyphs ON an orange fill
+  primarySoftText: "#F7B27A",
 
-  success: "#1F7A46",
-  successMuted: "rgba(31,122,70,0.12)",
-  warning: "#9A6B00",
-  warningMuted: "rgba(190,150,20,0.14)",
-  danger: "#B3453F",
-  dangerMuted: "rgba(179,69,63,0.10)",
+  success: "#4CC38A",
+  successMuted: "rgba(76,195,138,0.14)",
+  warning: "#E5B54A",
+  warningMuted: "rgba(229,181,74,0.14)",
+  danger: "#F0746D",
+  dangerMuted: "rgba(240,116,109,0.14)",
 
-  textPrimary: "#0E2410",
-  textSecondary: "#5E7258",
-  textMuted: "#8A9C84",
+  textPrimary: "#F5F5F5",
+  textSecondary: "#A3A3A3",
+  textMuted: "#737373",
   textInverse: "#FFFFFF",
 
-  // Dark panels (live map, navigation) stay dark — dark green now. Route
-  // lines and the "you" marker on them use `lime`.
-  panelDark: "#0E2410",
-  panelDarker: "#0E2410",
-  textOnDark: "#F2FAD0",
-  textOnDarkMuted: "rgba(242,250,208,0.65)",
+  // Panels that were already dark (live map, navigation) go a shade deeper than the page.
+  panelDark: "#050505",
+  panelDarker: "#000000",
+  textOnDark: "#F5F5F5",
+  textOnDarkMuted: "rgba(245,245,245,0.65)",
 
-  overlay: "rgba(14,36,16,0.55)",
+  overlay: "rgba(0,0,0,0.62)",
 
-  // ---- New in the Lime theme ----
-  /** Dark green-black: text on light, dark buttons, icon tiles. Same value as `primary`. */
-  ink: "#0E2410",
-  /** Ink at reduced strength, for secondary text sitting on a lime fill (hero cards). */
-  inkMuted: "rgba(14,36,16,0.6)",
-  /** Hairline / outline on ink-tinted surfaces (input borders, dashed tiles). */
-  inkBorder: "rgba(14,36,16,0.12)",
-  /** Bright lime: glyphs/labels on ink, the "you" marker, map route lines. */
-  lime: "#D8F25E",
-  /** Slightly deeper lime used for fills (progress segments, hero gradient end). */
-  limeStrong: "#C9E643",
-  /** Mid lime-green, legible on both pale and lime backgrounds (dots, logo accent). */
-  limeMid: "#8DB61C",
-  /** Dark olive used for text sitting on a lime tint (`primaryMuted`). */
-  limeDeep: "#2E5A12",
-  /** Pale lime: tab bar fill, lighter lime surfaces. */
-  limePale: "#E6F58F",
-  /** Tab bar inactive label/icon colour. */
-  tabInactive: "#4d6a2c",
-  /** Secondary text on lime surfaces where `inkMuted` is too faint (hero labels). */
-  onLimeSecondary: "#35501c",
-  /** Translucent white "glass" chips on top of the lime hero. */
-  glass: "rgba(255,255,255,0.55)",
-  /** More opaque white for the active tab pill. */
-  glassStrong: "rgba(255,255,255,0.7)",
-  /** Darker text for warning notes on `warningMuted` backgrounds. */
-  warningText: "#7a5a08",
+  // ---- Accent / ink tokens (names kept from the lime theme) ----
+  /** Light text on the dark surfaces. */
+  ink: "#F5F5F5",
+  inkMuted: "rgba(245,245,245,0.65)",
+  inkBorder: "rgba(255,255,255,0.14)",
+  /** Text/glyphs that sit ON an orange fill: white (not black), so they read as part of the accent. */
+  onAccent: "#FFFFFF",
+  onAccentMuted: "rgba(255,255,255,0.82)",
+  /** Brand orange: glyphs/labels on dark, the "you" marker, map route lines. */
+  lime: "#ef6c00",
+  limeStrong: "#ef6c00",
+  limeMid: "#ef6c00",
+  /** Lighter orange for text sitting on an orange tint. */
+  limeDeep: "#FF8A3D",
+  /** Tab bar fill. */
+  limePale: "#262626",
+  tabInactive: "#8A8A8A",
+  /** Secondary text on orange surfaces (hero labels). */
+  onLimeSecondary: "rgba(255,255,255,0.88)",
+  /** Translucent white chips on top of the orange hero. */
+  glass: "rgba(255,255,255,0.22)",
+  /** Active tab pill. */
+  glassStrong: "rgba(255,255,255,0.12)",
+  warningText: "#E5B54A",
 } as const;
 
 export type ColorToken = keyof typeof colors;

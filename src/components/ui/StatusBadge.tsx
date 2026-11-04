@@ -33,7 +33,7 @@ const toneStyles = StyleSheet.create({
   danger: { backgroundColor: colors.dangerMuted },
   neutral: { backgroundColor: colors.surfaceMuted },
   primary: { backgroundColor: colors.primaryMuted },
-  ink: { backgroundColor: colors.ink },
+  ink: { backgroundColor: colors.limeStrong },
 });
 
 const textToneStyles = StyleSheet.create({
@@ -42,5 +42,5 @@ const textToneStyles = StyleSheet.create({
   danger: { color: colors.danger },
   neutral: { color: colors.textSecondary },
   primary: { color: colors.limeDeep },
-  ink: { color: colors.lime },
+  ink: { color: colors.onAccent },
 });

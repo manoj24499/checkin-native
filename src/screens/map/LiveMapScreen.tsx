@@ -30,6 +30,7 @@ import { getErrorMessage } from "@/utils/errors";
 import { endpoints } from "@/api/endpoints";
 import { env } from "@/config/env";
 import { colors, radius, spacing, typography } from "@/theme";
+import { useTabBarClearance } from "@/navigation/tabBarClearance";
 
 type Coords = { latitude: number; longitude: number };
 
@@ -176,6 +177,7 @@ function formatVisitTime(iso: string) {
 }
 
 export function LiveMapScreen() {
+  const tabClearance = useTabBarClearance();
   const navigation = useNavigation();
   const { user } = useAuth();
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -398,7 +400,7 @@ export function LiveMapScreen() {
         </View>
 
         {!isFieldDay && (
-          <View style={styles.pingPanel}>
+          <View style={[styles.pingPanel, { bottom: 20 + tabClearance }]}>
             <View style={styles.pingPanelHeader}>
               <Text style={[styles.pingPanelLabel, isTracking && styles.pingPanelLabelLive]}>
                 {isTracking ? "Sharing live" : "Not sharing"}
@@ -411,7 +413,7 @@ export function LiveMapScreen() {
       </View>
 
       {isFieldDay && (
-        <ScrollView style={styles.fieldPanel} contentContainerStyle={styles.fieldPanelContent}>
+        <ScrollView style={styles.fieldPanel} contentContainerStyle={[styles.fieldPanelContent, { paddingBottom: spacing.xxl + tabClearance }]}>
           <Kicker>Logged locations</Kicker>
 
           {queue.pending.map((p, i) => (
@@ -526,7 +528,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs + 2,
-    backgroundColor: "rgba(14,36,16,0.9)",
+    backgroundColor: "rgba(26,21,18,0.9)",
     borderRadius: 99,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 3,
@@ -550,7 +552,7 @@ const styles = StyleSheet.create({
   headerText: {
     flexShrink: 1,
     maxWidth: "80%",
-    backgroundColor: "rgba(14,36,16,0.9)",
+    backgroundColor: "rgba(26,21,18,0.9)",
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: spacing.sm + 4,
@@ -565,7 +567,7 @@ const styles = StyleSheet.create({
     left: 14,
     right: 14,
     bottom: 20,
-    backgroundColor: "rgba(14,36,16,0.94)",
+    backgroundColor: "rgba(15,15,15,0.94)",
     borderRadius: 22,
     padding: 14,
   },
@@ -614,7 +616,7 @@ const styles = StyleSheet.create({
     width: 96,
     borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: "rgba(14,36,16,0.3)",
+    borderColor: "rgba(255,255,255,0.28)",
     borderRadius: 16,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
