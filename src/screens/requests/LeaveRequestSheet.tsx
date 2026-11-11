@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Button, Chip, TextField, IssueDialog } from "@/components/ui";
+import { Button, Chip, TextField, IssueDialog, Rise, StatBox } from "@/components/ui";
 import { DayChipPicker } from "@/components/leave";
 import { useHolidays, useLeaveRequests, useRequestLeave } from "@/hooks";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, fontFamilies, radius, spacing, typography } from "@/theme";
 import type { TimeOffType } from "@/types";
 
 const TYPE_OPTIONS: { value: TimeOffType; label: string }[] = [
@@ -95,9 +95,12 @@ export function LeaveRequestSheet({ onDone }: { onDone: () => void }) {
         ))}
       </View>
       {balance ? (
-        <Text style={styles.balanceHint}>
-          {balance.remaining} of {balance.quota} {type.toLowerCase()} day(s) remaining this year
-        </Text>
+        <Rise delay={60} distance={12} duration={500} style={styles.balanceRow}>
+          <StatBox tone="light" label={`${type.toLowerCase()} left`} value={`${balance.remaining} / ${balance.quota}`} style={styles.balanceBox} />
+          <Text style={styles.balanceHint}>
+            {balance.remaining} of {balance.quota} {type.toLowerCase()} day(s) remaining this year
+          </Text>
+        </Rise>
       ) : null}
 
       <View style={styles.pickerBlock}>
@@ -138,6 +141,7 @@ export function LeaveRequestSheet({ onDone }: { onDone: () => void }) {
         onPress={onSubmit}
         loading={isPending}
         disabled={!canSubmit}
+        pulse={canSubmit}
         style={styles.submit}
       />
 
@@ -154,10 +158,12 @@ export function LeaveRequestSheet({ onDone }: { onDone: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  blurb: { ...typography.caption, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  blurb: { ...typography.caption, lineHeight: 19, color: colors.textSecondary, marginTop: spacing.sm },
   typeRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  typeChip: { flex: 1, alignItems: "center", paddingVertical: spacing.sm + 2 },
-  balanceHint: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  typeChip: { flex: 1 },
+  balanceRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: spacing.md },
+  balanceBox: { flex: 0, minWidth: 96, borderWidth: 1, borderColor: colors.cardBorder },
+  balanceHint: { flex: 1, fontSize: 12.5, lineHeight: 17, fontFamily: fontFamilies.regular, color: colors.textSecondary },
   pickerBlock: { marginTop: spacing.md + 4 },
   note: {
     ...typography.caption,
@@ -168,7 +174,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     overflow: "hidden",
   },
-  daysPreview: { color: colors.textSecondary, backgroundColor: colors.surfaceMuted },
+  daysPreview: { color: colors.accentText, backgroundColor: colors.primaryMuted },
   daysPreviewWarn: { color: colors.danger, backgroundColor: colors.dangerMuted },
   reasonBlock: { marginTop: spacing.md + 4 },
   submit: { marginTop: spacing.lg },

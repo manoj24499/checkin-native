@@ -1,17 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRoute, type RouteProp } from "@react-navigation/native";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   Screen,
   Button,
   BottomSheet,
+  Card,
   StatusBadge,
   EmptyState,
   LoadingView,
-  Card,
+  SegmentedControl,
+  Rise,
   Kicker,
   ScreenTitle,
-  SegmentedControl,
+  useReducedMotion,
 } from "@/components/ui";
 import { LeaveRequestSheet } from "./LeaveRequestSheet";
 import { PermissionRequestSheet } from "./PermissionRequestSheet";
@@ -25,7 +28,7 @@ import {
   useLateArrivals,
 } from "@/hooks";
 import { getErrorMessage } from "@/utils/errors";
-import { colors, radius, shadows, spacing, typography } from "@/theme";
+import { colors, fontFamilies, gradientDirection, gradients, spacing, typography } from "@/theme";
 import type { AppTabParamList } from "@/navigation/types";
 import type {
   TimeOffRequest,
@@ -83,6 +86,14 @@ const OVERTIME_STATUS_LABEL: Record<OvertimeRequestStatus, string> = {
   REJECTED: "Declined",
 };
 
+/** Holiday date block tint (Requests.dc.html: rgba(239,108,0,.16)). */
+const DATE_BLOCK_BG = "rgba(239,108,0,0.16)";
+/** Mockup `fill` keyframe easing. */
+const GROW_EASING = Easing.bezier(0.3, 0.7, 0.2, 1);
+/** Stagger step for list cards (mockup: .28s, .34s, .40s…). */
+const ITEM_STEP = 60;
+const MAX_STAGGER = 8;
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
@@ -91,6 +102,100 @@ function formatDateWithWeekday(iso: string) {
 }
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function stagger(base: number, i: number) {
+  return base + Math.min(i, MAX_STAGGER) * ITEM_STEP;
+}
+
+/**
+ * Balance track with the mockup's `fill` keyframe: the gradient bar grows from 0 to its width (1.2s,
+ * cubic-bezier(.3,.7,.2,1), .4s delay). scaleX from the left edge so it stays on the native driver.
+ */
+function GrowBar({ pct }: { pct: number }) {
+  const reduced = useReducedMotion();
+  const v = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduced) {
+      v.setValue(1);
+      return;
+    }
+    const a = Animated.timing(v, {
+      toValue: 1,
+      duration: 1200,
+      delay: 400,
+      easing: GROW_EASING,
+      useNativeDriver: true,
+    });
+    a.start();
+    return () => a.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduced]);
+  return (
+    <View style={styles.track}>
+      <Animated.View
+        style={[
+          styles.trackFill,
+          { width: `${Math.max(0, Math.min(100, pct))}%`, transformOrigin: "left", transform: [{ scaleX: v }] },
+        ]}
+      >
+        <LinearGradient
+          pointerEvents="none"
+          colors={gradients.orange}
+          start={gradientDirection.horizontal.start}
+          end={gradientDirection.horizontal.end}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+/** One white request card (radius 20, padding 10/16, gap 3). */
+function RequestCard({ delay, children }: { delay: number; children: ReactNode }) {
+  return (
+    <Rise delay={delay}>
+      <Card size="sm" style={styles.rq}>
+        {children}
+      </Card>
+    </Rise>
+  );
+}
+
+/** White CTA card used on the Permission / Overtime tabs (same shape as the leave balance card). */
+function ActionCard({
+  kicker,
+  title,
+  body,
+  cta,
+  onPress,
+}: {
+  kicker: string;
+  title: string;
+  body: string;
+  cta: string;
+  onPress: () => void;
+}) {
+  return (
+    <Rise delay={160}>
+      <Card size="sm" style={styles.balanceCard}>
+        <Kicker>{kicker}</Kicker>
+        <View style={{ gap: 4 }}>
+          <Text style={styles.ctaTitle}>{title}</Text>
+          <Text style={styles.ctaBody}>{body}</Text>
+        </View>
+        <Button label={`+ ${cta}`} onPress={onPress} pulse style={styles.cta} labelStyle={styles.ctaLabel} />
+      </Card>
+    </Rise>
+  );
+}
+
+function ListKicker({ delay, children }: { delay: number; children: string }) {
+  return (
+    <Rise delay={delay}>
+      <Kicker style={styles.listKicker}>{children}</Kicker>
+    </Rise>
+  );
 }
 
 export function RequestsScreen() {
@@ -145,18 +250,30 @@ export function RequestsScreen() {
     { id: "overtime", label: "Overtime" },
   ];
 
-  return (
-    <Screen scroll onRefresh={() => leaveQuery.refetch()} refreshing={leaveQuery.isRefetching}>
-      <Kicker style={styles.kicker}>Time off & approvals</Kicker>
-      <ScreenTitle>Requests</ScreenTitle>
+  const holidayBase = stagger(280, leaveRequests.length) + 60;
 
-      {/* Pending-count bubble is ink with lime text (SegmentedControl's badge). */}
-      <SegmentedControl
-        options={TABS.map((t) => ({ key: t.id, label: t.label, badge: t.badge }))}
-        value={tab}
-        onChange={setTab}
-        style={styles.segRow}
-      />
+  return (
+    <Screen
+      scroll
+      glow="topLeft"
+      contentStyle={styles.content}
+      onRefresh={() => leaveQuery.refetch()}
+      refreshing={leaveQuery.isRefetching}
+    >
+      <Rise>
+        <View accessibilityRole="header">
+          <Kicker>Time off & approvals</Kicker>
+          <ScreenTitle style={styles.pageTitle}>Requests</ScreenTitle>
+        </View>
+      </Rise>
+
+      <Rise delay={80}>
+        <SegmentedControl
+          options={TABS.map((t) => ({ key: t.id, label: t.label, badge: t.badge }))}
+          value={tab}
+          onChange={setTab}
+        />
+      </Rise>
 
       {tab === "leave" ? (
         <>
@@ -164,78 +281,97 @@ export function RequestsScreen() {
             <LoadingView label="Loading your leave…" />
           ) : (
             <>
-              <View style={styles.statGrid}>
-                {balances.map((b) => (
-                  <View key={b.type} style={styles.statCell}>
-                    <Text style={styles.statLabel}>{TYPE_LABEL[b.type].toUpperCase()}</Text>
-                    <View style={styles.statValueRow}>
-                      <Text style={styles.statValue}>{b.remaining}</Text>
-                      <Text style={styles.statQuota}> / {b.quota}</Text>
-                    </View>
-                    <View style={styles.statTrack}>
-                      <View
-                        style={[styles.statFill, { width: `${b.quota > 0 ? (b.remaining / b.quota) * 100 : 0}%` }]}
-                      />
-                    </View>
+              <Rise delay={160}>
+                <Card size="sm" style={styles.balanceCard}>
+                  <Kicker>This year</Kicker>
+                  <View style={styles.balRow}>
+                    {balances.map((b) => (
+                      <View key={b.type} style={styles.bal}>
+                        <Text style={styles.balLabel}>{TYPE_LABEL[b.type].toUpperCase()}</Text>
+                        <Text style={styles.balValue} numberOfLines={1} adjustsFontSizeToFit>
+                          {b.remaining} / {b.quota}
+                        </Text>
+                        <GrowBar pct={b.quota > 0 ? (b.remaining / b.quota) * 100 : 0} />
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
+                  <Button
+                    label="+ Request leave"
+                    onPress={() => setSheet("leave")}
+                    pulse
+                    style={styles.cta}
+                    labelStyle={styles.ctaLabel}
+                  />
+                </Card>
+              </Rise>
 
-              <Button label="Request leave" onPress={() => setSheet("leave")} style={styles.cta} />
-
-              <Kicker style={styles.sectionLabel}>This year</Kicker>
+              <ListKicker delay={220}>Your requests</ListKicker>
               {cancelError ? <Text style={styles.errorText}>{cancelError}</Text> : null}
               {leaveRequests.length === 0 ? (
-                <EmptyState title="Nothing here yet" message="Requests you submit show up here." />
+                <Rise delay={280}>
+                  <EmptyState title="Nothing here yet" message="Requests you submit show up here." />
+                </Rise>
               ) : (
-                <View style={styles.list}>
-                  {leaveRequests.map((r: TimeOffRequest) => {
-                    const rangeLabel =
-                      r.startDate === r.endDate
-                        ? formatDate(r.startDate)
-                        : `${formatDate(r.startDate)} – ${formatDate(r.endDate)}`;
-                    return (
-                      <View key={r.id} style={styles.rowWrap}>
-                        <View style={styles.row}>
-                          <View style={styles.rowText}>
-                            <Text style={styles.rowTitle}>{TYPE_LABEL[r.type]}</Text>
-                            <Text style={styles.rowMeta}>
-                              {rangeLabel} · {r.days} day{r.days === 1 ? "" : "s"}
-                            </Text>
-                            {r.status === "REJECTED" && r.reviewNote ? (
-                              <Text style={styles.reviewNote}>"{r.reviewNote}"</Text>
-                            ) : null}
-                          </View>
-                          <StatusBadge label={LEAVE_STATUS_LABEL[r.status]} tone={LEAVE_STATUS_TONE[r.status]} />
-                        </View>
-                        {r.status === "PENDING" ? (
-                          <Pressable onPress={() => handleCancelLeave(r.id)} disabled={cancellingId === r.id} hitSlop={8}>
-                            <Text style={styles.cancelLink}>
-                              {cancellingId === r.id ? "Cancelling…" : "Cancel request"}
-                            </Text>
-                          </Pressable>
-                        ) : null}
+                leaveRequests.map((r: TimeOffRequest, i) => {
+                  const rangeLabel =
+                    r.startDate === r.endDate
+                      ? formatDate(r.startDate)
+                      : `${formatDate(r.startDate)} – ${formatDate(r.endDate)}`;
+                  return (
+                    <RequestCard key={r.id} delay={stagger(280, i)}>
+                      <View style={styles.rqHead}>
+                        <Text style={styles.rqTitle}>{TYPE_LABEL[r.type]}</Text>
+                        <StatusBadge label={LEAVE_STATUS_LABEL[r.status]} tone={LEAVE_STATUS_TONE[r.status]} />
                       </View>
-                    );
-                  })}
-                </View>
+                      <Text style={styles.rqMeta}>
+                        {rangeLabel} · {r.days} day{r.days === 1 ? "" : "s"}
+                      </Text>
+                      {r.status === "REJECTED" && r.reviewNote ? (
+                        <Text style={[styles.rqMeta, styles.reviewNote]}>“{r.reviewNote}”</Text>
+                      ) : null}
+                      {r.status === "PENDING" ? (
+                        <Pressable
+                          onPress={() => handleCancelLeave(r.id)}
+                          disabled={cancellingId === r.id}
+                          accessibilityRole="button"
+                          hitSlop={{ top: 10, bottom: 10 }}
+                          style={styles.cancelBtn}
+                        >
+                          <Text style={styles.cancelLink}>
+                            {cancellingId === r.id ? "Cancelling…" : "Cancel request"}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </RequestCard>
+                  );
+                })
               )}
 
-              <Kicker style={styles.sectionLabel}>Upcoming holidays · not deducted</Kicker>
+              <ListKicker delay={holidayBase - 40}>Upcoming holidays · not deducted</ListKicker>
               {upcomingHolidays.length === 0 ? (
-                <EmptyState title="No upcoming holidays" message="None added for the rest of this year yet." />
+                <Rise delay={holidayBase}>
+                  <EmptyState title="No upcoming holidays" message="None added for the rest of this year yet." />
+                </Rise>
               ) : (
-                <View style={styles.list}>
-                  {upcomingHolidays.map((h) => (
-                    <View key={h.id} style={styles.holidayRow}>
-                      <View style={styles.rowText}>
-                        <Text style={styles.rowTitle}>{h.name}</Text>
-                        <Text style={styles.rowMeta}>{formatDateWithWeekday(h.date)}</Text>
-                      </View>
-                      <StatusBadge label="Holiday" tone="primary" />
-                    </View>
-                  ))}
-                </View>
+                upcomingHolidays.map((h, i) => {
+                  const d = new Date(h.date);
+                  return (
+                    <Rise key={h.id} delay={stagger(holidayBase, i)}>
+                      <Card size="sm" style={styles.holiday}>
+                        <View style={styles.dateBlock}>
+                          <Text style={styles.dateMonth}>
+                            {d.toLocaleDateString(undefined, { month: "short" }).toUpperCase()}
+                          </Text>
+                          <Text style={styles.dateDay}>{d.getDate()}</Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.holidayName}>{h.name}</Text>
+                          <Text style={styles.rqMeta}>{d.toLocaleDateString(undefined, { weekday: "long" })}</Text>
+                        </View>
+                      </Card>
+                    </Rise>
+                  );
+                })
               )}
             </>
           )}
@@ -244,100 +380,81 @@ export function RequestsScreen() {
 
       {tab === "permission" ? (
         <>
-          <Card style={styles.explainCard}>
-            <Text style={styles.explainTitle}>Pause your work time for a few hours today</Text>
-            <Text style={styles.explainBody}>
-              Stepping out for a while? A permission window stops the clock for exactly that stretch, so the gap
-              isn't read as you going missing. Takes effect immediately — your admin just sees the record.
-            </Text>
-          </Card>
-          <Button label="New permission window" onPress={() => setSheet("permission")} style={styles.cta} />
+          <ActionCard
+            kicker="Today"
+            title="Pause my work time"
+            body="Pause your work time for a few hours today. It won't count as outside time."
+            cta="Request permission"
+            onPress={() => setSheet("permission")}
+          />
 
-          <Kicker style={styles.sectionLabel}>Permission windows</Kicker>
+          <ListKicker delay={220}>Permission windows</ListKicker>
           {permissions.length === 0 ? (
-            <EmptyState title="Nothing here yet" message="Requests you submit show up here." />
+            <Rise delay={280}>
+              <EmptyState title="Nothing here yet" message="Requests you submit show up here." />
+            </Rise>
           ) : (
-            <View style={styles.list}>
-              {permissions.map((p: TimedPermission) => (
-                <View key={p.id} style={styles.rowWrap}>
-                  <View style={styles.row}>
-                    <View style={styles.rowText}>
-                      <Text style={styles.rowTitle}>
-                        {formatTime(p.startTime)} – {formatTime(p.endTime)}
-                      </Text>
-                      <Text style={styles.rowMeta}>{formatDateWithWeekday(p.startTime)}</Text>
-                    </View>
-                    <StatusBadge
-                      label={PERMISSION_STATUS_LABEL[p.status]}
-                      tone={PERMISSION_STATUS_TONE[p.status]}
-                    />
-                  </View>
+            permissions.map((p: TimedPermission, i) => (
+              <RequestCard key={p.id} delay={stagger(280, i)}>
+                <View style={styles.rqHead}>
+                  <Text style={styles.rqTitle}>
+                    {formatTime(p.startTime)} – {formatTime(p.endTime)}
+                  </Text>
+                  <StatusBadge label={PERMISSION_STATUS_LABEL[p.status]} tone={PERMISSION_STATUS_TONE[p.status]} />
                 </View>
-              ))}
-            </View>
+                <Text style={styles.rqMeta}>{formatDateWithWeekday(p.startTime)}</Text>
+              </RequestCard>
+            ))
           )}
-
-          {lateArrivals.length > 0 ? (
-            <>
-              <Kicker style={styles.sectionLabel}>Late arrivals</Kicker>
-              <Text style={styles.lateNote}>
-                Marked automatically when you check in after your shift starts. This is only a record: it doesn't
-                pause your work clock and needs nothing from you.
-              </Text>
-              <View style={styles.list}>
-                {lateArrivals.map((a: LateArrival) => (
-                  <View key={a.id} style={styles.rowWrap}>
-                    <View style={styles.row}>
-                      <View style={styles.rowText}>
-                        <Text style={styles.rowTitle}>
-                          {a.lateMinutes ? `Late by ${a.lateMinutes} min` : "Late arrival"}
-                        </Text>
-                        <Text style={styles.rowMeta}>
-                          {formatDateWithWeekday(a.timestamp)} · checked in {formatTime(a.timestamp)}
-                        </Text>
-                      </View>
-                      <StatusBadge
-                        label={a.leaveType === "HALF_DAY" ? "Half-day leave" : "Permission"}
-                        tone={a.leaveType === "HALF_DAY" ? "danger" : "warning"}
-                      />
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </>
-          ) : null}
         </>
       ) : null}
 
       {tab === "overtime" ? (
         <>
-          <Card style={styles.explainCard}>
-            <Text style={styles.explainTitle}>Staying past shift end?</Text>
-            <Text style={styles.explainBody}>
-              Tell us roughly when you'll finish. Your check-out reminder moves to that time instead of your
-              shift end, and you can log what you worked on when you check out.
-            </Text>
-          </Card>
-          <Button label="Request overtime" onPress={() => setSheet("overtime")} style={styles.cta} />
+          <ActionCard
+            kicker="After hours"
+            title="Staying past shift end?"
+            body="Ask before your shift ends so the extra time counts."
+            cta="Request overtime"
+            onPress={() => setSheet("overtime")}
+          />
 
-          <Kicker style={styles.sectionLabel}>Overtime</Kicker>
+          <ListKicker delay={220}>Overtime</ListKicker>
           {overtimeRequests.length === 0 ? (
-            <EmptyState title="Nothing here yet" message="Requests you submit show up here." />
+            <Rise delay={280}>
+              <EmptyState title="Nothing here yet" message="Requests you submit show up here." />
+            </Rise>
           ) : (
-            <View style={styles.list}>
-              {overtimeRequests.map((r: OvertimeRequest) => (
-                <View key={r.id} style={styles.rowWrap}>
-                  <View style={styles.row}>
-                    <View style={styles.rowText}>
-                      <Text style={styles.rowTitle}>Until ~{formatTime(r.estimatedEndAt)}</Text>
-                      <Text style={styles.rowMeta}>{r.reason}</Text>
-                    </View>
-                    <StatusBadge label={OVERTIME_STATUS_LABEL[r.status]} tone={OVERTIME_STATUS_TONE[r.status]} />
-                  </View>
+            overtimeRequests.map((r: OvertimeRequest, i) => (
+              <RequestCard key={r.id} delay={stagger(280, i)}>
+                <View style={styles.rqHead}>
+                  <Text style={styles.rqTitle}>Until ~{formatTime(r.estimatedEndAt)}</Text>
+                  <StatusBadge label={OVERTIME_STATUS_LABEL[r.status]} tone={OVERTIME_STATUS_TONE[r.status]} />
                 </View>
-              ))}
-            </View>
+                <Text style={styles.rqMeta}>{r.reason}</Text>
+              </RequestCard>
+            ))
           )}
+          {lateArrivals.length > 0 ? (
+            <>
+              <ListKicker delay={stagger(280, overtimeRequests.length) + 20}>Late arrivals</ListKicker>
+              {lateArrivals.map((a: LateArrival, i) => (
+                <RequestCard key={a.id} delay={stagger(stagger(280, overtimeRequests.length) + 80, i)}>
+                  <View style={styles.rqHead}>
+                    <Text style={styles.rqTitle}>{formatDateWithWeekday(a.timestamp)}</Text>
+                    <StatusBadge
+                      label={a.leaveType === "HALF_DAY" ? "Half-day leave" : "Permission"}
+                      tone={a.leaveType === "HALF_DAY" ? "danger" : "warning"}
+                    />
+                  </View>
+                  <Text style={styles.rqMeta}>
+                    In {formatTime(a.timestamp)}
+                    {a.lateMinutes ? ` · ${a.lateMinutes} min late` : ""}
+                  </Text>
+                </RequestCard>
+              ))}
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -352,12 +469,7 @@ export function RequestsScreen() {
       >
         <PermissionRequestSheet onDone={() => setSheet(null)} />
       </BottomSheet>
-      <BottomSheet
-        visible={sheet === "overtime"}
-        onClose={() => setSheet(null)}
-        kicker="TODAY"
-        title="Request overtime"
-      >
+      <BottomSheet visible={sheet === "overtime"} onClose={() => setSheet(null)} kicker="TODAY" title="Request overtime">
         <OvertimeRequestSheet onDone={() => setSheet(null)} />
       </BottomSheet>
     </Screen>
@@ -365,47 +477,38 @@ export function RequestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  kicker: { marginTop: spacing.xs },
-  segRow: { marginTop: spacing.md },
-  statGrid: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  statCell: { flex: 1, backgroundColor: colors.surfaceMuted, borderRadius: radius.md, padding: spacing.sm + 2 },
-  statLabel: { ...typography.kicker, fontSize: 9.5, letterSpacing: 1.2, color: colors.textSecondary },
-  statValueRow: { flexDirection: "row", alignItems: "baseline", marginTop: 4 },
-  statValue: { ...typography.number, fontSize: 22, color: colors.ink },
-  statQuota: { ...typography.caption, color: colors.textMuted, fontSize: 11 },
-  statTrack: { height: 4, borderRadius: 99, backgroundColor: colors.surface, marginTop: 6, overflow: "hidden" },
-  statFill: { height: "100%", borderRadius: 99, backgroundColor: colors.ink },
-  cta: { marginTop: spacing.md },
-  explainCard: { marginTop: spacing.md },
-  explainTitle: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
-  explainBody: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.xs + 2, lineHeight: 18 },
-  sectionLabel: { marginTop: spacing.lg, marginBottom: spacing.sm },
-  errorText: { ...typography.caption, color: colors.danger, marginBottom: spacing.sm },
-  list: { gap: spacing.sm + 2 },
-  lateNote: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
-  rowWrap: {
-    borderRadius: radius.tile,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 13,
-    ...shadows.soft,
+  content: { paddingHorizontal: spacing.gutter, paddingTop: 8, gap: 9 },
+  pageTitle: { fontSize: 26, lineHeight: 32 },
+  balanceCard: { paddingVertical: 12, paddingHorizontal: 16, gap: 8 },
+  balRow: { flexDirection: "row", gap: 14 },
+  bal: { flex: 1, minWidth: 0 },
+  balLabel: { ...typography.statLabel, color: colors.textSecondary },
+  balValue: { ...typography.number, fontSize: 20, color: colors.ink, marginTop: 4, marginBottom: 8 },
+  track: { height: 5, borderRadius: 3, backgroundColor: "rgba(23,19,15,0.12)", overflow: "hidden" },
+  trackFill: { height: 5, borderRadius: 3, overflow: "hidden" },
+  cta: { minHeight: 48, borderRadius: 24 },
+  ctaLabel: { fontSize: 15 },
+  ctaTitle: { ...typography.section, color: colors.ink },
+  ctaBody: { fontSize: 13, lineHeight: 18, fontFamily: fontFamilies.regular, color: colors.textSecondary },
+  listKicker: { marginTop: 2, marginBottom: 0 },
+  errorText: { fontSize: 13, fontFamily: fontFamilies.regular, color: colors.danger },
+  rq: { paddingVertical: 10, paddingHorizontal: 16, gap: 3 },
+  rqHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  rqTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    fontFamily: fontFamilies.semiBold,
+    color: colors.ink,
+    fontVariant: ["tabular-nums"],
   },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 2 },
-  rowText: { flex: 1, minWidth: 0 },
-  rowTitle: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
-  rowMeta: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  reviewNote: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 4, fontStyle: "italic" },
-  cancelLink: { ...typography.label, fontSize: 12, color: colors.danger, marginTop: spacing.sm },
-  holidayRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm + 2,
-    borderRadius: radius.tile,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 13,
-    ...shadows.soft,
-  },
+  rqMeta: { fontSize: 12, fontFamily: fontFamilies.regular, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  reviewNote: { fontStyle: "italic" },
+  cancelBtn: { alignSelf: "flex-start", paddingTop: 4 },
+  cancelLink: { fontSize: 13, fontWeight: "500", fontFamily: fontFamilies.medium, color: colors.danger },
+  holiday: { paddingVertical: 12, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 14 },
+  dateBlock: { width: 44, alignItems: "center", borderRadius: 12, backgroundColor: DATE_BLOCK_BG, paddingVertical: 6 },
+  dateMonth: { fontSize: 10, fontWeight: "600", fontFamily: fontFamilies.semiBold, color: colors.accentText },
+  dateDay: { ...typography.number, fontSize: 18, color: colors.ink },
+  holidayName: { fontSize: 14, fontWeight: "600", fontFamily: fontFamilies.semiBold, color: colors.ink },
 });

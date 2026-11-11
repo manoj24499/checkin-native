@@ -423,7 +423,7 @@ export function NavigationScreen() {
       {/* Instruction banner */}
       <View style={[styles.banner, { top: insets.top + spacing.sm }]}>
         <Pressable onPress={close} hitSlop={10} style={styles.bannerClose} accessibilityLabel="Close navigation">
-          <Icon name="close" size={16} color={colors.textOnDark} strokeWidth={2} />
+          <Icon name="close" size={16} color={colors.ink} strokeWidth={2} />
         </Pressable>
         {phase === "navigating" && upcoming && guidance ? (
           <View style={styles.bannerBody}>
@@ -446,7 +446,7 @@ export function NavigationScreen() {
           style={styles.bannerMute}
           accessibilityLabel={muted ? "Unmute voice guidance" : "Mute voice guidance"}
         >
-          <Icon name="speaker" size={16} color={muted ? colors.textOnDarkMuted : colors.lime} strokeWidth={2} />
+          <Icon name="speaker" size={16} color={muted ? colors.textSecondary : colors.accentText} strokeWidth={2} />
           {/* Muted: a slash through the speaker. */}
           {muted ? <View style={styles.muteSlash} /> : null}
         </Pressable>
@@ -522,8 +522,8 @@ export function NavigationScreen() {
             {target.notes ? <Text style={styles.panelNote}>Note: {target.notes}</Text> : null}
             <View style={styles.actions}>
               <Button
-                label="Skip"
-                variant="secondary"
+                label="Skip place"
+                variant="danger"
                 style={styles.actionHalf}
                 onPress={() => {
                   setSheetError(null);
@@ -587,29 +587,34 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     right: 12,
-    minHeight: 76,
-    borderRadius: 20,
-    backgroundColor: "rgba(26,21,18,0.95)",
+    minHeight: 88,
+    borderRadius: 16,
+    backgroundColor: colors.panelHero,
+    borderWidth: 1,
+    borderColor: "rgba(239,108,0,0.35)",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.sm + 4,
-    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     gap: spacing.sm + 2,
-    ...shadows.ink,
   },
   bannerClose: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.hairline,
     alignItems: "center",
     justifyContent: "center",
   },
   bannerMute: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.hairline,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -618,15 +623,15 @@ const styles = StyleSheet.create({
     width: 20,
     height: 2,
     borderRadius: 1,
-    backgroundColor: colors.textOnDarkMuted,
+    backgroundColor: colors.textSecondary,
     transform: [{ rotate: "-45deg" }],
   },
   bannerBody: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm + 2 },
   // Lime manoeuvre arrow on the ink banner.
-  glyph: { color: colors.lime, fontSize: 34, width: 40, textAlign: "center" },
+  glyph: { color: colors.primarySoftText, fontSize: 30, width: 52, height: 52, lineHeight: 52, borderRadius: 12, overflow: "hidden", backgroundColor: "rgba(239,108,0,0.18)", textAlign: "center" },
   bannerText: { flex: 1 },
-  bannerDistance: { ...typography.h2, fontSize: 21, color: colors.textOnDark },
-  bannerInstruction: { ...typography.caption, fontSize: 13.5, color: colors.textOnDarkMuted, marginTop: 1 },
+  bannerDistance: { ...typography.h1, lineHeight: 32, color: colors.textOnDark },
+  bannerInstruction: { fontSize: 15, lineHeight: 20, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.panelHeroText, marginTop: 1 },
   bannerPlain: { ...typography.bodyStrong, color: colors.textOnDark, flex: 1, textAlign: "center" },
   pill: {
     position: "absolute",
@@ -665,36 +670,37 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    paddingHorizontal: 18,
-    paddingTop: spacing.md + 2,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderTopWidth: 1,
+    borderColor: colors.hairline,
+    paddingHorizontal: 16,
+    paddingTop: spacing.md,
     minHeight: 120,
-    ...shadows.card,
   },
   center: { alignItems: "center", paddingVertical: spacing.md, gap: spacing.sm },
   panelKicker: { marginBottom: 2 },
-  panelTitle: { ...typography.h3, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.ink, marginTop: 2 },
+  panelTitle: { ...typography.h2, lineHeight: 28, color: colors.ink, marginTop: 2 },
   panelHint: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: 3 },
-  panelMeta: { ...typography.bodyStrong, fontSize: 13.5, color: colors.limeDeep, marginTop: spacing.xs },
+  panelMeta: { ...typography.bodyStrong, fontSize: 13.5, color: colors.success, marginTop: spacing.xs },
   panelNote: { ...typography.caption, fontSize: 12.5, fontStyle: "italic", color: colors.textSecondary, marginTop: spacing.xs },
   panelButton: { marginTop: spacing.md },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm + 4 },
+  actions: { flexDirection: "row", gap: 8, marginTop: 16 },
   actionHalf: { flex: 1 },
   photoTile: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm + 4,
     borderRadius: 16,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1.5,
+    backgroundColor: "rgba(239,108,0,0.06)",
+    borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.28)",
+    borderColor: "rgba(239,108,0,0.45)",
     padding: spacing.sm + 4,
     marginTop: spacing.sm,
   },
-  photoTileFilled: { borderStyle: "solid", borderColor: colors.ink, backgroundColor: colors.primaryMuted },
+  photoTileFilled: { borderStyle: "solid", borderColor: "rgba(76,195,138,0.45)", backgroundColor: colors.successMuted },
   photoText: { flex: 1 },
   photoLabel: { ...typography.bodyStrong, fontSize: 13.5, color: colors.ink },
   photoHint: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
@@ -703,9 +709,9 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm + 2 },
   reasonInput: {
     marginTop: spacing.sm + 2,
-    borderRadius: radius.input,
-    borderWidth: 1.5,
-    borderColor: colors.inkBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.hairline,
     backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: spacing.sm + 4,

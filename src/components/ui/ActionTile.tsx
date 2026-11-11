@@ -1,89 +1,107 @@
 import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { renderIcon, type IconSource } from "./Icon";
-import { colors, spacing } from "@/theme";
+import { colors, fontFamilies, radius } from "@/theme";
+
+export type ActionTileTone = "hero" | "light";
 
 export interface ActionTileProps {
-  /** Icon name or element (drawn lime on the ink tile). */
+  /** Icon name or element (stroked #FFB067, 20px). */
   icon: IconSource;
-  /** Label under the tile (keep it to one short word or two). */
+  /** Label inside the tile, under the icon (one short word). */
   label: string;
   onPress?: () => void;
   disabled?: boolean;
-  /** Small lime-ringed dot on the tile's top-right corner (e.g. "pending"). */
+  /** Small orange dot on the tile's top-right corner (e.g. "pending"). */
   badge?: boolean;
-  /** Tile square size. Default 58. */
+  /**
+   * "hero" (default): translucent white rgba(255,255,255,.08) tile with light label — inside the dark hero.
+   * "light": white tile with ink label — on the page.
+   */
+  tone?: ActionTileTone;
+  /** Tile height. Default 64 (hero) / 68 (light). Width is flexible (fills its cell). */
   size?: number;
   style?: ViewStyle;
 }
 
+const TONES = {
+  hero: { bg: colors.panelHeroChip, fg: colors.panelHeroText, border: undefined, badgeRing: colors.panelHero },
+  light: { bg: colors.surface, fg: colors.ink, border: colors.cardBorder, badgeRing: colors.surface },
+} as const;
+
 /**
- * Quick-action tile from the hero card: ink rounded square (radius ~19) with
- * a lime icon and an ink label underneath. Works on lime and pale surfaces.
+ * Quick-action tile (Main.dc.html `.hq` / `.qt`): rounded (18) rectangle with a 20px #FFB067 line icon above a
+ * 12/500 label. Fills its parent's width — lay several out with `QuickActions` (equal columns, 8px gap).
  */
-export function ActionTile({ icon, label, onPress, disabled, badge, size = 58, style }: ActionTileProps) {
+export function ActionTile({ icon, label, onPress, disabled, badge, tone = "hero", size, style }: ActionTileProps) {
+  const t = TONES[tone];
+  const height = size ?? (tone === "hero" ? 64 : 68);
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || !onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.wrap, disabled && styles.disabled, pressed && styles.pressed, style]}
+      style={({ pressed }) => [
+        styles.tile,
+        { height, backgroundColor: t.bg },
+        t.border ? { borderWidth: 1, borderColor: t.border } : null,
+        disabled && styles.disabled,
+        pressed && styles.pressed,
+        style,
+      ]}
     >
-      <View style={[styles.tile, { width: size, height: size, borderRadius: Math.round(size * 0.33) }]}>
-        {renderIcon(icon, Math.round(size * 0.38), colors.onAccent)}
-        {badge ? <View style={styles.badge} /> : null}
-      </View>
-      <Text style={styles.label} numberOfLines={1}>
+      {renderIcon(icon, 20, colors.panelHeroIcon, 1.8)}
+      <Text style={[styles.label, { color: t.fg }]} numberOfLines={1}>
         {label}
       </Text>
+      {badge ? <View style={[styles.badge, { borderColor: t.badgeRing }]} /> : null}
     </Pressable>
   );
 }
 
 export interface QuickActionsProps {
-  /** 1-4 tiles (the row is laid out as 4 equal columns). `key` defaults to the label. */
+  /** 1-4 tiles in equal columns. `key` defaults to the label. */
   actions: (ActionTileProps & { key?: string })[];
+  /** Applied to every tile that doesn't set its own tone. Default "hero". */
+  tone?: ActionTileTone;
   style?: ViewStyle;
 }
 
-/** A row of ActionTiles in equal columns — the four buttons inside the hero card. */
-export function QuickActions({ actions, style }: QuickActionsProps) {
+/** A row of ActionTiles in equal columns with an 8px gap — the four buttons inside the hero card. */
+export function QuickActions({ actions, tone = "hero", style }: QuickActionsProps) {
   return (
     <View style={[styles.row, style]}>
       {actions.map(({ key, ...a }) => (
         <View key={key ?? a.label} style={styles.cell}>
-          <ActionTile {...a} />
+          <ActionTile tone={tone} {...a} />
         </View>
-      ))}
-      {/* Pad short rows so tiles keep the 4-column rhythm. */}
-      {Array.from({ length: Math.max(0, 4 - actions.length) }, (_, i) => (
-        <View key={`pad-${i}`} style={styles.cell} />
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: "center", gap: 7 },
   tile: {
-    backgroundColor: "rgba(255,255,255,0.22)",
+    alignSelf: "stretch",
+    borderRadius: radius.tile,
     alignItems: "center",
     justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 4,
   },
   badge: {
     position: "absolute",
     top: 8,
-    right: 8,
+    right: 10,
     width: 9,
     height: 9,
-    borderRadius: 99,
-    backgroundColor: colors.onAccent,
-    borderWidth: 1.5,
-    borderColor: "#D9480A",
+    borderRadius: 5,
+    backgroundColor: colors.pulse,
+    borderWidth: 2,
   },
-  label: { fontSize: 11.5, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.onAccent },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.96 }] },
+  label: { fontSize: 12, fontWeight: "500", fontFamily: fontFamilies.medium },
+  pressed: { opacity: 0.8, transform: [{ scale: 0.97 }] },
   disabled: { opacity: 0.4 },
-  row: { flexDirection: "row", gap: spacing.sm },
-  cell: { flex: 1, alignItems: "center" },
+  row: { flexDirection: "row", gap: 8 },
+  cell: { flex: 1 },
 });

@@ -1,8 +1,8 @@
 import { PropsWithChildren, ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "./Icon";
-import { colors, gradients, radius, shadows, spacing, typography } from "@/theme";
+import { GlowPanel } from "./GlowPanel";
+import { colors, fontFamilies, radius, spacing, typography } from "@/theme";
 
 export interface HeroCardProps extends PropsWithChildren {
   /** Small label at the top-left ("Worked today"). */
@@ -27,10 +27,9 @@ export interface HeroCardProps extends PropsWithChildren {
 }
 
 /**
- * The big lime gradient card at the top of Home (and Reimbursement): ink
- * text, radius 30, greenish glow, optional "notch" tab underneath.
- * Everything inside is free-form `children` rendered after the optional
- * label/value header — e.g. a row of `Pill`s, then `<QuickActions />`.
+ * The dark presence hero (GlowPanel, radius 28, padding 18, gap 16): optional caps label + right node, a big
+ * Space Grotesk value, then free-form `children` — e.g. a `StatRow` of `StatBox`es, a solid `Button`, then
+ * `<QuickActions />`. Optional "notch" tab underneath (legacy).
  */
 export function HeroCard({
   label,
@@ -43,21 +42,14 @@ export function HeroCard({
   contentStyle,
   children,
 }: HeroCardProps) {
-  const notchContent = notch === true ? <Icon name="chevronDown" size={16} color={colors.onAccent} /> : notch;
+  const notchContent = notch === true ? <Icon name="chevronDown" size={16} color={colors.panelHeroText} /> : notch;
   return (
     <View style={style}>
       <View style={styles.shadowWrap}>
-        <LinearGradient
-          colors={gradients.hero}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
-          style={[styles.card, contentStyle]}
-        >
-          {/* Soft white highlight in the top-right (mockup's radial glow). */}
-          <View pointerEvents="none" style={styles.glow} />
+        <GlowPanel rounded style={[styles.card, contentStyle]}>
           {label || labelRight ? (
             <View style={styles.headerRow}>
-              {label ? <Text style={styles.label}>{label}</Text> : <View />}
+              {label ? <Text style={styles.label}>{label.toUpperCase()}</Text> : <View />}
               {labelRight}
             </View>
           ) : null}
@@ -68,7 +60,7 @@ export function HeroCard({
             </Text>
           ) : null}
           {children}
-        </LinearGradient>
+        </GlowPanel>
       </View>
       {notch ? (
         <Pressable onPress={onNotchPress} disabled={!onNotchPress} hitSlop={8} style={styles.notch}>
@@ -80,40 +72,23 @@ export function HeroCard({
 }
 
 const styles = StyleSheet.create({
-  shadowWrap: { borderRadius: radius.hero, backgroundColor: "#D9480A", ...shadows.hero },
-  card: {
-    borderTopLeftRadius: radius.hero,
-    borderTopRightRadius: radius.hero,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md + 2,
-    overflow: "hidden",
-  },
-  glow: {
-    position: "absolute",
-    right: -60,
-    top: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
+  shadowWrap: { borderRadius: radius.hero },
+  card: { gap: 0 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  label: { fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.onLimeSecondary },
-  value: { ...typography.display, color: colors.onAccent, marginTop: spacing.sm + 4 },
+  label: { ...typography.kicker, color: colors.panelHeroMuted },
+  value: { ...typography.display, lineHeight: 48, color: colors.panelHeroText, marginTop: spacing.sm },
   suffix: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "500",
-    fontFamily: "Inter_500Medium",
+    fontFamily: fontFamilies.medium,
     letterSpacing: 0,
-    color: colors.onAccentMuted,
+    color: colors.panelHeroMuted,
   },
   notch: {
     alignSelf: "center",
     width: 60,
     height: 22,
-    backgroundColor: gradients.hero[1],
+    backgroundColor: colors.panelHero,
     borderBottomLeftRadius: 22,
     borderBottomRightRadius: 22,
     alignItems: "center",

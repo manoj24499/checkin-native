@@ -1,29 +1,43 @@
 import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { renderIcon, type IconSource } from "./Icon";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, fontFamilies, gradientDirection, gradients, radius } from "@/theme";
 
-export type PillVariant = "lime" | "white" | "glass" | "ink" | "outline" | "muted" | "success" | "warning" | "danger";
+export type PillVariant =
+  | "lime"
+  | "white"
+  | "glass"
+  | "ink"
+  | "outline"
+  | "muted"
+  | "success"
+  | "warning"
+  | "danger"
+  | "gradient"
+  | "hero";
 
 const PILL: Record<PillVariant, { bg: string; fg: string; border?: string }> = {
-  lime: { bg: colors.primaryMuted, fg: colors.limeDeep },
-  white: { bg: colors.surface, fg: colors.ink },
-  glass: { bg: colors.glass, fg: colors.onAccent },
-  ink: { bg: colors.surfaceRaised, fg: colors.limeDeep },
-  outline: { bg: "transparent", fg: colors.ink, border: colors.ink },
-  muted: { bg: colors.surfaceMuted, fg: colors.textSecondary },
-  success: { bg: colors.surface, fg: colors.success },
+  lime: { bg: colors.primaryMuted, fg: colors.accentText },
+  white: { bg: colors.surface, fg: colors.ink, border: colors.cardBorder },
+  /** Translucent white on the dark hero ("24 m", "In 09:02"). */
+  glass: { bg: "rgba(255,255,255,0.12)", fg: colors.panelHeroText },
+  hero: { bg: "rgba(255,255,255,0.12)", fg: colors.panelHeroText },
+  ink: { bg: colors.ink, fg: colors.primarySoftText },
+  outline: { bg: "transparent", fg: colors.ink, border: colors.hairlineStrong },
+  muted: { bg: "rgba(23,19,15,0.10)", fg: colors.textSecondary },
+  success: { bg: colors.successMuted, fg: colors.success },
   warning: { bg: colors.warningMuted, fg: colors.warning },
   danger: { bg: colors.dangerMuted, fg: colors.danger },
+  gradient: { bg: colors.primary, fg: colors.onOrange },
 };
 
 export interface PillProps {
   label: string;
   /**
-   * - lime: lime tint, olive text.  - white: solid white, ink text.
-   * - glass: translucent white on the lime hero ("In 9:02 AM").
-   * - ink: ink fill, lime text ("₹8 / km").  - outline: ink border.
-   * - muted: surfaceMuted.  - success: white with green text (hero "● Live").
-   * - warning/danger: matching *Muted fills.
+   * Status chips (11/600, padding 4/10): success "Approved", warning "Pending"/"Scheduled", danger "Declined",
+   * muted (grey), lime (orange tint, accent text). Others: white (bordered), glass/hero (translucent on the
+   * dark hero), ink (dark fill, orange text), outline, gradient (orange gradient, dark text).
+   * For "● Live" use LivePill.
    */
   variant?: PillVariant;
   /** Leading coloured dot (e.g. the "● Live" indicator). `true` = label colour. */
@@ -52,15 +66,29 @@ export function Pill({ label, variant = "lime", dot, icon, trailingIcon, onPress
   const base = [
     styles.pill,
     { backgroundColor: t.bg },
-    t.border ? { borderWidth: 1.5, borderColor: t.border } : null,
+    t.border ? { borderWidth: 1, borderColor: t.border } : null,
     style,
   ];
+  const fill =
+    variant === "gradient" ? (
+      <LinearGradient
+        pointerEvents="none"
+        colors={gradients.orange}
+        start={gradientDirection.diagonal.start}
+        end={gradientDirection.diagonal.end}
+        style={StyleSheet.absoluteFill}
+      />
+    ) : null;
   return onPress ? (
     <Pressable onPress={onPress} hitSlop={6} style={({ pressed }) => [...base, pressed && styles.pressed]}>
+      {fill}
       {content}
     </Pressable>
   ) : (
-    <View style={base}>{content}</View>
+    <View style={base}>
+      {fill}
+      {content}
+    </View>
   );
 }
 
@@ -73,8 +101,8 @@ export interface ChipProps {
 }
 
 /**
- * Selectable option chip (leave type, day, time slot). Selected = lime tint
- * with a 2px ink outline and olive label; unselected = surfaceMuted.
+ * Selectable filter/option chip (Notifications filters, leave type, day, time slot): 36 high, radius 18.
+ * Selected = orange gradient with dark 600 label; unselected = white with secondary 500 label.
  */
 export function Chip({ label, selected, disabled, onPress, style }: ChipProps) {
   return (
@@ -85,6 +113,15 @@ export function Chip({ label, selected, disabled, onPress, style }: ChipProps) {
       accessibilityState={{ selected: !!selected, disabled: !!disabled }}
       style={[styles.chip, selected && styles.chipSelected, disabled && styles.chipDisabled, style]}
     >
+      {selected ? (
+        <LinearGradient
+          pointerEvents="none"
+          colors={gradients.orange}
+          start={gradientDirection.diagonal.start}
+          end={gradientDirection.diagonal.end}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]} numberOfLines={1}>
         {label}
       </Text>
@@ -101,20 +138,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.full,
+    overflow: "hidden",
   },
-  pillLabel: { fontSize: 11.5, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  pillLabel: { fontSize: 11, fontWeight: "600", fontFamily: fontFamilies.semiBold },
   dot: { width: 7, height: 7, borderRadius: 99 },
   pressed: { opacity: 0.7 },
   chip: {
-    paddingHorizontal: spacing.sm + 5,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 2,
-    borderColor: "transparent",
+    minHeight: 36,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    overflow: "hidden",
   },
-  chipSelected: { backgroundColor: colors.primaryMuted, borderColor: colors.ink },
+  chipSelected: { borderColor: "transparent" },
   chipDisabled: { opacity: 0.35 },
-  chipLabel: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary },
-  chipLabelSelected: { color: colors.limeDeep, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  chipLabel: { fontSize: 13, fontWeight: "500", fontFamily: fontFamilies.medium, color: colors.textSecondary },
+  chipLabelSelected: { color: colors.onOrange, fontWeight: "600", fontFamily: fontFamilies.semiBold },
 });

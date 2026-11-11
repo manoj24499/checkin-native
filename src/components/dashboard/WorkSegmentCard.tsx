@@ -1,22 +1,23 @@
 import { StyleSheet, Text, View } from "react-native";
 import { Button, Card, Kicker } from "@/components/ui";
 import { colors, spacing, typography } from "@/theme";
-import type { WorkSegmentMode } from "@/types";
+
+type FieldSegmentMode = "OFFICE" | "FIELD";
 
 interface WorkSegmentCardProps {
-  mode: WorkSegmentMode;
-  onSwitch: (mode: WorkSegmentMode) => void;
+  mode: FieldSegmentMode;
+  onSwitch: (mode: FieldSegmentMode) => void;
   switching: boolean;
 }
 
-const MODE_LABEL: Record<WorkSegmentMode, string> = { OFFICE: "Office", FIELD: "Field" };
+const MODE_LABEL: Record<FieldSegmentMode, string> = { OFFICE: "Office", FIELD: "Field" };
 
 /** Live Field/Office indicator for FIELD-workMode employees — the mode
  * switches automatically via GPS (see /api/kiosk/location's
  * evaluateWorkSegment), but this lets them correct it by hand if detection
  * is late, wrong, or unavailable (e.g. indoors). */
 export function WorkSegmentCard({ mode, onSwitch, switching }: WorkSegmentCardProps) {
-  const other: WorkSegmentMode = mode === "FIELD" ? "OFFICE" : "FIELD";
+  const other: FieldSegmentMode = mode === "FIELD" ? "OFFICE" : "FIELD";
   return (
     <Card style={styles.card}>
       <View style={styles.statusRow}>
@@ -41,10 +42,10 @@ export function WorkSegmentCard({ mode, onSwitch, switching }: WorkSegmentCardPr
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: spacing.sm + 4 },
+  card: {},
   statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  dot: { width: 8, height: 8, borderRadius: 99, backgroundColor: colors.limeMid },
+  dot: { width: 8, height: 8, borderRadius: 99, backgroundColor: colors.success },
   label: { marginBottom: 0 },
-  whyLine: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  whyLine: { ...typography.caption, fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, marginTop: spacing.sm },
   switchButton: { marginTop: spacing.sm + 4, alignSelf: "flex-start" },
 });

@@ -1,8 +1,10 @@
-export { Button } from "./Button";
+export { Button, GradientButton } from "./Button";
+export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
 export { TextField } from "./TextField";
 export { Card } from "./Card";
 export { Screen } from "./Screen";
 export { ScreenBackground } from "./ScreenBackground";
+export type { ScreenBackgroundProps } from "./ScreenBackground";
 export { LoadingView } from "./LoadingView";
 export { ErrorView } from "./ErrorView";
 export { EmptyState } from "./EmptyState";
@@ -12,7 +14,7 @@ export { BottomSheet } from "./BottomSheet";
 export { IssueDialog } from "./IssueDialog";
 export { TrackingReadinessSheet } from "./TrackingReadinessSheet";
 
-// Lime redesign building blocks.
+// Building blocks.
 export { Icon, renderIcon } from "./Icon";
 export type { IconName, IconProps, IconSource } from "./Icon";
 export { IconTile, iconTileForeground } from "./IconTile";
@@ -22,7 +24,7 @@ export type { IconButtonProps } from "./IconButton";
 export { HeroCard } from "./HeroCard";
 export type { HeroCardProps } from "./HeroCard";
 export { ActionTile, QuickActions } from "./ActionTile";
-export type { ActionTileProps, QuickActionsProps } from "./ActionTile";
+export type { ActionTileProps, ActionTileTone, QuickActionsProps } from "./ActionTile";
 export { SectionHeader } from "./SectionHeader";
 export type { SectionHeaderProps } from "./SectionHeader";
 export { ListRow } from "./ListRow";
@@ -31,4 +33,24 @@ export { Pill, Chip } from "./Pill";
 export type { PillProps, PillVariant, ChipProps } from "./Pill";
 export { SegmentedControl } from "./SegmentedControl";
 export type { SegmentOption, SegmentedControlProps } from "./SegmentedControl";
-export { Kicker, ScreenTitle } from "./Typography";
+export { Kicker, ScreenTitle, PageHeader } from "./Typography";
+export { GlowPanel } from "./GlowPanel";
+export type { GlowPanelProps } from "./GlowPanel";
+
+// Redesign 2: light, glowing, animated (see DESIGN_KIT.md).
+export { AmbientGlow } from "./AmbientGlow";
+export type { AmbientGlowProps, AmbientGlowPreset, GlowSpec, GlowCorner } from "./AmbientGlow";
+export { Rise } from "./Rise";
+export type { RiseProps } from "./Rise";
+export { GradientFill } from "./GradientFill";
+export type { GradientFillProps } from "./GradientFill";
+export { PulseRing } from "./PulseRing";
+export type { PulseRingProps } from "./PulseRing";
+export { AvatarBadge } from "./AvatarBadge";
+export type { AvatarBadgeProps } from "./AvatarBadge";
+export { LivePill } from "./LivePill";
+export type { LivePillProps } from "./LivePill";
+export { StatBox, StatRow } from "./StatBox";
+export type { StatBoxProps } from "./StatBox";
+export { useReducedMotion } from "./useReducedMotion";
+export { useLoop, loopEasing } from "./animation";

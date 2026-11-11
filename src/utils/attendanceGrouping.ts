@@ -1,12 +1,16 @@
-import type { AttendancePauseInterval, AttendanceRecord } from "@/types";
+import type { AttendancePauseInterval, AttendanceRecord, AttendanceSegment } from "@/types";
 
 export interface DaySummary {
   dateKey: string;
   date: Date;
   checkIn: AttendanceRecord | null;
   checkOut: AttendanceRecord | null;
+  /** Worked time — for a HYBRID day, travel (TRANSIT) is excluded. */
   durationMs: number | null;
   outsideMs: number | null;
+  /** HYBRID days only (a timeline with HOME/TRANSIT): office / home / transit
+   * split, up to check-out (or now for a still-open day). Null otherwise. */
+  hybridSplit: SegmentSplit | null;
 }
 
 function dateKey(iso: string) {
@@ -27,9 +31,69 @@ export function computePausedMs(referenceEnd: Date, pauses: AttendancePauseInter
   }, 0);
 }
 
-export function computeWorkedMs(checkIn: Date, checkOut: Date, pauses: AttendancePauseInterval[]): number {
+/**
+ * `segments` (optional): the session's segment timeline. Only matters for
+ * HYBRID sessions — TRANSIT time is not work, so it's subtracted too (net of
+ * any pause overlapping it, so nothing is subtracted twice). Mirrors the
+ * backend's computeWorkedMs(…, segments); sessions with no TRANSIT segment get
+ * exactly the same result as without it.
+ */
+export function computeWorkedMs(
+  checkIn: Date,
+  checkOut: Date,
+  pauses: AttendancePauseInterval[],
+  segments?: AttendanceSegment[],
+): number {
   const totalMs = checkOut.getTime() - checkIn.getTime();
-  return Math.max(0, totalMs - computePausedMs(checkOut, pauses));
+  const transitMs =
+    segments && segments.some((s) => s.mode === "TRANSIT")
+      ? computeSegmentSplit(checkIn, checkOut, segments, pauses).transitMs
+      : 0;
+  return Math.max(0, totalMs - computePausedMs(checkOut, pauses) - transitMs);
+}
+
+export interface SegmentSplit {
+  officeMs: number;
+  fieldMs: number;
+  homeMs: number;
+  transitMs: number;
+}
+
+/** Time per segment type, each net of any pause overlapping it — mirrors the
+ * backend's lib/attendanceHours.ts computeSegmentSplit. A still-open segment
+ * is treated as ending at `checkOut` (pass "now" for a live session). */
+export function computeSegmentSplit(
+  checkIn: Date,
+  checkOut: Date,
+  segments: AttendanceSegment[],
+  pauses: AttendancePauseInterval[],
+): SegmentSplit {
+  const split: SegmentSplit = { officeMs: 0, fieldMs: 0, homeMs: 0, transitMs: 0 };
+  const inMs = checkIn.getTime();
+  const outMs = checkOut.getTime();
+  for (const segment of segments) {
+    const start = Math.max(inMs, new Date(segment.startedAt).getTime());
+    const end = Math.min(outMs, segment.endedAt ? new Date(segment.endedAt).getTime() : outMs);
+    if (end <= start) continue;
+    let segmentMs = end - start;
+    for (const p of pauses) {
+      const pStart = new Date(p.pausedAt).getTime();
+      const pEnd = p.resumedAt ? new Date(p.resumedAt).getTime() : outMs;
+      const overlap = Math.min(pEnd, end) - Math.max(pStart, start);
+      if (overlap > 0) segmentMs -= overlap;
+    }
+    segmentMs = Math.max(0, segmentMs);
+    if (segment.mode === "OFFICE") split.officeMs += segmentMs;
+    else if (segment.mode === "HOME") split.homeMs += segmentMs;
+    else if (segment.mode === "TRANSIT") split.transitMs += segmentMs;
+    else split.fieldMs += segmentMs;
+  }
+  return split;
+}
+
+/** True when a session's timeline is a HYBRID one (has a HOME or TRANSIT segment). */
+export function isHybridTimeline(segments: AttendanceSegment[] | undefined): boolean {
+  return !!segments && segments.some((s) => s.mode === "HOME" || s.mode === "TRANSIT");
 }
 
 /**
@@ -54,9 +118,19 @@ export function groupAttendanceByDay(records: AttendanceRecord[]): DaySummary[] 
     );
     const checkIn = sorted.find((r) => r.type === "CHECK_IN") ?? null;
     const checkOut = sorted.find((r) => r.type === "CHECK_OUT") ?? null;
+    const segments = checkIn?.segments;
     const durationMs =
       checkIn && checkOut
-        ? computeWorkedMs(new Date(checkIn.timestamp), new Date(checkOut.timestamp), checkIn.pauses ?? [])
+        ? computeWorkedMs(new Date(checkIn.timestamp), new Date(checkOut.timestamp), checkIn.pauses ?? [], segments)
+        : null;
+    const hybridSplit =
+      checkIn && segments && isHybridTimeline(segments)
+        ? computeSegmentSplit(
+            new Date(checkIn.timestamp),
+            checkOut ? new Date(checkOut.timestamp) : new Date(),
+            segments,
+            checkIn.pauses ?? [],
+          )
         : null;
     // For a still-open day (no checkout yet, e.g. today), use "now" as the
     // reference end so an open pause still counts toward outside time —
@@ -71,6 +145,7 @@ export function groupAttendanceByDay(records: AttendanceRecord[]): DaySummary[] 
       checkOut,
       durationMs,
       outsideMs,
+      hybridSplit,
     });
   }
 

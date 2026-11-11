@@ -1,10 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ActivityIndicator, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
-import { BarSpark } from "@/components/dashboard/BarSpark";
-import { Card, Button, Icon, IconButton, IconTile, Kicker } from "@/components/ui";
+import {
+  Card,
+  Button,
+  Icon,
+  IconTile,
+  Kicker,
+  PulseRing,
+  Rise,
+  StatBox,
+  StatRow,
+  useReducedMotion,
+} from "@/components/ui";
 import {
   EMPTY_VISIT_FORM,
   VisitFormFields,
@@ -18,6 +30,7 @@ import {
   useAuth,
   useAttendanceStatus,
   useResolvedGeofenceTarget,
+  useHybridTargets,
   useFieldSummary,
   useQueuedFieldVisit,
 } from "@/hooks";
@@ -25,11 +38,11 @@ import type { GeofenceTarget } from "@/hooks/useGeofence";
 import type { FieldVisit } from "@/types";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { useAuthStore } from "@/store/authStore";
-import { getCurrentPositionWithTimeout, formatDistance } from "@/utils/geo";
+import { getCurrentPositionWithTimeout, formatDistance, haversineDistanceMeters } from "@/utils/geo";
 import { getErrorMessage } from "@/utils/errors";
 import { endpoints } from "@/api/endpoints";
 import { env } from "@/config/env";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, fontFamilies, gradientDirection, gradients, spacing, typography } from "@/theme";
 import { useTabBarClearance } from "@/navigation/tabBarClearance";
 
 type Coords = { latitude: number; longitude: number };
@@ -65,11 +78,10 @@ const SMOOTHING_FACTOR = 0.35;
 // only ever sees "Low" from the two one-time initial fixes on mount, which
 // aren't filtered.
 const ACCURACY_TIERS = {
-  // Bright variants: these sit on the dark (ink) header panel, where the
-  // theme's success/warning/danger text colours are too dark to read.
+  // Dot colours on the white map chips.
   high: { maxMeters: 15, label: "High accuracy", color: "#4ADE80" },
-  medium: { maxMeters: MIN_ACCURACY_METERS, label: "Medium accuracy", color: "#FBBF24" },
-  low: { maxMeters: Infinity, label: "Low accuracy", color: "#F87171" },
+  medium: { maxMeters: MIN_ACCURACY_METERS, label: "Medium accuracy", color: "#F5A524" },
+  low: { maxMeters: Infinity, label: "Low accuracy", color: "#F05252" },
 } as const;
 
 function accuracyTier(meters: number) {
@@ -93,21 +105,27 @@ function buildMapHtml(
   target: GeofenceTarget | null,
   route: Coords[],
   visits: FieldVisit[],
+  targetLabel = "Office / Home",
+  animate = true,
 ): string {
   const center = userCoords ?? target ?? route[0] ?? { latitude: 20.5937, longitude: 78.9629 };
   const zoom = userCoords || target || route.length ? 16 : 4;
 
   const userMarker = userCoords
-    ? `L.circleMarker([${userCoords.latitude}, ${userCoords.longitude}], {
-        radius: 8, color: "#FFFFFF", fillColor: "${colors.lime}", fillOpacity: 1, weight: 3
+    ? `L.marker([${userCoords.latitude}, ${userCoords.longitude}], {
+        icon: L.divIcon({ className: "", iconSize: [72, 72], iconAnchor: [36, 36],
+          html: '<div class="you"><span class="ping"></span><span class="dot"></span></div>' }),
+        zIndexOffset: 1000
       }).addTo(map).bindPopup("You");`
     : "";
 
   const targetMarkers = target
-    ? `L.marker([${target.latitude}, ${target.longitude}]).addTo(map).bindPopup("Office / Home");
-      L.circle([${target.latitude}, ${target.longitude}], {
-        radius: ${target.radiusMeters}, color: "#4ADE80", fillColor: "#4ADE80", fillOpacity: 0.1, weight: 1.5, dashArray: "4 4"
-      }).addTo(map);`
+    ? `L.circle([${target.latitude}, ${target.longitude}], {
+        radius: ${target.radiusMeters}, color: "#FF9A3D", fillColor: "#EF6C00", fillOpacity: 0.1, weight: 1.5, dashArray: "5 6", className: "geo"
+      }).addTo(map);
+      L.marker([${target.latitude}, ${target.longitude}], {
+        icon: L.divIcon({ className: "", iconSize: [14, 14], iconAnchor: [7, 7], html: '<span class="place"></span>' })
+      }).addTo(map).bindPopup(${JSON.stringify(targetLabel)});`
     : "";
 
   const routeLine =
@@ -149,8 +167,15 @@ function buildMapHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; background: ${colors.panelDarker}; }
+    html, body, #map { height: 100%; margin: 0; padding: 0; background: #E9E4DC; }
     .leaflet-control-attribution { font-size: 9px; }
+    .you { position: relative; width: 72px; height: 72px; }
+    .you .ping { position: absolute; left: 0; top: 0; width: 72px; height: 72px; border-radius: 36px; background: rgba(255,154,61,.5); opacity: 0; ${animate ? "animation: ping 2.4s ease-out infinite;" : ""} }
+    .you .dot { position: absolute; left: 27px; top: 27px; width: 18px; height: 18px; border-radius: 9px; background: #FF9A3D; border: 3px solid #fff; box-sizing: border-box; }
+    .place { display: block; width: 14px; height: 14px; border-radius: 7px; background: #17130F; border: 2px solid #fff; box-sizing: border-box; }
+    .geo { ${animate ? "animation: geo 3s ease-in-out infinite;" : ""} }
+    @keyframes ping { 0% { transform: scale(.4); opacity: .8; } 100% { transform: scale(1.8); opacity: 0; } }
+    @keyframes geo { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
   </style>
 </head>
 <body>
@@ -178,6 +203,8 @@ function formatVisitTime(iso: string) {
 
 export function LiveMapScreen() {
   const tabClearance = useTabBarClearance();
+  const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const navigation = useNavigation();
   const { user } = useAuth();
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -189,7 +216,24 @@ export function LiveMapScreen() {
   // location all day despite them actually being in the office.
   const isWfhOfficeDay =
     user?.workMode === "WFH" && statusQuery.data?.exists === true && statusQuery.data.checkInMode === "OFFICE";
-  const target = useResolvedGeofenceTarget(isWfhOfficeDay ? "OFFICE" : undefined);
+  const resolvedTarget = useResolvedGeofenceTarget(isWfhOfficeDay ? "OFFICE" : undefined);
+  // HYBRID: the place they're at now — home in a HOME segment, the
+  // destination while travelling, else the office.
+  const isHybrid = user?.workMode === "HYBRID";
+  const statusData = statusQuery.data?.exists ? statusQuery.data : null;
+  const hybridTargets = useHybridTargets(statusData?.hybrid ?? null);
+  const hybridSegment = isHybrid && statusData?.checkedIn && !statusData.checkedOut ? (statusData.segment ?? null) : null;
+  const hybridPlace =
+    hybridSegment?.mode === "TRANSIT"
+      ? (hybridSegment.heading ?? null)
+      : hybridSegment?.mode === "HOME" || hybridSegment?.mode === "OFFICE"
+        ? hybridSegment.mode
+        : null;
+  const target = isHybrid
+    ? hybridPlace === "HOME"
+      ? hybridTargets.home
+      : (hybridTargets.office ?? hybridTargets.home)
+    : resolvedTarget;
   const pings = useActivityPattern(isTracking);
 
   const isFieldDay =
@@ -306,9 +350,23 @@ export function LiveMapScreen() {
   const route = fieldSummaryQuery.data?.active ? fieldSummaryQuery.data.route : [];
   const visits = fieldSummaryQuery.data?.active ? fieldSummaryQuery.data.visits : [];
 
+  // The place the geofence circle belongs to (marker popup + "24 m from office").
+  const targetIsHome = isHybrid
+    ? hybridPlace === "HOME" || (!hybridPlace && !hybridTargets.office)
+    : !isWfhOfficeDay && user?.workMode === "WFH";
+  const targetWord = targetIsHome ? "Home" : "Office";
+
   const mapHtml = useMemo(
-    () => buildMapHtml(userCoords, isFieldDay ? null : target, isFieldDay ? route : [], isFieldDay ? visits : []),
-    [userCoords, target, isFieldDay, route, visits],
+    () =>
+      buildMapHtml(
+        userCoords,
+        isFieldDay ? null : target,
+        isFieldDay ? route : [],
+        isFieldDay ? visits : [],
+        targetWord,
+        !reducedMotion,
+      ),
+    [userCoords, target, isFieldDay, route, visits, targetWord, reducedMotion],
   );
 
   // Non-blocking save: the position is already live on this screen, so the
@@ -348,6 +406,14 @@ export function LiveMapScreen() {
 
   const locationLabel = isFieldDay
     ? "Field day"
+    : isHybrid
+      ? hybridSegment?.mode === "TRANSIT"
+        ? hybridPlace === "HOME"
+          ? "Heading home"
+          : "Heading to the office"
+        : hybridPlace === "HOME" || (!hybridPlace && !hybridTargets.office)
+          ? "Home location"
+          : "Office"
     : isWfhOfficeDay
       ? "Office (WFH)"
       : user?.workMode === "WFH"
@@ -362,6 +428,14 @@ export function LiveMapScreen() {
       : "Loading today's route…"
     : (locationError ?? (target ? `Geofence ${Math.round(target.radiusMeters)} m` : "No geofence configured"));
 
+  const tier = accuracyMeters != null ? accuracyTier(accuracyMeters) : null;
+  const distanceToTarget =
+    !isFieldDay && userCoords && target
+      ? haversineDistanceMeters(userCoords.latitude, userCoords.longitude, target.latitude, target.longitude)
+      : null;
+  // Room under the white sheet: the floating tab bar inside the tabs, the home indicator in the modal.
+  const sheetBottom = tabClearance ? tabClearance + 6 : insets.bottom + spacing.md;
+
   return (
     <View style={styles.container}>
       <View style={[styles.mapArea, isFieldDay && styles.mapAreaSplit]}>
@@ -375,152 +449,286 @@ export function LiveMapScreen() {
 
         {!userCoords && !locationError && (
           <View style={styles.loadingPill} pointerEvents="none">
-            <ActivityIndicator color={colors.lime} size="small" />
+            <ActivityIndicator color={colors.primary} size="small" />
             <Text style={styles.loadingPillLabel}>Getting your location…</Text>
           </View>
         )}
 
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Kicker color={colors.textOnDarkMuted}>{isFieldDay ? "FIELD DAY" : "LIVE LOCATION"}</Kicker>
-            <Text style={styles.title}>{locationLabel}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
-            {accuracyMeters != null &&
-              (() => {
-                const tier = accuracyTier(accuracyMeters);
-                return (
-                  <View style={styles.accuracyRow}>
-                    <View style={[styles.accuracyDot, { backgroundColor: tier.color }]} />
-                    <Text style={[styles.accuracyText, { color: tier.color }]}>{tier.label}</Text>
-                  </View>
-                );
-              })()}
-          </View>
-          <IconButton icon="close" variant="dark" onPress={() => navigation.goBack()} accessibilityLabel="Close map" />
-        </View>
-
-        {!isFieldDay && (
-          <View style={[styles.pingPanel, { bottom: 20 + tabClearance }]}>
-            <View style={styles.pingPanelHeader}>
-              <Text style={[styles.pingPanelLabel, isTracking && styles.pingPanelLabelLive]}>
-                {isTracking ? "Sharing live" : "Not sharing"}
-              </Text>
-              <Text style={styles.pingPanelInterval}>every 2 min</Text>
+        <Rise style={[styles.header, { top: insets.top + spacing.sm }]}>
+          <View style={styles.headerRow}>
+            <View style={styles.chipRow}>
+              <MapChip>
+                <View style={[styles.chipDot, { backgroundColor: isTracking ? colors.liveDot : colors.textMuted }]} />
+                <Text style={[styles.chipText, { color: isTracking ? colors.success : colors.textSecondary }]}>
+                  {isTracking ? "Sharing live" : "Not sharing"}
+                </Text>
+              </MapChip>
+              {tier && accuracyMeters != null ? (
+                <MapChip accessibilityLabel={`${tier.label}, plus or minus ${Math.round(accuracyMeters)} metres`}>
+                  <View style={[styles.chipDot, { backgroundColor: tier.color }]} />
+                  <Text style={styles.chipText}>{`GPS · ±${Math.round(accuracyMeters)} m`}</Text>
+                </MapChip>
+              ) : null}
             </View>
-            <BarSpark values={pings} color={colors.lime} height={44} />
+            <Pressable
+              onPress={() => navigation.goBack()}
+              accessibilityRole="button"
+              accessibilityLabel="Close map"
+              style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.7 }]}
+            >
+              <Icon name="close" size={18} color={colors.ink} strokeWidth={2} />
+            </Pressable>
           </View>
-        )}
+          <MapChip>
+            <Text style={[styles.chipText, styles.chipStrong]}>{locationLabel}</Text>
+            <Text style={[styles.chipText, styles.chipMuted, locationError ? { color: colors.danger } : null]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          </MapChip>
+          {tier && tier === ACCURACY_TIERS.low ? (
+            <MapChip>
+              <Text style={[styles.chipText, { color: colors.warning }]}>{tier.label} — the dot may be off</Text>
+            </MapChip>
+          ) : null}
+        </Rise>
       </View>
 
-      {isFieldDay && (
-        <ScrollView style={styles.fieldPanel} contentContainerStyle={[styles.fieldPanelContent, { paddingBottom: spacing.xxl + tabClearance }]}>
-          <Kicker>Logged locations</Kicker>
-
-          {queue.pending.map((p, i) => (
-            <View key={p.key} style={[styles.visitRow, i > 0 && styles.visitRowDivider]}>
-              {p.status === "saving" ? (
-                <View style={[styles.visitThumb, styles.pendingThumb]}>
-                  <ActivityIndicator color={colors.lime} />
-                </View>
-              ) : (
-                <IconTile glyph="!" tone="danger" size={44} radius={14} />
-              )}
-              <View style={styles.visitInfo}>
-                <Text style={styles.visitName}>{p.name}</Text>
-                <Text style={[styles.visitTime, p.status === "failed" && { color: colors.danger }]}>
-                  {p.status === "saving" ? "Saving…" : p.error ?? "Couldn't save"}
-                </Text>
-                {p.status === "failed" ? (
-                  <View style={styles.pendingRow}>
-                    <Pressable onPress={() => queue.retry(p.key)} hitSlop={8}>
-                      <Text style={styles.pendingRetry}>Retry</Text>
-                    </Pressable>
-                    <Pressable onPress={() => queue.remove(p.key)} hitSlop={8}>
-                      <Text style={styles.visitTime}>Remove</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
+      {!isFieldDay && (
+        <Rise delay={200} style={[styles.sheet, { paddingBottom: sheetBottom }]}>
+          <View style={styles.handle} />
+          <View style={styles.sheetHeader}>
+            <View style={styles.flex1}>
+              <View style={styles.sheetTitleRow}>
+                <LiveDot live={isTracking} />
+                <Text style={styles.sheetTitle}>{isTracking ? "Sharing live" : "Not sharing"}</Text>
               </View>
+              <Text style={styles.sheetSub}>
+                {isTracking ? "every 2 min · only while checked in" : "Turns on when you check in"}
+              </Text>
             </View>
-          ))}
+            {distanceToTarget != null ? (
+              <Text style={styles.distancePill}>
+                {`${formatDistance(distanceToTarget)} from ${targetWord.toLowerCase()}`}
+              </Text>
+            ) : null}
+          </View>
+          <GrowBars values={pings} />
+        </Rise>
+      )}
 
-          {visits.length === 0 && queue.pending.length === 0 ? (
-            <Text style={styles.emptyVisits}>Nothing logged yet — add the places you visit as you go.</Text>
-          ) : (
-            visits.map((visit, i) => (
-              <View key={visit.id} style={[styles.visitRow, (i > 0 || queue.pending.length > 0) && styles.visitRowDivider]}>
-                <Image
-                  source={{
-                    uri: `${env.apiUrl}${endpoints.fieldVisitPhoto(visit.id)}`,
-                    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-                  }}
-                  style={styles.visitThumb}
-                />
-                <View style={styles.visitInfo}>
-                  <Text style={styles.visitName}>{visit.name}</Text>
-                  {visit.description ? <Text style={styles.visitTime}>{visit.description}</Text> : null}
-                  {visit.contactName || visit.contactPhone ? (
-                    <Text style={styles.visitTime}>{[visit.contactName, visit.contactPhone].filter(Boolean).join(" · ")}</Text>
-                  ) : null}
-                  <Text style={styles.visitTime}>Reached {formatVisitTime(visit.reachedAt)}</Text>
-                </View>
+      {isFieldDay && (
+        <View style={styles.fieldSheet}>
+          <View style={styles.handle} />
+          <ScrollView
+            style={styles.flex1}
+            contentContainerStyle={[styles.fieldPanelContent, { paddingBottom: spacing.xxl + tabClearance }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <Rise delay={150} style={styles.liveRow}>
+              <Kicker>Live location</Kicker>
+              <View style={styles.sheetTitleRow}>
+                <LiveDot live={isTracking} />
+                <Text style={styles.sheetTitle}>{isTracking ? "Sharing with your admin" : "Sharing is off"}</Text>
               </View>
-            ))
-          )}
+              <Text style={styles.sheetSub}>Only ever on while checked in</Text>
+            </Rise>
+            <Rise delay={230}>
+              <StatRow>
+                <StatBox
+                  tone="muted"
+                  label="Distance"
+                  value={fieldSummaryQuery.data?.active ? formatDistance(fieldSummaryQuery.data.distanceMeters) : "—"}
+                />
+                <StatBox tone="muted" label="Stops" value={String(visits.length)} />
+                <StatBox
+                  tone="muted"
+                  label="Since"
+                  value={
+                    route.length
+                      ? new Date(route[0].timestamp).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+                      : "—"
+                  }
+                />
+              </StatRow>
+            </Rise>
 
-          {addingVisit ? (
-            <Card style={styles.addVisitCard}>
-              <VisitFormFields values={visitForm} onChange={setVisitForm} />
-              <Pressable
-                onPress={() => setVisitCameraOpen(true)}
-                style={[styles.photoTile, visitPhotoDataUrl && styles.photoTileReady]}
-              >
-                {visitPhotoDataUrl ? (
-                  <Image source={{ uri: visitPhotoDataUrl }} style={styles.photoTileImage} />
+            <Rise delay={310}>
+              <Text style={styles.logTitle}>Logged locations</Text>
+              <Card style={styles.visitCard}>
+                {queue.pending.map((p, i) => (
+                  <View key={p.key} style={[styles.visitRow, i > 0 && styles.visitRowDivider]}>
+                    {p.status === "saving" ? (
+                      <View style={[styles.visitThumb, styles.pendingThumb]}>
+                        <ActivityIndicator color={colors.primary} />
+                      </View>
+                    ) : (
+                      <IconTile glyph="!" tone="danger" size={44} radius={14} />
+                    )}
+                    <View style={styles.visitInfo}>
+                      <Text style={styles.visitName}>{p.name}</Text>
+                      <Text style={[styles.visitTime, p.status === "failed" && { color: colors.danger }]}>
+                        {p.status === "saving" ? "Saving…" : p.error ?? "Couldn't save"}
+                      </Text>
+                      {p.status === "failed" ? (
+                        <View style={styles.pendingRow}>
+                          <Pressable onPress={() => queue.retry(p.key)} hitSlop={8}>
+                            <Text style={styles.pendingRetry}>Retry</Text>
+                          </Pressable>
+                          <Pressable onPress={() => queue.remove(p.key)} hitSlop={8}>
+                            <Text style={styles.visitTime}>Remove</Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+
+                {visits.length === 0 && queue.pending.length === 0 ? (
+                  <Text style={styles.emptyVisits}>Nothing logged yet — add the places you visit as you go.</Text>
                 ) : (
-                  <Icon name="camera" size={22} color={colors.ink} />
+                  visits.map((visit, i) => (
+                    <View key={visit.id} style={[styles.visitRow, (i > 0 || queue.pending.length > 0) && styles.visitRowDivider]}>
+                      <Image
+                        source={{
+                          uri: `${env.apiUrl}${endpoints.fieldVisitPhoto(visit.id)}`,
+                          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+                        }}
+                        style={styles.visitThumb}
+                      />
+                      <View style={styles.visitInfo}>
+                        <Text style={styles.visitName}>{visit.name}</Text>
+                        {visit.description ? <Text style={styles.visitTime}>{visit.description}</Text> : null}
+                        {visit.contactName || visit.contactPhone ? (
+                          <Text style={styles.visitTime}>{[visit.contactName, visit.contactPhone].filter(Boolean).join(" · ")}</Text>
+                        ) : null}
+                        <Text style={styles.visitTime}>Reached {formatVisitTime(visit.reachedAt)}</Text>
+                      </View>
+                    </View>
+                  ))
                 )}
-                <Text style={styles.photoTileLabel}>{visitPhotoDataUrl ? "PHOTO READY" : "SITE PHOTO"}</Text>
-              </Pressable>
+              </Card>
+            </Rise>
 
-              {!userCoords ? (
-                <Text style={styles.meta}>Waiting for your location before this can be saved…</Text>
-              ) : null}
-              {visitFormError ? <Text style={styles.errorText}>{visitFormError}</Text> : null}
+            {addingVisit ? (
+              <Card style={styles.addVisitCard}>
+                <VisitFormFields values={visitForm} onChange={setVisitForm} />
+                <Pressable
+                  onPress={() => setVisitCameraOpen(true)}
+                  style={[styles.photoTile, visitPhotoDataUrl && styles.photoTileReady]}
+                >
+                  {visitPhotoDataUrl ? (
+                    <Image source={{ uri: visitPhotoDataUrl }} style={styles.photoTileImage} />
+                  ) : (
+                    <Icon name="camera" size={22} color={colors.accentText} />
+                  )}
+                  <Text style={styles.photoTileLabel}>{visitPhotoDataUrl ? "PHOTO READY" : "SITE PHOTO"}</Text>
+                </Pressable>
 
-              <View style={styles.addVisitButtonRow}>
-                <Button
-                  label="Cancel"
-                  variant="secondary"
-                  onPress={() => {
-                    setAddingVisit(false);
-                    setVisitForm(EMPTY_VISIT_FORM);
-                    setVisitFormError(null);
-                    setVisitPhotoDataUrl(null);
-                  }}
-                  style={styles.addVisitButtonHalf}
-                />
-                <Button
-                  label="Save location"
-                  onPress={handleSaveVisit}
-                  disabled={!visitForm.name.trim() || !visitPhotoDataUrl || !userCoords}
-                  style={styles.addVisitButtonHalf}
-                />
-              </View>
-            </Card>
-          ) : (
-            <Button label="Add a location" icon="plus" variant="secondary" onPress={() => setAddingVisit(true)} />
-          )}
-        </ScrollView>
+                {!userCoords ? (
+                  <Text style={styles.meta}>Waiting for your location before this can be saved…</Text>
+                ) : null}
+                {visitFormError ? <Text style={styles.errorText}>{visitFormError}</Text> : null}
+
+                <View style={styles.addVisitButtonRow}>
+                  <Button
+                    label="Cancel"
+                    variant="secondary"
+                    onPress={() => {
+                      setAddingVisit(false);
+                      setVisitForm(EMPTY_VISIT_FORM);
+                      setVisitFormError(null);
+                      setVisitPhotoDataUrl(null);
+                    }}
+                    style={styles.addVisitButtonHalf}
+                  />
+                  <Button
+                    label="Save location"
+                    onPress={handleSaveVisit}
+                    disabled={!visitForm.name.trim() || !visitPhotoDataUrl || !userCoords}
+                    style={styles.addVisitButtonHalf}
+                  />
+                </View>
+              </Card>
+            ) : (
+              <Rise delay={390}>
+                <Button label="Add a location" icon="plus" onPress={() => setAddingVisit(true)} />
+              </Rise>
+            )}
+          </ScrollView>
+        </View>
       )}
     </View>
   );
 }
 
+/** White map chip (Map.dc.html `.chip`): 94% white, 1px border, pill. */
+function MapChip({ children, accessibilityLabel }: { children: ReactNode; accessibilityLabel?: string }) {
+  return (
+    <View style={styles.chip} accessibilityLabel={accessibilityLabel} accessible={!!accessibilityLabel}>
+      {children}
+    </View>
+  );
+}
+
+/** Green status dot that pulses while sharing; grey and still when not. */
+function LiveDot({ live }: { live: boolean }) {
+  return (
+    <View style={styles.liveDotBox}>
+      <PulseRing size={9} color={colors.liveDot} enabled={live} duration={2000} />
+      <View style={[styles.liveDot, { backgroundColor: live ? colors.liveDot : colors.textMuted }]} />
+    </View>
+  );
+}
+
+const BAR_AREA = 44;
+
+/** The ping bars: orange gradient columns that grow up from the baseline on mount (mockup `grow`, staggered). */
+function GrowBars({ values }: { values: number[] }) {
+  return (
+    <View style={styles.bars}>
+      {values.map((v, i) => (
+        <GrowBar key={i} index={i} percent={Math.max(8, Math.min(100, v))} />
+      ))}
+    </View>
+  );
+}
+
+function GrowBar({ index, percent }: { index: number; percent: number }) {
+  const reduced = useReducedMotion();
+  const t = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduced) {
+      t.setValue(1);
+      return;
+    }
+    const anim = Animated.timing(t, {
+      toValue: 1,
+      duration: 700,
+      delay: 400 + index * 50,
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+    // Entrance only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduced]);
+  return (
+    <Animated.View
+      style={[
+        styles.bar,
+        { height: (BAR_AREA * percent) / 100, transformOrigin: "bottom", transform: [{ scaleY: t }] },
+      ]}
+    >
+      <LinearGradient colors={gradients.orangeVertical} {...gradientDirection.vertical} style={StyleSheet.absoluteFill} />
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.panelDarker },
+  container: { flex: 1, backgroundColor: "#E9E4DC" },
   mapArea: { flex: 1, position: "relative" },
   mapAreaSplit: { flex: 0.44 },
+  flex1: { flex: 1 },
   loadingPill: {
     position: "absolute",
     top: "45%",
@@ -528,85 +736,115 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs + 2,
-    backgroundColor: "rgba(26,21,18,0.9)",
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
     borderRadius: 99,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 3,
-  },
-  loadingPillLabel: { ...typography.caption, color: colors.textOnDark },
-  header: {
-    position: "absolute",
-    top: 64,
-    left: 14,
-    right: 14,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
-  // Sits directly on top of the raw map tiles with nothing else behind it —
-  // without its own background, light-colored text here is only readable
-  // by coincidence, wherever the map tile underneath happens to be dark.
-  // Same near-opaque ink scrim `pingPanel` below uses, so text stays
-  // legible over any tile color (roads, buildings, green space, ...).
-  headerText: {
-    flexShrink: 1,
-    maxWidth: "80%",
-    backgroundColor: "rgba(26,21,18,0.9)",
-    borderRadius: 18,
     paddingHorizontal: 14,
-    paddingVertical: spacing.sm + 4,
+    paddingVertical: 8,
   },
-  title: { ...typography.section, color: colors.textOnDark },
-  subtitle: { ...typography.caption, fontSize: 12, color: colors.textOnDarkMuted, marginTop: 2 },
-  accuracyRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 6 },
-  accuracyDot: { width: 6, height: 6, borderRadius: 99 },
-  accuracyText: { fontSize: 11, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  pingPanel: {
-    position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 20,
-    backgroundColor: "rgba(15,15,15,0.94)",
-    borderRadius: 22,
-    padding: 14,
-  },
-  pingPanelHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    marginBottom: spacing.sm + 2,
-  },
-  pingPanelLabel: { ...typography.bodyStrong, fontSize: 14, color: colors.textOnDarkMuted },
-  pingPanelLabelLive: { color: colors.lime },
-  pingPanelInterval: { ...typography.caption, fontSize: 12, color: colors.textOnDarkMuted },
+  loadingPillLabel: { fontFamily: fontFamilies.medium, fontWeight: "500", fontSize: 12, color: colors.ink },
 
-  // White sheet rising over the bottom of the map (rounded top corners).
-  fieldPanel: {
+  // Top chrome over the map.
+  header: { position: "absolute", left: 16, right: 16, gap: 8 },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
+  chipRow: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    maxWidth: "100%",
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chipDot: { width: 7, height: 7, borderRadius: 4 },
+  chipText: { fontFamily: fontFamilies.medium, fontWeight: "500", fontSize: 12, color: colors.ink },
+  chipStrong: { fontFamily: fontFamilies.semiBold, fontWeight: "600" },
+  chipMuted: { color: colors.textSecondary, flexShrink: 1 },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // White bottom sheet (non-field days) over the map.
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: spacing.gutter,
+    paddingTop: 14,
+    gap: 12,
+  },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(23,19,15,0.2)", alignSelf: "center" },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  sheetTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sheetTitle: { fontFamily: fontFamilies.display700, fontWeight: "700", fontSize: 20, color: colors.ink, flexShrink: 1 },
+  sheetSub: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  liveDotBox: { width: 9, height: 9 },
+  liveDot: { width: 9, height: 9, borderRadius: 5 },
+  distancePill: {
+    fontFamily: fontFamilies.semiBold,
+    fontWeight: "600",
+    fontSize: 12,
+    color: colors.accentText,
+    backgroundColor: "rgba(239,108,0,0.15)",
+    borderRadius: 99,
+    overflow: "hidden",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  bars: { flexDirection: "row", alignItems: "flex-end", gap: 6, height: BAR_AREA },
+  bar: { flex: 1, borderRadius: 4, overflow: "hidden" },
+
+  // Field day: white sheet under the (shorter) map.
+  fieldSheet: {
     flex: 0.56,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    marginTop: -24,
+    borderTopWidth: 1,
+    borderColor: colors.cardBorder,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -28,
+    paddingTop: 14,
   },
-  fieldPanelContent: { padding: spacing.md, paddingTop: spacing.md + 4, paddingBottom: spacing.xxl, gap: spacing.xs },
-  emptyVisits: { ...typography.body, fontSize: 14, color: colors.textSecondary, marginVertical: spacing.xs },
+  fieldPanelContent: { paddingHorizontal: spacing.gutter, paddingTop: 12, gap: 12 },
+  liveRow: { gap: 4 },
+  logTitle: { ...typography.section, color: colors.ink, marginBottom: 8 },
+  visitCard: { paddingVertical: 4 },
+  emptyVisits: { ...typography.body, fontSize: 14, color: colors.textSecondary, marginVertical: spacing.sm },
   visitRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm + 4,
     paddingVertical: spacing.sm + 2,
   },
-  visitRowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  visitRowDivider: { borderTopWidth: 1, borderTopColor: colors.hairlineSoft },
   visitThumb: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.surfaceMuted },
   visitInfo: { flex: 1 },
-  pendingThumb: { alignItems: "center", justifyContent: "center", backgroundColor: colors.ink },
+  pendingThumb: { alignItems: "center", justifyContent: "center", backgroundColor: colors.primaryMuted },
   pendingRow: { flexDirection: "row", gap: spacing.md, marginTop: 2 },
-  pendingRetry: { ...typography.bodyStrong, fontSize: 12.5, color: colors.primaryDark },
-  visitName: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
-  visitTime: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  pendingRetry: { ...typography.link, fontFamily: fontFamilies.semiBold, fontWeight: "600", color: colors.accentText },
+  visitName: { fontFamily: fontFamilies.semiBold, fontWeight: "600", fontSize: 14, color: colors.ink },
+  visitTime: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
-  addVisitCard: { gap: spacing.sm, marginTop: spacing.sm },
+  addVisitCard: { gap: spacing.sm },
   addVisitButtonRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
   addVisitButtonHalf: { flex: 1 },
   meta: { ...typography.body, fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
@@ -616,8 +854,8 @@ const styles = StyleSheet.create({
     width: 96,
     borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.28)",
-    borderRadius: 16,
+    borderColor: "rgba(239,108,0,0.35)",
+    borderRadius: 18,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
@@ -627,5 +865,5 @@ const styles = StyleSheet.create({
   },
   photoTileReady: { borderStyle: "solid", borderColor: colors.success },
   photoTileImage: { width: 56, height: 56, borderRadius: 99 },
-  photoTileLabel: { fontSize: 9.5, letterSpacing: 0.5, color: colors.textSecondary, textAlign: "center" },
+  photoTileLabel: { fontSize: 10, letterSpacing: 0.8, fontFamily: fontFamilies.semiBold, fontWeight: "600", color: colors.textSecondary, textAlign: "center" },
 });

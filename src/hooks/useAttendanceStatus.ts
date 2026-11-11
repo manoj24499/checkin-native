@@ -14,6 +14,8 @@ export function useAttendanceStatus(employeeCode: string | undefined) {
     },
     enabled: !!employeeCode,
     staleTime: 15_000,
+    // Reopening the app always re-reads the status (the copy kept on the phone can be older than the last check-in).
+    refetchOnMount: "always",
     // Poll so an auto-pause/resume (driven entirely by background location
     // pings, not anything this screen does) shows up without the employee
     // having to background/refocus the app — and so a genuinely checked-in

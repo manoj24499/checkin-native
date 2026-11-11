@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing, typography } from "@/theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { colors, fontFamilies, gradientDirection, gradients, radius, spacing, typography } from "@/theme";
 
 const DAYS_AHEAD = 30;
 
@@ -50,8 +51,19 @@ export function DayChipPicker({ label, value, onChange, disabledBefore, holidayD
               key={day}
               disabled={disabled}
               onPress={() => onChange(day)}
+              accessibilityRole="button"
+              accessibilityState={{ selected, disabled }}
               style={[styles.chip, selected && styles.chipSelected, disabled && styles.chipDisabled]}
             >
+              {selected ? (
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={gradients.orange}
+                  start={gradientDirection.diagonal.start}
+                  end={gradientDirection.diagonal.end}
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : null}
               <Text
                 style={[
                   styles.chipLabel,
@@ -61,7 +73,9 @@ export function DayChipPicker({ label, value, onChange, disabledBefore, holidayD
               >
                 {formatDayLabel(day)}
               </Text>
-              {isHoliday ? <Text style={styles.holidayTag}>Holiday</Text> : null}
+              {isHoliday ? (
+                <Text style={[styles.holidayTag, selected && { color: colors.onOrange }]}>Holiday</Text>
+              ) : null}
             </Pressable>
           );
         })}
@@ -71,22 +85,25 @@ export function DayChipPicker({ label, value, onChange, disabledBefore, holidayD
 }
 
 const styles = StyleSheet.create({
-  label: { ...typography.kicker, color: colors.textSecondary, marginBottom: spacing.sm },
-  row: { flexDirection: "row", gap: 7, paddingVertical: 2 },
-  // Same look as the shared `Chip`: muted fill; selected = lime tint with a 2px ink outline.
+  label: { ...typography.kicker, color: colors.kicker, marginBottom: spacing.sm },
+  row: { flexDirection: "row", gap: 8, paddingVertical: 2 },
+  // Same look as the shared `Chip`: white + hairline border; selected = orange gradient with a dark label.
   chip: {
-    paddingHorizontal: spacing.sm + 5,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "transparent",
-    backgroundColor: colors.surfaceMuted,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.chip,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.surface,
     alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
-  chipSelected: { borderColor: colors.ink, backgroundColor: colors.primaryMuted },
+  chipSelected: { borderColor: "transparent" },
   chipDisabled: { opacity: 0.35 },
-  chipLabel: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary },
-  chipLabelSelected: { color: colors.limeDeep, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  chipLabel: { fontSize: 13, fontWeight: "500", fontFamily: fontFamilies.medium, color: colors.textSecondary },
+  chipLabelSelected: { color: colors.onOrange, fontWeight: "600", fontFamily: fontFamilies.semiBold },
   chipLabelDisabled: { color: colors.textMuted },
-  holidayTag: { fontSize: 9, color: colors.warning, marginTop: 2, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  holidayTag: { fontSize: 9, color: colors.warning, marginTop: 2, fontWeight: "700", fontFamily: fontFamilies.bold },
 });

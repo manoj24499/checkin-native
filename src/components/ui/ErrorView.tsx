@@ -19,7 +19,7 @@ export function ErrorView({ message, onRetry }: { message: string; onRetry?: () 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg },
   icon: { marginBottom: spacing.md },
-  title: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs },
+  title: { ...typography.section, fontSize: 18, color: colors.textPrimary, marginBottom: spacing.xs },
   message: { ...typography.body, color: colors.textSecondary, textAlign: "center" },
   retry: { marginTop: spacing.lg, minWidth: 160 },
 });

@@ -17,6 +17,8 @@ export type DashboardStackParamList = {
   // Field employees' travel reimbursement (distance x rate per month). The
   // entry point (Home's ReimbursementCard) is only shown to FIELD employees.
   Reimbursement: undefined;
+  // Items derived from leave / overtime requests and late arrivals (no feed endpoint).
+  Notifications: undefined;
 };
 
 export type ProfileStackParamList = {

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
@@ -8,8 +8,11 @@ import {
   LoadingView,
   ErrorView,
   Card,
+  AvatarBadge,
   IconButton,
+  Kicker,
   ListRow,
+  Rise,
   SectionHeader,
   type ActionTileProps,
 } from "@/components/ui";
@@ -21,10 +24,11 @@ import {
   OvertimeStatusCard,
   LeaveNoticeCard,
   WorkSegmentCard,
+  HybridSegmentCard,
+  HybridArrivalPrompt,
   FieldVisitCard,
   AssignedPlacesCard,
   LeaveBalanceCard,
-  RecentHistoryCard,
   PendingSyncCard,
   ReimbursementCard,
 } from "@/components/dashboard";
@@ -41,16 +45,19 @@ import {
   useSwitchWorkSegment,
   useFieldSummary,
   useLeaveRequests,
+  useNotifications,
+  useHybridTargets,
 } from "@/hooks";
+import { useHybridPromptStore } from "@/store/hybridPromptStore";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { startLocationTracking } from "@/services/locationTracking";
 import { formatDuration, groupAttendanceByDay } from "@/utils/attendanceGrouping";
-import { getErrorMessage } from "@/utils/errors";
+import { getErrorMessage, isNetworkError } from "@/utils/errors";
 import { formatDistance } from "@/utils/geo";
-import { colors, shadows, spacing, typography } from "@/theme";
+import { colors, spacing, typography } from "@/theme";
 import type { AppTabParamList, DashboardStackParamList } from "@/navigation/types";
 import { useTabBarClearance } from "@/navigation/tabBarClearance";
-import type { WorkSegmentMode } from "@/types";
+import type { HybridPlace, WorkSegmentMode, WorkSegmentSwitchRequest } from "@/types";
 
 type Nav = NativeStackNavigationProp<DashboardStackParamList, "DashboardHome">;
 
@@ -59,29 +66,25 @@ function formatTime(iso: string | null) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatShiftTime(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 const WORK_MODE_LABEL: Record<string, string> = {
   OFFICE: "Office",
   WFH: "Home",
   FIELD: "Anywhere",
+  HYBRID: "Hybrid",
 };
+
+const HYBRID_SEGMENT_LABEL: Record<string, string> = { OFFICE: "Office", HOME: "Home", TRANSIT: "Transit" };
 
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-}
-
-// "HH:mm" shift start/end -> "of 9h" / "of 8h 30m" (overnight shifts wrap).
-function shiftLengthLabel(start: string | null, end: string | null) {
-  if (!start || !end) return undefined;
-  const toMin = (t: string) => {
-    const [h, m] = t.split(":").map(Number);
-    return h * 60 + (m || 0);
-  };
-  const mins = (toMin(end) - toMin(start) + 1440) % 1440;
-  if (!mins || !Number.isFinite(mins)) return undefined;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `of ${h}h${m ? ` ${m}m` : ""}`;
 }
 
 export function DashboardScreen() {
@@ -104,7 +107,16 @@ export function DashboardScreen() {
   const overtimeQuery = useOvertimeStatus(hasActiveSession);
   const todayLeave = useTodayLeave();
   const isFieldWorker = user?.workMode === "FIELD";
-  const segmentQuery = useWorkSegment(hasActiveSession && isFieldWorker);
+  const isHybrid = user?.workMode === "HYBRID";
+  const segmentQuery = useWorkSegment(hasActiveSession && (isFieldWorker || isHybrid));
+  const hybridStatus = isHybrid && statusQuery.data?.exists ? (statusQuery.data.hybrid ?? null) : null;
+  // The polled work-segment is the freshest; status.segment covers its first load.
+  const hybridSegment =
+    isHybrid && hasActiveSession
+      ? (segmentQuery.data ?? (statusQuery.data?.exists ? (statusQuery.data.segment ?? null) : null))
+      : null;
+  const hybridTargets = useHybridTargets(hybridStatus);
+  const departure = useHybridPromptStore((s) => s.departure);
   const switchSegment = useSwitchWorkSegment();
   // Same query (and key) FieldVisitCard already polls while a Field session
   // is open — read here for the hero's distance and visit count.
@@ -112,14 +124,39 @@ export function DashboardScreen() {
   // Same query LeaveBalanceCard / the Requests tab dot use — drives the
   // bell's dot (pending leave requests).
   const leaveQuery = useLeaveRequests();
+  const { unreadCount: unreadNotifications } = useNotifications();
   // A WFH employee who chose Office today (see CheckInOutScreen's Home/
   // Office picker) needs the RANGE stat and PresenceCard geofenced against
   // the office too, not home — same reasoning as LiveMapScreen's identical
   // check.
   const isWfhOfficeDay =
     user?.workMode === "WFH" && statusQuery.data?.exists === true && statusQuery.data.checkInMode === "OFFICE";
-  const target = useResolvedGeofenceTarget(isWfhOfficeDay ? "OFFICE" : undefined);
+  const resolvedTarget = useResolvedGeofenceTarget(isWfhOfficeDay ? "OFFICE" : undefined);
+  // HYBRID: the current place (home during a HOME segment, the destination
+  // while travelling), else the office.
+  const hybridPlaceNow: HybridPlace | null =
+    hybridSegment?.mode === "HOME" || hybridSegment?.mode === "OFFICE"
+      ? hybridSegment.mode
+      : hybridSegment?.mode === "TRANSIT"
+        ? (hybridSegment.heading ?? null)
+        : null;
+  const target = isHybrid
+    ? hybridPlaceNow === "HOME"
+      ? hybridTargets.home
+      : (hybridTargets.office ?? hybridTargets.home)
+    : resolvedTarget;
   const geofence = useGeofence(target);
+
+  // Drop push hints once the segment has moved on (switched, arrived, extended).
+  const segmentMode = hybridSegment?.mode ?? null;
+  const segmentExpired = !!hybridSegment?.transitExpired;
+  useEffect(() => {
+    if (!isHybrid || !segmentQuery.data) return;
+    const store = useHybridPromptStore.getState();
+    const atPlace = segmentMode === "OFFICE" || segmentMode === "HOME";
+    if (store.departure && (!atPlace || store.departure.suggestedHeading === segmentMode)) store.clearDeparture();
+    if (store.transitExpired && !(segmentMode === "TRANSIT" && segmentExpired)) store.clearTransitExpired();
+  }, [isHybrid, segmentQuery.data, segmentMode, segmentExpired]);
   const recentQuery = useRecentAttendance(14);
   const [enablingSharing, setEnablingSharing] = useState(false);
   const [segmentError, setSegmentError] = useState<string | null>(null);
@@ -167,6 +204,11 @@ export function DashboardScreen() {
   const leaveType = status?.exists ? status.leaveType : "NONE";
   const lateMinutes = status?.exists ? status.lateMinutes : null;
   const sessionOpen = checkedIn && !checkedOut;
+  // Right after the app is reopened the status can still be loading (or the copy kept on the phone predates the
+  // check-in), which used to leave the clock at 0 until a second refresh. While the status is being fetched, fall
+  // back to the open check-in in today's history so the clock keeps running from the real check-in time.
+  const provisionalCheckInAt =
+    !sessionOpen && !checkedOut && statusQuery.isFetching ? (activeCheckIn?.timestamp ?? null) : null;
 
   // Whichever of today's timed-permission requests is currently relevant —
   // for display, that's the most recent non-resolved one (a rejected one is
@@ -185,6 +227,10 @@ export function DashboardScreen() {
   const rangeLabel =
     user?.workMode === "FIELD"
       ? "Anywhere"
+      : isHybrid && sessionOpen && segmentMode === "TRANSIT"
+        ? geofence.distanceMeters !== null
+          ? `${formatDistance(geofence.distanceMeters)} to go`
+          : "Travelling"
       : geofence.distanceMeters !== null
         ? formatDistance(geofence.distanceMeters)
         : "—";
@@ -215,12 +261,34 @@ export function DashboardScreen() {
     }
   };
 
-  const initials = (user?.name ?? "?")
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  // HYBRID: switch to TRANSIT, arrive, or extend the transit window.
+  const handleHybridSegment = async (body: WorkSegmentSwitchRequest) => {
+    setSegmentError(null);
+    try {
+      await switchSegment.mutateAsync(body);
+      if ("mode" in body) useHybridPromptStore.getState().clearDeparture();
+    } catch (error) {
+      setSegmentError(
+        isNetworkError(error)
+          ? "You're offline — this needs a connection. Try again when you're back online."
+          : getErrorMessage(error, "Couldn't update your place. Please try again."),
+      );
+    }
+  };
+
+  // HYBRID live worked time leaves travel out: what status counted so far,
+  // plus the time since that fetch while a transit is still open.
+  const statusSegment = statusQuery.data?.exists ? statusQuery.data.segment : null;
+  const hybridTransit =
+    isHybrid && sessionOpen && hybridStatus?.segmentMinutes
+      ? {
+          baseMs: hybridStatus.segmentMinutes.transitMinutes * 60_000,
+          liveSince:
+            statusSegment?.mode === "TRANSIT" && !isPaused && statusQuery.dataUpdatedAt > 0
+              ? statusQuery.dataUpdatedAt
+              : null,
+        }
+      : undefined;
 
   // ---- Hero (PresenceCard) inputs ----
   const showFieldVisit = sessionOpen && isFieldWorker;
@@ -229,17 +297,6 @@ export function DashboardScreen() {
   const fieldDay = status?.exists ? status.checkInMode !== "OFFICE" : true;
   const heroDistance = fieldActive && fieldDay && fieldSummary?.active ? fieldSummary.distanceMeters : null;
   const visitCount = fieldSummary?.active ? fieldSummary.visits.length : 0;
-
-  const heroChips: string[] = [];
-  if (sessionOpen) {
-    if (isFieldWorker) {
-      const seg = segmentQuery.data?.mode === "OFFICE" ? "Office" : "Field";
-      heroChips.push(fieldActive ? `${seg} · ${visitCount} visit${visitCount === 1 ? "" : "s"}` : seg);
-    } else {
-      const mode = WORK_MODE_LABEL[isWfhOfficeDay ? "OFFICE" : user?.workMode ?? "OFFICE"];
-      heroChips.push(geofence.distanceMeters !== null ? `${mode} · ${rangeLabel}` : mode);
-    }
-  }
 
   const heroActions: (ActionTileProps & { key?: string })[] = isFieldWorker
     ? [
@@ -257,16 +314,25 @@ export function DashboardScreen() {
             scrollRef.current?.scrollTo({ y: Math.max(0, fieldVisitY.current - spacing.md), animated: true });
           },
         },
-      ]
-    : [
-        { key: "leave", icon: "calendar", label: "Leave", onPress: () => tabs()?.navigate("Requests", { tab: "leave" }) },
+        { key: "leave", icon: "leave", label: "Leave", onPress: () => tabs()?.navigate("Requests", { tab: "leave" }) },
         {
           key: "permission",
-          icon: "clock",
+          icon: "pause",
           label: "Permission",
           onPress: () => tabs()?.navigate("Requests", { tab: "permission" }),
         },
-        { key: "history", icon: "history", label: "History", onPress: goHistory },
+        { key: "history", icon: "historyClock", label: "History", onPress: goHistory },
+      ]
+    : [
+        { key: "map", icon: "pin", label: "Map", onPress: () => tabs()?.navigate("Map") },
+        { key: "leave", icon: "leave", label: "Leave", onPress: () => tabs()?.navigate("Requests", { tab: "leave" }) },
+        {
+          key: "permission",
+          icon: "pause",
+          label: "Permission",
+          onPress: () => tabs()?.navigate("Requests", { tab: "permission" }),
+        },
+        { key: "history", icon: "historyClock", label: "History", onPress: goHistory },
       ];
 
   // ---- "Today" list ----
@@ -284,12 +350,47 @@ export function DashboardScreen() {
     showPermissionRow ? "permission" : null,
     showOvertimeRow ? "overtime" : null,
   ].filter(Boolean) as string[];
+  // Design: while a session is open, a muted "Check out" placeholder row
+  // shows when the shift ends.
+  const shiftEnd = status?.exists ? status.shiftEndTime : null;
+  const showCheckOutPlaceholder = sessionOpen && !checkOutRecord;
+  if (showCheckOutPlaceholder) todayRows.push("checkOutPending");
   const dividerFor = (key: string) => todayRows.indexOf(key) > 0;
 
-  const pendingLeave = (leaveQuery.data?.requests ?? []).some((r) => r.status === "PENDING");
+  // Hero gauge: the shift scales the arc; a (non-declined) timed permission is drawn on it.
+  const shift = status?.exists ? { start: status.shiftStartTime, end: status.shiftEndTime } : null;
+  const gaugePermission =
+    sessionOpen && currentPermission && currentPermission.status !== "rejected"
+      ? { startTime: currentPermission.startTime, endTime: currentPermission.endTime }
+      : null;
+  // Today's bar in the 7-day chart while the session is still open.
+  const liveToday =
+    sessionOpen && checkInAt && status?.exists
+      ? { checkInAt, pauses: status.pauses, excludeMs: hybridTransit?.baseMs }
+      : null;
 
   return (
     <Screen contentStyle={styles.screenContent} tabBarClearance={false}>
+      {/* Fixed top bar: stays put while the page scrolls underneath. */}
+      <Rise style={styles.fixedHeader}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <AvatarBadge name={user?.name} size={44} pulse />
+            <View style={styles.headerText}>
+              <Kicker style={styles.greetingKicker}>{greeting()}</Kicker>
+              <Text style={styles.greeting} numberOfLines={1}>
+                {user?.name?.split(" ")[0] ?? "there"}
+              </Text>
+            </View>
+          </View>
+          <IconButton
+            icon="bell"
+            onPress={() => navigation.navigate("Notifications")}
+            badge={unreadNotifications > 0}
+            accessibilityLabel={unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : "Notifications"}
+          />
+        </View>
+      </Rise>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.lg + tabClearance }]}
@@ -298,64 +399,70 @@ export function DashboardScreen() {
           <RefreshControl
             refreshing={statusQuery.isRefetching}
             onRefresh={() => statusQuery.refetch()}
-            tintColor={colors.ink}
-            colors={[colors.ink]}
-            progressBackgroundColor={colors.lime}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surface}
           />
         }
       >
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarLabel}>{initials}</Text>
-            </View>
-            <View style={styles.headerText}>
-              <Text style={styles.greetingKicker}>{greeting()}</Text>
-              <Text style={styles.greeting} numberOfLines={1}>
-                {user?.name?.split(" ")[0] ?? "there"}
-              </Text>
-            </View>
-          </View>
-          <IconButton
-            icon="bell"
-            variant="ink"
-            shape="rounded"
-            size={44}
-            badge={pendingLeave}
-            accessibilityLabel="Requests"
-            onPress={() => tabs()?.navigate("Requests", { tab: "leave" })}
+        <Rise delay={100}>
+          <PresenceCard
+            isTracking={isTracking}
+            checkInAt={sessionOpen ? checkInAt : provisionalCheckInAt}
+            isPaused={sessionOpen ? isPaused : false}
+            pauses={sessionOpen && status?.exists ? status.pauses : []}
+            pauseReason={pauseReason}
+            trackingWarning={trackingWarning}
+            onEnableSharing={!isTracking && activeCheckIn ? handleEnableSharing : undefined}
+            enablingSharing={enablingSharing}
+            checkedIn={sessionOpen || !!provisionalCheckInAt}
+            onPrimaryAction={goCheckInOut}
+            pendingSync={!!effective.pendingCheckIn}
+            distanceMeters={heroDistance}
+            shift={shift}
+            permission={gaugePermission}
+            transit={hybridTransit}
+            stats={{
+              inAt: formatTime(checkInAt),
+              mode: isFieldWorker
+                ? segmentQuery.data?.mode === "OFFICE"
+                  ? "Office"
+                  : "Field"
+                : isHybrid && sessionOpen && segmentMode
+                  ? (HYBRID_SEGMENT_LABEL[segmentMode] ?? "Hybrid")
+                  : WORK_MODE_LABEL[isWfhOfficeDay ? "OFFICE" : user?.workMode ?? "OFFICE"],
+              range: rangeLabel,
+              rangeWarn: geofence.withinRadius === false && !(isHybrid && segmentMode === "TRANSIT"),
+            }}
+            actions={heroActions}
           />
-        </View>
+        </Rise>
 
-        <PresenceCard
-          isTracking={isTracking}
-          checkInAt={sessionOpen ? checkInAt : null}
-          isPaused={sessionOpen ? isPaused : false}
-          pauses={sessionOpen && status?.exists ? status.pauses : []}
-          pauseReason={pauseReason}
-          trackingWarning={trackingWarning}
-          onEnableSharing={!isTracking && activeCheckIn ? handleEnableSharing : undefined}
-          enablingSharing={enablingSharing}
-          checkedIn={sessionOpen}
-          onPrimaryAction={goCheckInOut}
-          pendingSync={!!effective.pendingCheckIn}
-          distanceMeters={heroDistance}
-          valueSuffix={status?.exists ? shiftLengthLabel(status.shiftStartTime, status.shiftEndTime) : undefined}
-          chips={heroChips}
-          actions={heroActions}
-        />
+        {sessionOpen && hybridSegment?.mode === "TRANSIT" && hybridSegment.transitExpired && hybridSegment.heading ? (
+          <Rise>
+            <HybridArrivalPrompt
+              heading={hybridSegment.heading}
+              busy={switchSegment.isPending}
+              onArrived={() => {
+                if (hybridSegment.heading) void handleHybridSegment({ mode: hybridSegment.heading });
+              }}
+              onStillTravelling={() => void handleHybridSegment({ extend: true })}
+            />
+          </Rise>
+        ) : null}
 
-        {!checkedIn && todayLeave ? <LeaveNoticeCard type={todayLeave.type} /> : null}
-
-        {isFieldWorker ? <ReimbursementCard /> : null}
+        {!checkedIn && todayLeave ? (
+          <Rise delay={200}>
+            <LeaveNoticeCard type={todayLeave.type} />
+          </Rise>
+        ) : null}
 
         {todayRows.length > 0 ? (
-          <>
-            <SectionHeader title="Today" onAction={goHistory} />
+          <Rise delay={250}>
             <Card style={styles.listCard}>
+              <SectionHeader title="Today" actionLabel="History" onAction={goHistory} style={styles.listHeader} />
               {checkInAt ? (
                 <ListRow
-                  icon="arrowDownLeft"
                   title="Checked in"
                   subtitle={`Today · ${formatTime(checkInAt)}`}
                   value={checkInValue}
@@ -365,12 +472,21 @@ export function DashboardScreen() {
               ) : null}
               {checkOutRecord ? (
                 <ListRow
-                  icon="arrowUpRight"
                   title="Checked out"
                   subtitle={`Today · ${formatTime(checkOutRecord.timestamp)}`}
                   value={todaySummary?.durationMs != null ? formatDuration(todaySummary.durationMs) : undefined}
                   valueSub={todaySummary?.durationMs != null ? "worked" : undefined}
                   divider={dividerFor("checkOut")}
+                />
+              ) : null}
+              {showCheckOutPlaceholder ? (
+                <ListRow
+                  muted
+                  title="Check out"
+                  subtitle={shiftEnd ? `Shift ends ${formatShiftTime(shiftEnd)}` : "Not yet"}
+                  value="—"
+                  valueTone="muted"
+                  divider={dividerFor("checkOutPending")}
                 />
               ) : null}
               {showPermissionRow && currentPermission ? (
@@ -380,56 +496,74 @@ export function DashboardScreen() {
                 <OvertimeStatusCard request={currentOvertime} asRow divider={dividerFor("overtime")} />
               ) : null}
             </Card>
-          </>
+          </Rise>
         ) : null}
 
-        {sessionOpen && isFieldWorker && segmentQuery.data?.mode ? (
-          <>
+        {sessionOpen && isFieldWorker && (segmentQuery.data?.mode === "OFFICE" || segmentQuery.data?.mode === "FIELD") ? (
+          <Rise delay={300}>
             <WorkSegmentCard
               mode={segmentQuery.data.mode}
               onSwitch={handleSwitchSegment}
               switching={switchSegment.isPending}
             />
             {segmentError ? <Text style={styles.segmentError}>{segmentError}</Text> : null}
-          </>
+          </Rise>
         ) : null}
 
-        {isFieldWorker ? <AssignedPlacesCard onOpen={() => navigation.navigate("TodaysPlaces")} /> : null}
+        {sessionOpen && isHybrid && hybridSegment?.mode && hybridSegment.mode !== "FIELD" ? (
+          <Rise delay={300}>
+            <HybridSegmentCard
+              segment={hybridSegment}
+              segmentMinutes={hybridStatus?.segmentMinutes ?? null}
+              isTracking={isTracking}
+              suggestedHeading={departure?.suggestedHeading ?? null}
+              onDismissSuggestion={() => useHybridPromptStore.getState().clearDeparture()}
+              onSwitch={(heading) => void handleHybridSegment({ mode: "TRANSIT", heading })}
+              onArrive={(place) => void handleHybridSegment({ mode: place })}
+              busy={switchSegment.isPending}
+              error={segmentError}
+            />
+          </Rise>
+        ) : null}
+
+        {isFieldWorker ? (
+          <Rise delay={300}>
+            <AssignedPlacesCard onOpen={() => navigation.navigate("TodaysPlaces")} />
+          </Rise>
+        ) : null}
 
         {showFieldVisit ? (
+          // onLayout on the outer View: its y is relative to the scroll content (the hero's "Visit" tile scrolls here).
           <View onLayout={(e) => (fieldVisitY.current = e.nativeEvent.layout.y)}>
-            <FieldVisitCard openSignal={visitSignal} />
+            <Rise delay={300}>
+              <FieldVisitCard openSignal={visitSignal} />
+            </Rise>
           </View>
         ) : null}
 
         <PendingSyncCard employeeCode={user?.employeeCode} />
 
-        <View style={styles.statGrid}>
-          <View style={styles.statCell}>
-            <Text style={styles.statLabel}>IN AT</Text>
-            <Text style={styles.statValue}>{formatTime(checkInAt)}</Text>
-          </View>
-          <View style={[styles.statCell, styles.statCellMiddle]}>
-            <Text style={styles.statLabel}>MODE</Text>
-            <Text style={styles.statValue}>{WORK_MODE_LABEL[user?.workMode ?? "OFFICE"]}</Text>
-          </View>
-          <View style={styles.statCell}>
-            <Text style={styles.statLabel}>RANGE</Text>
-            <Text style={[styles.statValue, geofence.withinRadius === false && styles.statValueWarn]}>
-              {rangeLabel}
-            </Text>
-          </View>
-        </View>
+        {leaveType !== "NONE" ? (
+          <Rise delay={300}>
+            <LateNoticeCard leaveType={leaveType} lateMinutes={lateMinutes} />
+          </Rise>
+        ) : null}
 
-        {leaveType !== "NONE" ? <LateNoticeCard leaveType={leaveType} lateMinutes={lateMinutes} /> : null}
+        <Rise delay={350}>
+          <Card>
+            <WeeklyHoursChart days={daySummaries} liveToday={liveToday} />
+          </Card>
+        </Rise>
 
-        <Card style={styles.weeklyCard}>
-          <WeeklyHoursChart days={daySummaries} />
-        </Card>
+        <Rise delay={450}>
+          <LeaveBalanceCard onPress={() => tabs()?.navigate("Requests", { tab: "leave" })} />
+        </Rise>
 
-        <RecentHistoryCard days={daySummaries} onSeeAll={goHistory} />
-
-        <LeaveBalanceCard onPress={() => tabs()?.navigate("Requests", { tab: "leave" })} />
+        {isFieldWorker ? (
+          <Rise delay={500}>
+            <ReimbursementCard />
+          </Rise>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -437,36 +571,14 @@ export function DashboardScreen() {
 
 const styles = StyleSheet.create({
   screenContent: { padding: 0 },
-  scrollContent: { flexGrow: 1, padding: spacing.md, paddingBottom: spacing.lg },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xs },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 2, flex: 1, minWidth: 0 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: spacing.gutter, paddingTop: spacing.sm, gap: spacing.md },
+  fixedHeader: { paddingHorizontal: spacing.gutter, paddingTop: 12, paddingBottom: spacing.sm },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
   headerText: { flex: 1, minWidth: 0 },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarLabel: { ...typography.bodyStrong, fontSize: 14, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.lime },
-  greetingKicker: { ...typography.caption, fontSize: 12, color: colors.textSecondary },
-  greeting: { ...typography.section, color: colors.ink },
-  listCard: { paddingVertical: spacing.xs + 2, paddingHorizontal: spacing.md - 2 },
-  statGrid: {
-    flexDirection: "row",
-    marginTop: spacing.sm + 4,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    ...shadows.soft,
-  },
-  statCell: { flex: 1, paddingVertical: spacing.sm + 3, paddingHorizontal: spacing.sm + 4 },
-  statCellMiddle: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border },
-  statLabel: { fontSize: 9, letterSpacing: 1.4, color: colors.textMuted, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  statValue: { ...typography.number, fontSize: 14, color: colors.ink, marginTop: spacing.xs },
-  statValueWarn: { color: colors.danger },
-  weeklyCard: { marginTop: spacing.sm + 4 },
+  greetingKicker: { marginBottom: 0 },
+  greeting: { ...typography.h2, lineHeight: 28, color: colors.ink },
+  listCard: { paddingVertical: 6, paddingHorizontal: 16 },
+  listHeader: { marginTop: 0, marginBottom: 0, marginHorizontal: 0, paddingTop: 10, paddingBottom: 2 },
   segmentError: { ...typography.caption, color: colors.danger, marginTop: spacing.xs },
 });

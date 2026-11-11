@@ -13,7 +13,7 @@ interface EmptyStateProps {
 export function EmptyState({ title, message, icon }: EmptyStateProps) {
   return (
     <View style={styles.container}>
-      {icon ? <IconTile icon={icon} tone="muted" size={48} style={styles.icon} /> : null}
+      {icon ? <IconTile icon={icon} tone="lime" size={52} radius={26} style={styles.icon} /> : null}
       <Text style={styles.title}>{title}</Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
     </View>
@@ -23,6 +23,6 @@ export function EmptyState({ title, message, icon }: EmptyStateProps) {
 const styles = StyleSheet.create({
   container: { alignItems: "center", justifyContent: "center", padding: spacing.xl },
   icon: { marginBottom: spacing.md },
-  title: { ...typography.bodyStrong, color: colors.textPrimary, marginBottom: spacing.xs, textAlign: "center" },
+  title: { ...typography.section, color: colors.textPrimary, marginBottom: spacing.xs, textAlign: "center" },
   message: { ...typography.body, fontSize: 14, color: colors.textSecondary, textAlign: "center" },
 });

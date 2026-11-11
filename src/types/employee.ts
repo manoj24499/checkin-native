@@ -1,6 +1,8 @@
 export type Role = "ADMIN" | "EMPLOYEE";
 // FIELD employees are never geofenced — they can check in from anywhere.
-export type WorkMode = "OFFICE" | "WFH" | "FIELD";
+// HYBRID employees split the day between the office and home (with TRANSIT
+// segments in between) — geofenced against whichever of the two they're at.
+export type WorkMode = "OFFICE" | "WFH" | "FIELD" | "HYBRID";
 
 export interface EmployeeSummary {
   id: string;

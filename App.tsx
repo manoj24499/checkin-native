@@ -7,6 +7,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
+import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk";
 import { AppProviders } from "@/providers/AppProviders";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -35,6 +36,9 @@ export default function App() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    // Display face for headings, timers and stat values (theme fontFamilies.display500/display700).
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_700Bold,
   });
 
   useEffect(() => {

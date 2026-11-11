@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Chip } from "@/components/ui";
 import { colors, spacing, typography } from "@/theme";
 
 // "HH:mm", 24-hour, matching Shift.startTime/endTime's format on the backend.
@@ -31,6 +32,7 @@ interface TimeSlotPickerProps {
   disabledAtOrBefore?: string | null;
 }
 
+/** Horizontal row of time-slot chips (kit `Chip`: selected = orange gradient, dark label). */
 export function TimeSlotPicker({ label, value, onChange, disabledAtOrBefore }: TimeSlotPickerProps) {
   return (
     <View>
@@ -38,24 +40,14 @@ export function TimeSlotPicker({ label, value, onChange, disabledAtOrBefore }: T
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {SLOTS.map((slot) => {
           const disabled = !!disabledAtOrBefore && slot <= disabledAtOrBefore;
-          const selected = slot === value;
           return (
-            <Pressable
+            <Chip
               key={slot}
+              label={formatSlotLabel(slot)}
+              selected={slot === value}
               disabled={disabled}
               onPress={() => onChange(slot)}
-              style={[styles.chip, selected && styles.chipSelected, disabled && styles.chipDisabled]}
-            >
-              <Text
-                style={[
-                  styles.chipLabel,
-                  selected && styles.chipLabelSelected,
-                  disabled && styles.chipLabelDisabled,
-                ]}
-              >
-                {formatSlotLabel(slot)}
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </ScrollView>
@@ -64,19 +56,6 @@ export function TimeSlotPicker({ label, value, onChange, disabledAtOrBefore }: T
 }
 
 const styles = StyleSheet.create({
-  label: { ...typography.kicker, fontSize: 10, color: colors.textSecondary, marginBottom: spacing.sm },
-  row: { flexDirection: "row", gap: spacing.xs + 2, paddingVertical: 2 },
-  chip: {
-    paddingHorizontal: spacing.sm + 4,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "transparent",
-    backgroundColor: colors.surfaceMuted,
-  },
-  chipSelected: { borderColor: colors.ink, backgroundColor: colors.primaryMuted },
-  chipDisabled: { opacity: 0.35 },
-  chipLabel: { ...typography.bodyStrong, fontSize: 12.5, color: colors.textSecondary },
-  chipLabelSelected: { color: colors.limeDeep },
-  chipLabelDisabled: { color: colors.textMuted },
+  label: { ...typography.kicker, color: colors.kicker, marginBottom: spacing.sm },
+  row: { flexDirection: "row", gap: spacing.sm - 2, paddingVertical: 2 },
 });

@@ -39,7 +39,7 @@ export function OvertimeStatusCard({ request, asRow, divider }: OvertimeStatusCa
   const subline = `Until ~${formatTime(request.estimatedEndAt)} — ${request.reason}`;
 
   if (asRow) {
-    return <ListRow icon="history" title="Overtime" subtitle={subline} trailing={badge} divider={divider} />;
+    return <ListRow title="Overtime" subtitle={subline} trailing={badge} divider={divider} />;
   }
 
   return (

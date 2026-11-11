@@ -1,7 +1,6 @@
 import { View } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { LiveMapScreen } from "@/screens/map/LiveMapScreen";
-import { colors } from "@/theme";
 
 /**
  * The `Map` tab: the exact same LiveMapScreen that Home opens as the
@@ -19,6 +18,7 @@ import { colors } from "@/theme";
  */
 export function MapTabScreen() {
   const focused = useIsFocused();
-  if (!focused) return <View style={{ flex: 1, backgroundColor: colors.panelDark }} />;
+  // Same light "map paper" colour as LiveMapScreen's backdrop, so switching tabs doesn't flash black.
+  if (!focused) return <View style={{ flex: 1, backgroundColor: "#E9E4DC" }} />;
   return <LiveMapScreen />;
 }

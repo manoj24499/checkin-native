@@ -1,6 +1,7 @@
-import { StyleSheet } from "react-native";
-import { TextField } from "@/components/ui";
-import { spacing } from "@/theme";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Icon, TextField } from "@/components/ui";
+import { colors, radius, spacing } from "@/theme";
 
 export interface VisitFormValues {
   name: string;
@@ -38,6 +39,8 @@ export function VisitFormFields({
   onChange: (next: VisitFormValues) => void;
 }) {
   const set = (key: keyof VisitFormValues) => (text: string) => onChange({ ...values, [key]: text });
+  const [moreOpen, setMoreOpen] = useState(false);
+  const showMore = moreOpen || !!(values.contactName || values.contactPhone || values.contactEmail);
   return (
     <>
       <TextField label="LOCATION NAME" placeholder="e.g. Sri Balaji Traders" value={values.name} onChangeText={set("name")} />
@@ -52,8 +55,21 @@ export function VisitFormFields({
         textAlignVertical="top"
         style={styles.multiline}
       />
+      <Pressable
+        onPress={() => setMoreOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showMore }}
+        style={styles.moreToggle}
+      >
+        <Text style={styles.moreLabel}>Contact details (optional)</Text>
+        <View style={{ transform: [{ rotate: showMore ? "180deg" : "0deg" }] }}>
+          <Icon name="chevronDown" size={18} color={colors.textSecondary} />
+        </View>
+      </Pressable>
+      {showMore ? (
+        <>
       <TextField
-        label="CONTACT PERSON (OPTIONAL)"
+        label="CONTACT PERSON"
         placeholder="Name of the person you met"
         value={values.contactName}
         onChangeText={set("contactName")}
@@ -61,7 +77,7 @@ export function VisitFormFields({
         maxLength={120}
       />
       <TextField
-        label="PHONE NUMBER (OPTIONAL)"
+        label="PHONE NUMBER"
         placeholder="e.g. 98765 43210"
         value={values.contactPhone}
         onChangeText={(t) => set("contactPhone")(t.replace(/[^0-9+\-\s()]/g, ""))}
@@ -69,7 +85,7 @@ export function VisitFormFields({
         maxLength={30}
       />
       <TextField
-        label="EMAIL ID (OPTIONAL)"
+        label="EMAIL ID"
         placeholder="name@company.com"
         value={values.contactEmail}
         onChangeText={set("contactEmail")}
@@ -78,6 +94,8 @@ export function VisitFormFields({
         autoCorrect={false}
         maxLength={160}
       />
+        </>
+      ) : null}
       <TextField
         label="REMARKS (OPTIONAL)"
         placeholder="Anything else worth noting"
@@ -107,5 +125,17 @@ export function visitFormToPayload(v: VisitFormValues) {
 }
 
 const styles = StyleSheet.create({
+  moreToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 48,
+    paddingHorizontal: 12,
+    borderRadius: radius.input,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.surface,
+  },
+  moreLabel: { fontSize: 15, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.ink },
   multiline: { minHeight: 76, marginBottom: spacing.xs },
 });

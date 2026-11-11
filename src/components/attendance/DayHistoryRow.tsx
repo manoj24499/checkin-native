@@ -65,6 +65,11 @@ export function DayHistoryRow({ day, divider }: DayHistoryRowProps) {
           <View style={[styles.fill, { left: `${leftPct}%`, width: `${widthPct}%` }]} />
         </View>
         {day.outsideMs ? <Text style={styles.outside}>Outside: {formatDuration(day.outsideMs)}</Text> : null}
+        {day.hybridSplit ? (
+          <Text style={styles.split} numberOfLines={1}>
+            {`Office ${formatDuration(day.hybridSplit.officeMs)} · Home ${formatDuration(day.hybridSplit.homeMs)} · Transit ${formatDuration(day.hybridSplit.transitMs)}`}
+          </Text>
+        ) : null}
       </View>
       <StatusBadge label={method} tone="primary" />
     </View>
@@ -78,8 +83,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm + 4,
     paddingVertical: spacing.sm + 3,
   },
-  dividerBottom: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  dividerTop: { borderTopWidth: 1, borderTopColor: colors.border },
+  dividerBottom: { borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },
+  dividerTop: { borderTopWidth: 1, borderTopColor: colors.hairlineSoft },
   dateCol: { width: 36, alignItems: "center" },
   dayNum: { ...typography.number, fontSize: 17, color: colors.ink },
   dow: { fontSize: 9.5, letterSpacing: 1, color: colors.textMuted, marginTop: 2, fontWeight: "600" },
@@ -95,5 +100,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   outside: { fontSize: 11, color: colors.warning, marginTop: spacing.xs },
+  split: { fontSize: 11, color: colors.textSecondary, marginTop: spacing.xs, fontVariant: ["tabular-nums"] },
   fill: { position: "absolute", top: 0, bottom: 0, borderRadius: 99, backgroundColor: colors.ink },
 });

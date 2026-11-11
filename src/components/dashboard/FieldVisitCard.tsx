@@ -108,7 +108,6 @@ export function FieldVisitCard({ openSignal }: { openSignal?: number } = {}) {
 
       {expanded ? (
         <View style={styles.form}>
-          <VisitFormFields values={form} onChange={setForm} />
           <Pressable
             onPress={() => setCapturing(true)}
             style={[styles.photoTile, photo && styles.photoTileFilled]}
@@ -116,25 +115,25 @@ export function FieldVisitCard({ openSignal }: { openSignal?: number } = {}) {
             {photo ? (
               <Image source={{ uri: photo }} style={styles.photoThumb} />
             ) : (
-              <IconTile icon="camera" tone="white" size={44} />
+              <IconTile icon="camera" tone="lime" size={52} radius={26} />
             )}
-            <View style={styles.photoText}>
-              <Text style={styles.photoTileLabel}>{photo ? "Photo attached" : "Add a photo"}</Text>
-              <Text style={styles.photoTileHint}>
-                {photo ? "Tap to retake" : "One shot of the place — required"}
-              </Text>
-            </View>
+            <Text style={[styles.photoTileLabel, photo && styles.photoTileLabelDone]}>
+              {photo ? "Photo attached" : "Add a photo"}
+            </Text>
+            <Text style={styles.photoTileHint}>
+              {photo ? "Tap to retake" : "One shot of the place — required"}
+            </Text>
           </Pressable>
+          <VisitFormFields values={form} onChange={setForm} />
           {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
           <View style={styles.formActions}>
-            <Button label="Cancel" variant="ghost" size="sm" onPress={reset} />
+            <Button label="Cancel" variant="secondary" onPress={reset} style={styles.cancelButton} />
             <Button
               label="Save visit"
-              size="sm"
               onPress={handleSubmit}
               disabled={!canSubmit}
               loading={locating}
-              style={styles.submitButton}
+              style={styles.cancelButton}
             />
           </View>
         </View>
@@ -142,8 +141,6 @@ export function FieldVisitCard({ openSignal }: { openSignal?: number } = {}) {
         <Button
           label="Log a visit"
           icon="plus"
-          variant="secondary"
-          size="sm"
           onPress={() => setExpanded(true)}
           style={styles.logButton}
         />
@@ -204,43 +201,44 @@ export function FieldVisitCard({ openSignal }: { openSignal?: number } = {}) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: spacing.sm + 4 },
+  card: {},
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   kicker: { marginBottom: 0, flexShrink: 1 },
   distance: { ...typography.caption, color: colors.textSecondary, fontSize: 12 },
-  blurb: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  blurb: { ...typography.caption, fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, marginTop: spacing.sm },
   logButton: { marginTop: spacing.sm + 4 },
   form: { marginTop: spacing.sm + 4, gap: spacing.sm },
   photoTile: {
-    flexDirection: "row",
+    height: 168,
     alignItems: "center",
-    gap: spacing.sm + 4,
+    justifyContent: "center",
+    gap: 8,
     borderRadius: radius.tile,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1.5,
+    backgroundColor: "rgba(239,108,0,0.06)",
+    borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.28)",
-    padding: spacing.sm + 2,
+    borderColor: "rgba(239,108,0,0.45)",
+    overflow: "hidden",
   },
-  photoTileFilled: { borderStyle: "solid", borderColor: colors.ink, backgroundColor: colors.primaryMuted },
-  photoThumb: { width: 44, height: 44, borderRadius: 14 },
-  photoText: { flex: 1 },
-  photoTileLabel: { ...typography.bodyStrong, fontSize: 13.5, color: colors.ink },
-  photoTileHint: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  photoTileFilled: { borderStyle: "solid", borderColor: "rgba(30,122,77,0.35)", backgroundColor: colors.successMuted },
+  photoThumb: { width: 96, height: 72, borderRadius: radius.md },
+  photoTileLabel: { ...typography.cardTitle, color: colors.ink },
+  photoTileLabelDone: { color: colors.success },
+  photoTileHint: { fontSize: 13, color: colors.textSecondary },
   errorText: { ...typography.caption, color: colors.danger },
-  formActions: { flexDirection: "row", gap: spacing.sm, justifyContent: "flex-end", alignItems: "center" },
-  submitButton: { minWidth: 120 },
+  formActions: { flexDirection: "row", gap: 8 },
+  cancelButton: { flex: 1 },
   visitList: { marginTop: spacing.sm + 2 },
   savingTile: {
     width: 38,
     height: 38,
-    borderRadius: 12,
+    borderRadius: 13,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
   },
   visitDescription: { ...typography.caption, color: colors.textSecondary, fontSize: 12, marginTop: 1 },
   pendingActions: { gap: spacing.xs, alignItems: "flex-end" },
-  pendingRetry: { ...typography.bodyStrong, fontSize: 12.5, color: colors.primaryDark },
+  pendingRetry: { ...typography.link, fontSize: 12.5, color: colors.accentText },
   pendingRemove: { ...typography.caption, fontSize: 12, color: colors.textMuted },
 });

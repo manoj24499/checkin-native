@@ -21,7 +21,7 @@ export function LoadingView({ label = "Loading…", animated = false, fullScreen
   const content = (
     <View style={styles.container}>
       <LogoMark animated={animated} size={40} barColor={colors.ink} />
-      <ActivityIndicator color={colors.ink} size="large" style={styles.spinner} />
+      <ActivityIndicator color={colors.primary} size="large" style={styles.spinner} />
       <Text style={styles.label}>{label}</Text>
     </View>
   );

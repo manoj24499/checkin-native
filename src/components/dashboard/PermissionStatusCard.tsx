@@ -38,7 +38,7 @@ export function PermissionStatusCard({ permission, asRow, divider }: PermissionS
   const range = `${formatTime(permission.startTime)} – ${formatTime(permission.endTime)}`;
 
   if (asRow) {
-    return <ListRow icon="clock" title="Timed permission" subtitle={range} trailing={badge} divider={divider} />;
+    return <ListRow title="Timed permission" subtitle={range} trailing={badge} divider={divider} />;
   }
 
   return (

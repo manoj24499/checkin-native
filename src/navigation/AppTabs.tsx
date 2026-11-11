@@ -1,25 +1,27 @@
 import { useEffect, useState } from "react";
-import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Keyboard, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { createBottomTabNavigator, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { DashboardNavigator } from "./DashboardNavigator";
 import { MapTabScreen } from "./MapTabScreen";
 import { CheckInOutScreen } from "@/screens/checkin/CheckInOutScreen";
 import { RequestsScreen } from "@/screens/requests/RequestsScreen";
 import { ProfileNavigator } from "./ProfileNavigator";
-import { Icon, type IconName } from "@/components/ui";
+import { Icon, loopEasing, useLoop, type IconName } from "@/components/ui";
 import { useLeaveRequests } from "@/hooks";
-import { colors, shadows } from "@/theme";
+import { colors, fontFamilies, gradientDirection, gradients, motion, shadows } from "@/theme";
 import type { AppTabParamList } from "./types";
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
 
-const ICON_SIZE = 21;
-const ICON_STROKE_WIDTH = 1.75;
-const BAR_HEIGHT = 66;
+const ICON_SIZE = 22;
+const ICON_STROKE_WIDTH = 1.8;
+const BAR_HEIGHT = 68;
+/** Gap between the bar and the screen bottom when there's no (or a small) safe-area inset (mockup: 22). */
+const TAB_BAR_BOTTOM_GAP = 22;
+const CENTRE_SIZE = 52;
 
 // Full-screen flows where the bar would only get in the way (mockup: no tab
 // bar on turn-by-turn navigation).
@@ -28,11 +30,19 @@ const HIDE_BAR_ON: string[] = ["Navigate"];
 type TabRouteName = keyof AppTabParamList;
 
 const TAB_ICONS: Record<TabRouteName, IconName> = {
-  CheckIn: "check",
+  CheckIn: "clock",
   Dashboard: "home",
   Map: "pin",
-  Requests: "requests",
-  Profile: "profile",
+  Requests: "doc",
+  Profile: "person",
+};
+
+/** Short labels under the icons (route titles can be longer, e.g. "Check In/Out"). */
+const TAB_LABELS: Partial<Record<TabRouteName, string>> = {
+  Dashboard: "Home",
+  Map: "Map",
+  Requests: "Requests",
+  Profile: "Profile",
 };
 
 function useAndroidKeyboardVisible() {
@@ -57,18 +67,50 @@ function RequestsIcon({ color }: { color: string }) {
   const hasPending = (query.data?.requests ?? []).some((r) => r.status === "PENDING");
   return (
     <View>
-      <Icon name="requests" size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
+      <Icon name="doc" size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
       {hasPending ? <View style={styles.pendingDot} /> : null}
     </View>
   );
 }
 
 /**
- * Floating "liquid glass" tab bar: a blurred, translucent pill hovering above the screens with a soft
- * specular highlight along its top edge. The active tab expands into an orange pill showing its label; the
- * rest are icon-only. It is absolutely positioned (screens scroll underneath it), so screens add
- * `useTabBarClearance()` of bottom padding. Tab press/long-press events are emitted exactly like the stock
- * bar, so nested stacks still pop-to-top when their tab is re-pressed.
+ * Centre check-in/out button: 52px orange-gradient circle with a dark clock glyph and a "breathe" halo (a soft
+ * orange disc behind it that swells ~12px and fades, 2.4s loop; static under reduced motion).
+ */
+function CentreButton() {
+  const t = useLoop({ duration: motion.breatheDuration, pingPong: true, easing: loopEasing.easeOut });
+  return (
+    <View style={styles.centreWrap}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.breathe,
+          {
+            opacity: t.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
+            transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [1, (CENTRE_SIZE + 24) / CENTRE_SIZE] }) }],
+          },
+        ]}
+      />
+      <View style={styles.centre}>
+        <LinearGradient
+          pointerEvents="none"
+          colors={gradients.orange}
+          start={gradientDirection.diagonal.start}
+          end={gradientDirection.diagonal.end}
+          style={StyleSheet.absoluteFill}
+        />
+        <Icon name={TAB_ICONS.CheckIn} size={24} color={colors.onOrange} strokeWidth={1.9} />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Floating tab bar (Main.dc.html `.nav`): a 96%-white pill, 68 high, 16 from the sides and ~22 from the
+ * bottom, hairline border. Five slots with icon + 10px label (inactive #6B635C, active #B34D05); the centre
+ * slot is the gradient check-in button with a breathe halo. It is absolutely positioned (screens scroll
+ * underneath it), so screens add `useTabBarClearance()` of bottom padding. Tab press/long-press events are
+ * emitted exactly like the stock bar, so nested stacks still pop-to-top when their tab is re-pressed.
  */
 function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -82,30 +124,30 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
   // Same contract as the stock tab bar: emit tabPress (lets a focused nested stack pop to top), then
   // navigate unless already focused or prevented.
-  const pressTab = (key: string, name: string, params: object | undefined, focused: boolean) => {
+  const pressTab = (key: string, name: string, _params: object | undefined, focused: boolean) => {
     const event = navigation.emit({ type: "tabPress", target: key, canPreventDefault: true });
-    if (!focused && !event.defaultPrevented) navigation.navigate(name, params);
+    if (focused || event.defaultPrevented) return;
+    // Never replay the route's stale params (a Home shortcut leaves { screen: "History" } on the Profile
+    // tab); tapping the Profile tab itself always lands on the profile root.
+    if (name === "Profile") navigation.navigate(name, { screen: "ProfileHome" });
+    else navigation.navigate(name);
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 10) + 4 }]}>
+    <View
+      pointerEvents="box-none"
+      style={[styles.outer, { paddingBottom: Math.max(TAB_BAR_BOTTOM_GAP, insets.bottom + 6) }]}
+    >
       <View style={styles.bar}>
-        <BlurView intensity={60} tint="dark" experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tint]} />
-        <LinearGradient
-          pointerEvents="none"
-          colors={["rgba(255,255,255,0.22)", "rgba(255,255,255,0.03)", "rgba(255,255,255,0.08)"]}
-          locations={[0, 0.55, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View pointerEvents="none" style={styles.edgeLight} />
         <View style={styles.row}>
           {state.routes.map((route, index) => {
             const name = route.name as TabRouteName;
             const { options } = descriptors[route.key];
             const focused = state.index === index;
             const label = options.title ?? route.name;
-            const color = focused ? colors.onAccent : "rgba(255,255,255,0.78)";
+            const shortLabel = TAB_LABELS[name] ?? label;
+            const isCentre = name === "CheckIn";
+            const color = focused ? colors.accentText : colors.textSecondary;
             return (
               <Pressable
                 key={route.key}
@@ -114,20 +156,22 @@ function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: focused }}
                 accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-                style={[styles.slot, { flex: focused ? 2.15 : 1 }]}
+                style={styles.slot}
               >
-                <View style={[styles.item, focused ? styles.itemActive : styles.itemIdle]}>
-                  {name === "Requests" ? (
-                    <RequestsIcon color={color} />
-                  ) : (
-                    <Icon name={TAB_ICONS[name]} size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
-                  )}
-                  {focused ? (
-                    <Text style={styles.label} numberOfLines={1}>
-                      {label}
+                {isCentre ? (
+                  <CentreButton />
+                ) : (
+                  <View style={styles.item}>
+                    {name === "Requests" ? (
+                      <RequestsIcon color={color} />
+                    ) : (
+                      <Icon name={TAB_ICONS[name]} size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
+                    )}
+                    <Text style={[styles.label, { color }]} numberOfLines={1}>
+                      {shortLabel}
                     </Text>
-                  ) : null}
-                </View>
+                  </View>
+                )}
               </Pressable>
             );
           })}
@@ -160,42 +204,41 @@ const styles = StyleSheet.create({
   bar: {
     height: BAR_HEIGHT,
     borderRadius: BAR_HEIGHT / 2,
-    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(20,20,20,0.55)",
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.limePale,
     ...shadows.tabBar,
   },
-  tint: { backgroundColor: "rgba(34,34,34,0.38)" },
-  // Thin bright line along the top edge: the "glass catches the light" cue.
-  edgeLight: { position: "absolute", top: 0, left: 22, right: 22, height: 1, backgroundColor: "rgba(255,255,255,0.4)" },
   row: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 8 },
-  slot: { alignItems: "center", justifyContent: "center" },
-  item: { height: 48, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
-  itemIdle: { width: 48, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.07)" },
-  itemActive: {
-    alignSelf: "stretch",
-    marginHorizontal: 2,
-    borderRadius: 24,
-    backgroundColor: colors.limeStrong,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
-    shadowColor: colors.limeStrong,
-    shadowOpacity: 0.55,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+  slot: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
+  item: { alignItems: "center", justifyContent: "center", gap: 3 },
+  label: { fontSize: 10, fontWeight: "500", fontFamily: fontFamilies.medium },
+  centreWrap: { width: CENTRE_SIZE, height: CENTRE_SIZE, alignItems: "center", justifyContent: "center" },
+  breathe: {
+    position: "absolute",
+    width: CENTRE_SIZE,
+    height: CENTRE_SIZE,
+    borderRadius: CENTRE_SIZE / 2,
+    backgroundColor: "#FF8A2B",
   },
-  label: { fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold", color: colors.onAccent, flexShrink: 1 },
+  centre: {
+    width: CENTRE_SIZE,
+    height: CENTRE_SIZE,
+    borderRadius: CENTRE_SIZE / 2,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   pendingDot: {
     position: "absolute",
     top: -2,
     right: -3,
-    width: 8,
-    height: 8,
-    borderRadius: 99,
-    backgroundColor: colors.ink,
-    borderWidth: 1.5,
-    borderColor: "#262626",
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.pulse,
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
 });

@@ -62,6 +62,18 @@ const ICONS = {
   map: [p("M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"), p("M9 4v14M15 6v14")],
   send: [p("M21 3L10 14M21 3l-7 18-4-7-7-4z")],
   trash: [p("M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3")],
+  // ---- Redesign 2 (Main.dc.html) ----
+  /** Requests tab: document with lines. */
+  doc: [p("M6 3h9l4 4v14H6z"), p("M9 12h7M9 16h5")],
+  /** Permission quick tile: circle with pause bars. */
+  pause: [c(12, 12, 9), p("M10 9v6M14 9v6")],
+  /** History quick tile: counter-clockwise clock. */
+  historyClock: [p("M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2")],
+  /** Leave quick tile: calendar. */
+  leave: [r(4, 5, 16, 15, 2), p("M4 10h16M9 3v4M15 3v4")],
+  /** Profile tab (mockup proportions). */
+  person: [c(12, 8, 4), p("M4 21c0-4 4-6 8-6s8 2 8 6")],
+  chevronLeft: [p("M15 5l-7 7 7 7")],
 } satisfies Record<string, Shape[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -95,10 +95,10 @@ export function PendingSyncCard({ employeeCode }: { employeeCode: string | undef
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: spacing.sm + 4, gap: spacing.sm },
+  card: { gap: spacing.sm },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   cardLabel: { marginBottom: 0 },
-  link: { ...typography.bodyStrong, color: colors.primaryDark, fontSize: 13 },
+  link: { ...typography.link, color: colors.accentText },
   noticeRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   noticeText: { ...typography.caption, color: colors.success, flex: 1 },
   noticeTextWarn: { color: colors.warning },
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingTop: spacing.sm + 2,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.hairlineSoft,
   },
   itemText: { flex: 1 },
   itemTitle: { ...typography.bodyStrong, color: colors.ink, fontSize: 14 },

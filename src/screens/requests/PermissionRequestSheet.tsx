@@ -63,6 +63,7 @@ export function PermissionRequestSheet({ onDone }: { onDone: () => void }) {
         onPress={onSubmit}
         loading={isPending}
         disabled={!canSubmit}
+        pulse={canSubmit}
         style={styles.submit}
       />
 
@@ -79,7 +80,7 @@ export function PermissionRequestSheet({ onDone }: { onDone: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  blurb: { ...typography.caption, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  blurb: { ...typography.caption, lineHeight: 19, color: colors.textSecondary, marginTop: spacing.sm },
   pickerBlock: { marginTop: spacing.md + 4 },
   submit: { marginTop: spacing.lg },
 });

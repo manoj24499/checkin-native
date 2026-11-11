@@ -2,9 +2,9 @@ import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { IconTile, type IconTileTone } from "./IconTile";
 import type { IconSource } from "./Icon";
-import { colors, spacing, typography } from "@/theme";
+import { colors, fontFamilies, spacing, typography } from "@/theme";
 
-type ValueTone = "default" | "success" | "warning" | "danger" | "muted";
+type ValueTone = "default" | "accent" | "success" | "warning" | "danger" | "muted";
 
 export interface ListRowProps {
   /** Leading icon in an IconTile (38px). Ignored when `leading` is given. */
@@ -16,10 +16,10 @@ export interface ListRowProps {
   title: string;
   /** Second line under the title (secondary text, wraps). */
   subtitle?: string;
-  /** Right-aligned bold value ("9h 29m", "₹197", "On time"). */
+  /** Right-aligned value 13/600 ("On time", "9h 29m", "₹197"). */
   value?: string;
   valueTone?: ValueTone;
-  /** Small muted line under the value ("PIN · photo ok"). */
+  /** Small 11px secondary caption under the value ("Face + PIN"). */
   valueSub?: string;
   /** Custom right-hand node (StatusBadge, Toggle, chevron). Rendered after `value`. */
   trailing?: ReactNode;
@@ -28,21 +28,24 @@ export interface ListRowProps {
   onPress?: () => void;
   /** Hairline divider above the row (set on every row except the first in a Card). */
   divider?: boolean;
+  /** Dim the title to secondary (an upcoming/not-yet-done item, e.g. "Check out" before it happens). */
+  muted?: boolean;
   style?: ViewStyle;
 }
 
 const VALUE_COLOR: Record<ValueTone, string> = {
   default: colors.ink,
+  accent: colors.accentText,
   success: colors.success,
   warning: colors.warning,
   danger: colors.danger,
-  muted: colors.textMuted,
+  muted: colors.textSecondary,
 };
 
 /**
- * Transaction-style row: leading IconTile, title + subtitle, right-aligned
- * value/badge. Usually stacked inside a `Card` with `padding: 6/14` and
- * `divider` on all rows but the first.
+ * Row from Main.dc.html's TODAY list: optional leading IconTile, title 14/600 over a 12px secondary subtitle,
+ * right-aligned value 13/600 with an 11px caption under it (`valueSub`), or a `trailing` node (Pill, chevron,
+ * Toggle). Stack inside a `Card` (padding 6/16) with `divider` on every row but the first; padding 12/0.
  */
 export function ListRow({
   icon,
@@ -57,13 +60,14 @@ export function ListRow({
   children,
   onPress,
   divider,
+  muted,
   style,
 }: ListRowProps) {
   const body = (
     <>
       {leading ?? (icon ? <IconTile icon={icon} tone={iconTone} /> : null)}
       <View style={styles.text}>
-        <Text style={styles.title} numberOfLines={2}>
+        <Text style={[styles.title, muted && styles.titleMuted]} numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -93,13 +97,14 @@ export function ListRow({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 4, paddingVertical: spacing.sm + 2 },
-  divider: { borderTopWidth: 1, borderTopColor: colors.border },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 4, paddingVertical: 12 },
+  divider: { borderTopWidth: 1, borderTopColor: colors.hairlineSoft },
   pressed: { opacity: 0.6 },
   text: { flex: 1, minWidth: 0 },
-  title: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
-  subtitle: { ...typography.caption, fontSize: 12, lineHeight: 17, color: colors.textSecondary, marginTop: 1 },
+  title: { ...typography.bodyStrong, fontSize: 14, color: colors.ink, marginBottom: 2 },
+  titleMuted: { color: colors.textSecondary },
+  subtitle: { ...typography.caption, fontSize: 12, lineHeight: 16, color: colors.textSecondary },
   valueCol: { alignItems: "flex-end" },
-  value: { ...typography.number, fontSize: 14 },
-  valueSub: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  value: { fontSize: 13, fontWeight: "600", fontFamily: fontFamilies.semiBold, fontVariant: ["tabular-nums"] },
+  valueSub: { fontSize: 11, fontFamily: fontFamilies.regular, color: colors.textSecondary, marginTop: 2 },
 });

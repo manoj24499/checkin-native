@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useAuth } from "./useAuth";
 import { useOfficeLocation } from "./useOfficeLocation";
 import type { GeofenceTarget } from "./useGeofence";
-import type { CheckInMode } from "@/types";
+import type { CheckInMode, HybridStatus } from "@/types";
 
 /** Resolves which location (if any) the current employee should be
  * geofenced against — shared by the Dashboard and CheckInOutScreen so the
@@ -48,6 +48,17 @@ export function useResolvedGeofenceTarget(dayOverrideMode?: CheckInMode | null):
       };
     }
 
+    // HYBRID: "HOME" geofences against their home location (a home segment,
+    // or travelling home); anything else falls through to the office below.
+    if (user.workMode === "HYBRID" && dayOverrideMode === "HOME") {
+      if (user.homeLatitude == null || user.homeLongitude == null) return null;
+      return {
+        latitude: user.homeLatitude,
+        longitude: user.homeLongitude,
+        radiusMeters: user.homeRadiusMeters,
+      };
+    }
+
     if (officeQuery.data) {
       return {
         latitude: officeQuery.data.latitude,
@@ -57,4 +68,36 @@ export function useResolvedGeofenceTarget(dayOverrideMode?: CheckInMode | null):
     }
     return null;
   }, [user, officeQuery.data, dayOverrideMode]);
+}
+
+/**
+ * Both of a HYBRID employee's places — the server's own copy from
+ * /api/kiosk/status's `hybrid` block when there is one, else the office
+ * location + the profile's home location (e.g. offline, or before the first
+ * status fetch). Either can be null when not configured / not loaded yet.
+ */
+export function useHybridTargets(serverHybrid?: HybridStatus | null): {
+  office: GeofenceTarget | null;
+  home: GeofenceTarget | null;
+} {
+  const { user } = useAuth();
+  const officeQuery = useOfficeLocation();
+
+  return useMemo(() => {
+    const office =
+      serverHybrid?.officeTarget ??
+      (officeQuery.data
+        ? {
+            latitude: officeQuery.data.latitude,
+            longitude: officeQuery.data.longitude,
+            radiusMeters: officeQuery.data.radiusMeters,
+          }
+        : null);
+    const home =
+      serverHybrid?.homeTarget ??
+      (user && user.homeLatitude != null && user.homeLongitude != null
+        ? { latitude: user.homeLatitude, longitude: user.homeLongitude, radiusMeters: user.homeRadiusMeters }
+        : null);
+    return { office, home };
+  }, [serverHybrid, officeQuery.data, user]);
 }

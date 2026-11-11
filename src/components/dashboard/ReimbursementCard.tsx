@@ -1,11 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { LinearGradient } from "expo-linear-gradient";
 import { Kicker, Pill } from "@/components/ui";
 import { useReimbursements } from "@/hooks";
 import type { DashboardStackParamList } from "@/navigation/types";
-import { colors, gradients, radius, shadows, spacing, typography } from "@/theme";
+import { colors, fontFamilies, radius, spacing, typography } from "@/theme";
 import { formatKm, formatRate, formatRupees } from "@/utils/reimbursement";
 
 type Nav = NativeStackNavigationProp<DashboardStackParamList>;
@@ -33,9 +32,8 @@ export function ReimbursementCard() {
       onPress={() => navigation.navigate("Reimbursement")}
       accessibilityRole="button"
       accessibilityLabel="Reimbursement details"
-      style={({ pressed }) => [styles.shadow, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <LinearGradient colors={gradients.limeCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
         <View style={styles.header}>
           <Kicker style={styles.kicker}>Reimbursement</Kicker>
           {hasRate ? (
@@ -47,13 +45,13 @@ export function ReimbursementCard() {
 
         <View style={styles.figures}>
           <View style={styles.flex}>
-            <Text style={styles.sub}>This month</Text>
+            <Text style={styles.sub}>THIS MONTH</Text>
             <Text style={styles.total} numberOfLines={1} adjustsFontSizeToFit>
               {hasRate ? formatRupees(totals.totalAmount) : formatKm(totals.distanceKm)}
             </Text>
           </View>
           <View style={styles.todayCol}>
-            <Text style={styles.sub}>{hasRate ? "Today ≈" : "Today"}</Text>
+            <Text style={styles.sub}>{hasRate ? "TODAY ≈" : "TODAY"}</Text>
             <Text style={styles.today}>
               {hasRate && today.estimatedAmount !== null ? formatRupees(today.estimatedAmount) : formatKm(today.distanceKm)}
             </Text>
@@ -66,19 +64,18 @@ export function ReimbursementCard() {
               {splitTotal > 0 ? (
                 <>
                   <View style={{ flex: totals.approvedAmount, backgroundColor: colors.ink }} />
-                  <View style={{ flex: totals.inReviewAmount, backgroundColor: colors.limeStrong }} />
+                  <View style={{ flex: totals.inReviewAmount, backgroundColor: colors.primary }} />
                 </>
               ) : null}
             </View>
             <View style={styles.legend}>
               <LegendItem color={colors.ink} label={`Approved ${formatRupees(totals.approvedAmount)}`} />
-              <LegendItem color={colors.limeStrong} label={`In review ${formatRupees(totals.inReviewAmount)}`} />
+              <LegendItem color={colors.primary} label={`In review ${formatRupees(totals.inReviewAmount)}`} />
             </View>
           </>
         ) : (
           <Text style={styles.noRate}>Your admin hasn't set a rate per km yet, so only distance is shown.</Text>
         )}
-      </LinearGradient>
     </Pressable>
   );
 }
@@ -93,19 +90,19 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  shadow: { borderRadius: radius.card, backgroundColor: colors.surface, ...shadows.card },
   pressed: { opacity: 0.85 },
   card: {
     borderRadius: radius.card,
+    backgroundColor: colors.surface,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: "rgba(160,200,30,0.35)",
+    borderColor: colors.cardBorder,
   },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm + 2 },
   kicker: { marginBottom: 0 },
   figures: { flexDirection: "row", alignItems: "flex-end", gap: spacing.md },
   flex: { flex: 1 },
-  sub: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary },
+  sub: { ...typography.statLabel, color: colors.textSecondary },
   total: { ...typography.display, fontSize: 34, letterSpacing: -1, color: colors.ink },
   todayCol: { alignItems: "flex-end" },
   today: { ...typography.number, fontSize: 20, color: colors.ink },
@@ -121,6 +118,6 @@ const styles = StyleSheet.create({
   legend: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { fontSize: 11, color: colors.textSecondary, fontFamily: "Inter_500Medium" },
+  legendLabel: { fontSize: 11, color: colors.textSecondary, fontFamily: fontFamilies.medium },
   noRate: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: spacing.sm },
 });

@@ -209,6 +209,29 @@ export async function flushPendingLocations(): Promise<void> {
   }
 }
 
+// Notified after every ping the server accepted, while the JS runtime is alive (the app is open or
+// was woken for the background task). Lets the UI refetch state the server derives from pings — a
+// HYBRID employee's segment auto-switches on arrival (see useWorkSegment).
+type PingListener = () => void;
+const pingListeners = new Set<PingListener>();
+
+export function onLocationPingSent(listener: PingListener): () => void {
+  pingListeners.add(listener);
+  return () => {
+    pingListeners.delete(listener);
+  };
+}
+
+function notifyPingSent() {
+  for (const listener of pingListeners) {
+    try {
+      listener();
+    } catch {
+      // A UI listener must never break the tracking task.
+    }
+  }
+}
+
 function isFieldProfile(): boolean {
   // Loaded lazily: authStore itself imports this module (to stop tracking on
   // sign-out), so a top-level import here would be a circular dependency.
@@ -284,6 +307,7 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
     removeFromOutbox(attendanceId, [...batch.map((s) => s.timestamp), latestSample.timestamp]);
     if (field) lastPingSentAt = Date.now();
     saveOutbox();
+    notifyPingSent();
     if (!result.tracking) {
       await stopLocationTracking();
       useAttendanceSessionStore.getState().stopTracking();

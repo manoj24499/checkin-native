@@ -1,3 +1,5 @@
+import type { WorkMode } from "./employee";
+
 export type AttendanceAction = "CHECK_IN" | "CHECK_OUT";
 // QR is kept only so historical records (from before QR was removed) still
 // type-check — no new QR-method attendance is produced anymore.
@@ -8,6 +10,23 @@ export interface AttendancePauseInterval {
   resumedAt: string | null;
 }
 
+/** Today's (or a past day's) minutes per place — HYBRID only. Each figure is
+ * net of any pause overlapping it, so officeMinutes + homeMinutes is the
+ * worked time (TRANSIT is not work). */
+export interface SegmentMinutes {
+  officeMinutes: number;
+  homeMinutes: number;
+  transitMinutes: number;
+}
+
+/** One stretch of a session's work-segment timeline (see /api/mobile/me/attendance). */
+export interface AttendanceSegment {
+  mode: WorkSegmentMode;
+  heading: HybridPlace | null;
+  startedAt: string;
+  endedAt: string | null;
+}
+
 export interface AttendanceRecord {
   id: string;
   type: AttendanceAction;
@@ -15,6 +34,11 @@ export interface AttendanceRecord {
   timestamp: string;
   hasPhoto: boolean;
   pauses?: AttendancePauseInterval[];
+  // The session's segment timeline (CHECK_IN rows of FIELD/HYBRID sessions).
+  // Optional so an older backend that doesn't send it reads as "no segments".
+  segments?: AttendanceSegment[];
+  // HYBRID CHECK_IN rows only (null otherwise).
+  segmentMinutes?: SegmentMinutes | null;
 }
 
 export interface AttendanceHistoryPage {
@@ -28,19 +52,64 @@ export interface AttendanceHistoryPage {
 // a day they're actually coming in) or omits this field entirely (an
 // ordinary day from home) — there's no "HOME" value, since omitting it
 // already means exactly that for a WFH profile.
-export type CheckInMode = "OFFICE" | "FIELD";
+// "HOME" only ever comes back from the server, for a HYBRID check-in made
+// inside the home geofence — this app never sends it (a hybrid check-in
+// omits checkInMode and lets the server pick office or home).
+export type CheckInMode = "OFFICE" | "FIELD" | "HOME";
 
-// A FIELD-workMode employee's *current* Field/Office segment during an
-// active check-in — unlike CheckInMode above (fixed for the whole day, set
-// once at check-in), this changes over the day: auto-detected via GPS (see
-// /api/kiosk/location's evaluateWorkSegment) or manually corrected (see
-// useSwitchWorkSegment). Only ever meaningful for FIELD-workMode employees;
+/** The two places a HYBRID employee works from (also a TRANSIT segment's heading). */
+export type HybridPlace = "OFFICE" | "HOME";
+
+// The employee's *current* segment during an active check-in — unlike
+// CheckInMode above (fixed for the whole day, set once at check-in), this
+// changes over the day: auto-detected via GPS (see /api/kiosk/location) or
+// manually switched (see useSwitchWorkSegment).
+//  - FIELD employees: OFFICE / FIELD.
+//  - HYBRID employees: OFFICE / HOME / TRANSIT (travelling between the two —
+//    not counted as work time).
 // mode is null for everyone else, or when not currently checked in.
-export type WorkSegmentMode = "OFFICE" | "FIELD";
+export type WorkSegmentMode = "OFFICE" | "FIELD" | "HOME" | "TRANSIT";
 
 export interface WorkSegmentStatus {
   mode: WorkSegmentMode | null;
   startedAt: string | null;
+  // HYBRID only — all optional so an older backend reads as "not travelling".
+  /** TRANSIT only: where they're travelling to. */
+  heading?: HybridPlace | null;
+  /** When the "have you arrived?" push went out for the current transit window. */
+  promptedAt?: string | null;
+  /** TRANSIT only: minutes since the transit started. */
+  transitMinutes?: number | null;
+  /** TRANSIT only: when the 45-minute window runs out. */
+  transitWindowEndsAt?: string | null;
+  /** True while TRANSIT is open and its window has run out — ask "Arrived / Still travelling". */
+  transitExpired?: boolean;
+}
+
+/** Body for POST /api/mobile/me/work-segment (see HYBRID_API_CONTRACT.md). */
+export type WorkSegmentSwitchRequest =
+  // FIELD: manual Office/Field correction. HYBRID: "I've arrived" (or a direct correction).
+  | { mode: "OFFICE" | "FIELD" | "HOME" }
+  // HYBRID: "Switch to Home" / "Switch to Office" — starts travelling.
+  | { mode: "TRANSIT"; heading: HybridPlace }
+  // HYBRID, only while TRANSIT: "Still travelling" — a fresh 45-minute window.
+  | { extend: true };
+
+export interface GeofencePoint {
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+}
+
+/** /api/kiosk/status's `hybrid` block — non-null only for HYBRID employees. */
+export interface HybridStatus {
+  officeTarget: GeofencePoint | null;
+  homeTarget: GeofencePoint | null;
+  /** True while checked in: location pings drive arrival/departure detection. */
+  trackingRequired: boolean;
+  transitWindowMinutes: number;
+  /** Today's session so far (up to check-out, or now). */
+  segmentMinutes: SegmentMinutes | null;
 }
 
 export type KioskStatus =
@@ -48,7 +117,7 @@ export type KioskStatus =
   | {
       exists: true;
       name: string;
-      workMode: "OFFICE" | "WFH" | "FIELD";
+      workMode: WorkMode;
       checkedIn: boolean;
       checkedOut: boolean;
       checkInAt: string | null;
@@ -78,6 +147,10 @@ export type KioskStatus =
       // Optional so an older backend that doesn't send them reads as "off".
       offlineCheckInEnabled?: boolean;
       offlineMaxAgeMinutes?: number;
+      // Current segment (FIELD/HYBRID) — null when not checked in / no
+      // segment. Optional: older backends don't send these.
+      segment?: WorkSegmentStatus | null;
+      hybrid?: HybridStatus | null;
     };
 
 // Set only for CHECK_IN results, computed server-side from the employee's

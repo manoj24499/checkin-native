@@ -39,10 +39,10 @@ export function AssignedPlacesCard({ onOpen }: { onOpen: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: spacing.sm + 4 },
+  card: {},
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   kicker: { marginBottom: 0 },
   count: { ...typography.caption, color: colors.textSecondary, fontSize: 12 },
-  blurb: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  blurb: { ...typography.caption, fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, marginTop: spacing.sm },
   button: { marginTop: spacing.sm + 4 },
 });

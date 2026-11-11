@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View, ViewStyle } from "react-native";
-import { colors, radius } from "@/theme";
+import { colors, fontFamilies, radius } from "@/theme";
 
 /**
- * success/warning/danger/neutral as before; "primary" = lime tint with olive
- * text (e.g. "PIN", "Photo", "Holiday"); "ink" = ink with lime text.
+ * Status chip (Requests.dc.html `.bd`): 11/600, padding 4/10, full pill.
+ * success "Approved" (#1E7A4D on green tint), warning "Pending"/"Scheduled" (#8A5A00 on amber tint),
+ * danger "Declined" (#B3261E on red tint), neutral (grey), primary (orange tint, accent text),
+ * ink (dark fill, #FFB067 text).
  */
 type Tone = "success" | "warning" | "danger" | "neutral" | "primary" | "ink";
 
@@ -20,20 +22,20 @@ export function StatusBadge({ label, tone = "neutral", style }: { label: string;
 const styles = StyleSheet.create({
   base: {
     alignSelf: "flex-start",
-    paddingHorizontal: 9,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: radius.full,
   },
-  label: { fontSize: 10.5, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  label: { fontSize: 11, fontWeight: "600", fontFamily: fontFamilies.semiBold },
 });
 
 const toneStyles = StyleSheet.create({
   success: { backgroundColor: colors.successMuted },
   warning: { backgroundColor: colors.warningMuted },
   danger: { backgroundColor: colors.dangerMuted },
-  neutral: { backgroundColor: colors.surfaceMuted },
+  neutral: { backgroundColor: "rgba(23,19,15,0.10)" },
   primary: { backgroundColor: colors.primaryMuted },
-  ink: { backgroundColor: colors.limeStrong },
+  ink: { backgroundColor: colors.ink },
 });
 
 const textToneStyles = StyleSheet.create({
@@ -41,6 +43,6 @@ const textToneStyles = StyleSheet.create({
   warning: { color: colors.warning },
   danger: { color: colors.danger },
   neutral: { color: colors.textSecondary },
-  primary: { color: colors.limeDeep },
-  ink: { color: colors.onAccent },
+  primary: { color: colors.accentText },
+  ink: { color: colors.primarySoftText },
 });

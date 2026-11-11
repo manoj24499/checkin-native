@@ -14,9 +14,10 @@ import {
   Icon,
   IconButton,
   IconTile,
+  Rise,
   Kicker,
-  ListRow,
   ScreenTitle,
+  AvatarBadge,
 } from "@/components/ui";
 import { PhotoCaptureView } from "@/components/camera";
 import { useAuth, useAttendanceStatus, useBiometricAuth, useUploadProfilePhoto } from "@/hooks";
@@ -35,7 +36,7 @@ import { employeeService } from "@/api/services";
 import { endpoints } from "@/api/endpoints";
 import { env } from "@/config/env";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
-import { colors, radius, spacing, typography } from "@/theme";
+import { colors, fontFamilies, radius, spacing, typography } from "@/theme";
 
 // Same gallery-pick shape as ReportIssueScreen's — quality/size choices
 // mirror PhotoCaptureView's own camera capture, so a gallery pick and a
@@ -58,6 +59,7 @@ const WORK_MODE_LABEL: Record<string, string> = {
   OFFICE: "Office",
   WFH: "Work from home",
   FIELD: "Anywhere",
+  HYBRID: "Hybrid",
 };
 
 interface SettingsRowProps {
@@ -70,15 +72,44 @@ interface SettingsRowProps {
   divider?: boolean;
 }
 
+/** Profile.dc.html `.li` with a switch: 14/600 title over a 12px help line, padding 11/16. */
 function SettingsRow({ label, help, value, disabled, onValueChange, divider }: SettingsRowProps) {
   return (
-    <View style={[styles.settingsRow, divider && styles.settingsRowDivider]}>
-      <View style={styles.settingsRowText}>
-        <Text style={styles.settingsLabel}>{label}</Text>
-        <Text style={styles.settingsHelp}>{help}</Text>
+    <View style={[styles.li, divider && styles.liDivider]}>
+      <View style={styles.liText}>
+        <Text style={styles.liTitle}>{label}</Text>
+        <Text style={styles.liSub}>{help}</Text>
       </View>
-      <Toggle value={value} onValueChange={onValueChange} disabled={disabled} />
+      <Toggle value={value} onValueChange={onValueChange} disabled={disabled} accessibilityLabel={label} />
     </View>
+  );
+}
+
+/** Profile.dc.html `.li` link row with a chevron. */
+function LinkRow({
+  title,
+  subtitle,
+  onPress,
+  divider,
+}: {
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  divider?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [styles.li, divider && styles.liDivider, pressed && { opacity: 0.6 }]}
+    >
+      <View style={styles.liText}>
+        <Text style={styles.liTitle}>{title}</Text>
+        <Text style={styles.liSub}>{subtitle}</Text>
+      </View>
+      <Icon name="chevronRight" size={16} color={colors.textSecondary} strokeWidth={2} />
+    </Pressable>
   );
 }
 
@@ -231,6 +262,10 @@ export function ProfileScreen() {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  const photoSource = {
+    uri: `${env.apiUrl}${endpoints.profilePhoto}?v=${photoNonce}`,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  };
 
   if (capturingAvatar) {
     return (
@@ -248,117 +283,113 @@ export function ProfileScreen() {
   }
 
   return (
-    <Screen scroll>
-      <Kicker>Account</Kicker>
-      <ScreenTitle>Profile</ScreenTitle>
+    <Screen scroll glow="topRight" contentStyle={styles.content}>
+      <Rise>
+        <View accessibilityRole="header">
+          <Kicker>Account</Kicker>
+          <ScreenTitle style={styles.pageTitle}>Profile</ScreenTitle>
+        </View>
+      </Rise>
 
-      <Card style={styles.identityCard}>
-        <View style={styles.identityRow}>
-          <Pressable
-            onPress={() => (user?.hasProfilePhoto ? setViewingPhoto(true) : setAvatarSheetOpen(true))}
-            style={styles.avatarWrapper}
-            accessibilityLabel="Profile photo"
-          >
-            {user?.hasProfilePhoto ? (
-              <Image
-                source={{
-                  uri: `${env.apiUrl}${endpoints.profilePhoto}?v=${photoNonce}`,
-                  headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-                }}
-                style={styles.avatarImage}
-              />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarLabel}>{initials}</Text>
+      <Rise delay={80}>
+        <Card style={styles.identityCard}>
+          <View style={styles.identityRow}>
+            <Pressable
+              onPress={() => (user?.hasProfilePhoto ? setViewingPhoto(true) : setAvatarSheetOpen(true))}
+              style={styles.avatarWrapper}
+              accessibilityRole="button"
+              accessibilityLabel="Profile photo"
+            >
+              <AvatarBadge initials={initials} size={AVATAR} pulse="ring" />
+              {user?.hasProfilePhoto ? <Image source={photoSource} style={styles.avatarImage} /> : null}
+              <View style={styles.avatarEditBadge}>
+                <Icon name="camera" size={13} color={colors.primarySoftText} strokeWidth={2} />
               </View>
-            )}
-            <View style={styles.avatarEditBadge}>
-              <Icon name="camera" size={11} color={colors.ink} strokeWidth={2.2} />
+            </Pressable>
+            <View style={styles.identityText}>
+              <Text style={styles.name} numberOfLines={2}>
+                {user?.name}
+              </Text>
+              <Text style={styles.meta} numberOfLines={2}>
+                {user?.employeeCode} · {user?.email}
+              </Text>
             </View>
-          </Pressable>
-          <View style={styles.identityText}>
-            <Text style={styles.name}>{user?.name}</Text>
-            <Text style={styles.meta}>
-              {user?.employeeCode} · {user?.email}
-            </Text>
           </View>
-        </View>
-      </Card>
 
-      <View style={styles.statRow}>
-        <View style={styles.statCell}>
-          <Text style={styles.statLabel}>WORK MODE</Text>
-          <Text style={styles.statValue}>{WORK_MODE_LABEL[user?.workMode ?? "OFFICE"]}</Text>
-        </View>
-        <View style={[styles.statCell, styles.statCellDivider]}>
-          <Text style={styles.statLabel}>SHIFT TIMING</Text>
-          <Text style={styles.statValue}>{shiftTimingLabel}</Text>
-        </View>
-      </View>
+          <View style={styles.statRow}>
+            <View style={[styles.statCell, { flex: 1 }]}>
+              <Text style={styles.statLabel}>WORK MODE</Text>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                {WORK_MODE_LABEL[user?.workMode ?? "OFFICE"]}
+              </Text>
+            </View>
+            <View style={[styles.statCell, { flex: 1.3 }]}>
+              <Text style={styles.statLabel}>SHIFT TIMING</Text>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                {shiftTimingLabel}
+              </Text>
+            </View>
+          </View>
+        </Card>
+      </Rise>
 
-      <Card style={styles.groupCard}>
-        <SettingsRow
-          label="Biometric unlock"
-          help={
-            biometricAvailable
-              ? "Face ID / fingerprint to unlock the app. If that fails, your phone's own lock code works too — not your employee PIN."
-              : "Not available on this device"
-          }
-          value={biometricUnlockEnabled}
-          disabled={!biometricAvailable}
-          onValueChange={handleBiometricToggle}
-        />
-        {biometricError ? <Text style={styles.errorText}>Biometric error: {biometricError}</Text> : null}
-        <SettingsRow
-          label="Shift reminders"
-          help="A nudge to check out ~10 minutes before your shift (or approved overtime) ends"
-          value={shiftRemindersEnabled}
-          onValueChange={handleShiftRemindersToggle}
-          divider
-        />
-        {shiftRemindersError ? <Text style={styles.errorText}>{shiftRemindersError}</Text> : null}
-        <SettingsRow
-          label="Live location"
-          help="Only ever on while checked in"
-          value={liveLocationEnabled}
-          onValueChange={setLiveLocationEnabled}
-          divider
-        />
-      </Card>
+      <Rise delay={160}>
+        <Card style={styles.groupCard}>
+          <SettingsRow
+            label="Biometric unlock"
+            help={biometricAvailable ? "Face ID / fingerprint to unlock the app." : "Not available on this device"}
+            value={biometricUnlockEnabled}
+            disabled={!biometricAvailable}
+            onValueChange={handleBiometricToggle}
+          />
+          {biometricError ? <Text style={styles.errorText}>Biometric error: {biometricError}</Text> : null}
+          <SettingsRow
+            label="Shift reminders"
+            help="A nudge before your shift starts and ends."
+            value={shiftRemindersEnabled}
+            onValueChange={handleShiftRemindersToggle}
+            divider
+          />
+          {shiftRemindersError ? <Text style={styles.errorText}>{shiftRemindersError}</Text> : null}
+          <SettingsRow
+            label="Live location"
+            help="Only ever on while checked in"
+            value={liveLocationEnabled}
+            onValueChange={setLiveLocationEnabled}
+            divider
+          />
+        </Card>
+      </Rise>
 
-      <Card style={styles.groupCard}>
-        <ListRow
-          icon="history"
-          title="History"
-          subtitle="Past check-ins and hours"
-          onPress={() => navigation.navigate("History")}
-          trailing={<Icon name="chevronRight" size={18} color={colors.textMuted} />}
-        />
-        <ListRow
-          icon="lock"
-          title="Change PIN"
-          subtitle="Keep it private"
-          onPress={() => navigation.navigate("ChangePin")}
-          trailing={<Icon name="chevronRight" size={18} color={colors.textMuted} />}
-          divider
-        />
-        <ListRow
-          icon="help"
-          title="Help & report an issue"
-          subtitle="Wrong hours, geofence trouble, PIN reset"
-          onPress={() => navigation.navigate("ReportIssue")}
-          trailing={<Icon name="chevronRight" size={18} color={colors.textMuted} />}
-          divider
-        />
-      </Card>
+      <Rise delay={240}>
+        <Card style={styles.groupCard}>
+          <LinkRow title="Change PIN" subtitle="Keep it private" onPress={() => navigation.navigate("ChangePin")} />
+          <LinkRow
+            title="History"
+            subtitle="Past check-ins and hours"
+            onPress={() => navigation.navigate("History")}
+            divider
+          />
+          <LinkRow
+            title="Help & report an issue"
+            subtitle="Wrong hours, geofence trouble, PIN reset"
+            onPress={() => navigation.navigate("ReportIssue")}
+            divider
+          />
+        </Card>
+      </Rise>
 
-      <Button
-        label="Log out"
-        variant="danger"
-        icon="logout"
-        onPress={() => (unsentCount > 0 ? setConfirmLogoutOpen(true) : void signOut())}
-        style={styles.logout}
-      />
+      <Rise delay={320}>
+        <Button
+          label="Log out"
+          variant="danger"
+          onPress={() => (unsentCount > 0 ? setConfirmLogoutOpen(true) : void signOut())}
+          style={styles.logout}
+          labelStyle={styles.logoutLabel}
+        />
+      </Rise>
+
+      <Text style={styles.footer}>Inzivo · Employee app</Text>
 
       <Modal
         visible={viewingPhoto}
@@ -377,10 +408,7 @@ export function ProfileScreen() {
           />
 
           <Image
-            source={{
-              uri: `${env.apiUrl}${endpoints.profilePhoto}?v=${photoNonce}`,
-              headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-            }}
+            source={photoSource}
             style={styles.viewerImage}
             resizeMode="contain"
           />
@@ -447,31 +475,31 @@ export function ProfileScreen() {
   );
 }
 
+const AVATAR = 68;
+
 const styles = StyleSheet.create({
-  identityCard: { marginTop: spacing.md },
-  identityRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 4 },
-  avatarWrapper: { width: 60, height: 60 },
-  // Ink circle with lime initials (mockup's avatar).
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 99,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
+  content: { paddingHorizontal: spacing.gutter, paddingTop: 12, gap: 12 },
+  pageTitle: { fontSize: 30, lineHeight: 36 },
+  identityCard: { borderRadius: 26, padding: 16, gap: 14 },
+  identityRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  avatarWrapper: { width: AVATAR, height: AVATAR },
+  avatarImage: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    backgroundColor: colors.surfaceMuted,
   },
-  avatarImage: { width: 60, height: 60, borderRadius: 99, backgroundColor: colors.surfaceMuted },
-  avatarLabel: { ...typography.h3, fontSize: 20, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.lime },
   avatarEditBadge: {
     position: "absolute",
     right: -2,
     bottom: -2,
-    width: 22,
-    height: 22,
-    borderRadius: 99,
-    backgroundColor: colors.lime,
-    borderWidth: 2,
-    borderColor: colors.surface,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -481,7 +509,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm + 4,
     paddingVertical: spacing.sm + 4,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.hairlineSoft,
   },
   avatarSheetOptionLast: { borderBottomWidth: 0 },
   avatarSheetOptionLabel: { ...typography.bodyStrong, color: colors.ink },
@@ -496,32 +524,34 @@ const styles = StyleSheet.create({
   viewerImage: { width: "100%", aspectRatio: 1, borderRadius: radius.lg },
   viewerChangeButton: { marginTop: spacing.xl, alignSelf: "stretch" },
   identityText: { flex: 1, minWidth: 0 },
-  name: { ...typography.section, color: colors.ink },
-  meta: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
-  statRow: {
-    flexDirection: "row",
-    marginTop: spacing.sm + 4,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
+  name: { ...typography.h2, lineHeight: 28, color: colors.ink },
+  meta: { fontSize: 12, lineHeight: 16, fontFamily: fontFamilies.regular, color: colors.textSecondary, marginTop: 2 },
+  statRow: { flexDirection: "row", gap: 10 },
+  statCell: {
+    minWidth: 0,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceMuted,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
-  statCell: { flex: 1, paddingHorizontal: spacing.sm + 4, paddingVertical: 11 },
-  statCellDivider: { borderLeftWidth: 1, borderLeftColor: colors.border },
-  statLabel: { ...typography.kicker, fontSize: 9, letterSpacing: 1.3, color: colors.textMuted },
-  statValue: { ...typography.bodyStrong, fontSize: 14, color: colors.ink, marginTop: 3 },
-  groupCard: { marginTop: spacing.sm + 4, paddingVertical: spacing.xs, paddingHorizontal: 14 },
-  settingsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.sm + 3,
+  statLabel: { ...typography.statLabel, color: colors.textSecondary },
+  statValue: { fontSize: 14, fontWeight: "600", fontFamily: fontFamilies.semiBold, color: colors.ink, marginTop: 3 },
+  groupCard: { padding: 0 },
+  li: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, paddingHorizontal: 16 },
+  liDivider: { borderTopWidth: 1, borderTopColor: colors.hairlineSoft },
+  liText: { flex: 1, minWidth: 0 },
+  liTitle: { fontSize: 14, fontWeight: "600", fontFamily: fontFamilies.semiBold, color: colors.ink, marginBottom: 1 },
+  liSub: { fontSize: 12, lineHeight: 16, fontFamily: fontFamilies.regular, color: colors.textSecondary },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: fontFamilies.regular,
+    color: colors.danger,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    marginTop: -4,
   },
-  settingsRowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
-  settingsRowText: { flex: 1, minWidth: 0 },
-  settingsLabel: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
-  settingsHelp: { ...typography.caption, fontSize: 12, lineHeight: 17, color: colors.textSecondary, marginTop: 2 },
-  errorText: { ...typography.caption, fontSize: 12, color: colors.danger, marginTop: -spacing.xs, marginBottom: spacing.sm },
-  logout: { marginTop: spacing.lg },
+  footer: { textAlign: "center", fontSize: 11, fontFamily: fontFamilies.regular, color: colors.textSecondary },
+  logout: { minHeight: 50, borderRadius: 25 },
+  logoutLabel: { fontSize: 15 },
 });

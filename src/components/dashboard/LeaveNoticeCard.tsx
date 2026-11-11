@@ -17,7 +17,7 @@ const TYPE_LABEL: Record<TimeOffType, string> = {
 // approved state, not a warning like a late check-in.
 export function LeaveNoticeCard({ type }: LeaveNoticeCardProps) {
   return (
-    <Card tone="success" style={styles.card}>
+    <Card tone="success" size="sm" style={styles.card}>
       <IconTile icon="check" tone="success" />
       <View style={styles.textWrap}>
         <Text style={styles.headline}>On leave today</Text>
@@ -32,10 +32,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm + 4,
-    padding: spacing.sm + 6,
-    marginTop: spacing.sm + 4,
+    padding: 14,
   },
   textWrap: { flex: 1 },
-  headline: { ...typography.bodyStrong, fontSize: 14.5, color: colors.success },
-  subline: { ...typography.caption, color: colors.textSecondary, marginTop: 1 },
+  headline: { ...typography.bodyStrong, fontSize: 14, color: colors.success },
+  subline: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 });

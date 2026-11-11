@@ -4,7 +4,7 @@ import { Button, TextField, IssueDialog } from "@/components/ui";
 import { TimeSlotPicker, formatSlotLabel } from "@/components/checkin";
 import { useAuth, useAttendanceStatus, useRequestOvertime } from "@/hooks";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
-import { colors, spacing, typography } from "@/theme";
+import { colors, fontFamilies, spacing, typography } from "@/theme";
 
 /** Combines an "HH:mm" slot with today's calendar date, in local time — same
  * convention as PermissionRequestSheet. */
@@ -80,6 +80,7 @@ export function OvertimeRequestSheet({ onDone }: { onDone: () => void }) {
         onPress={onSubmit}
         loading={isPending}
         disabled={!canSubmit}
+        pulse={canSubmit}
         style={styles.submit}
       />
 
@@ -96,9 +97,9 @@ export function OvertimeRequestSheet({ onDone }: { onDone: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  blurb: { ...typography.caption, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  blurb: { ...typography.caption, lineHeight: 19, color: colors.textSecondary, marginTop: spacing.sm },
   pickerBlock: { marginTop: spacing.md + 4 },
-  pickerHint: { ...typography.caption, fontSize: 12.5, color: colors.textSecondary, marginTop: spacing.sm },
+  pickerHint: { fontSize: 12.5, lineHeight: 17, fontFamily: fontFamilies.regular, color: colors.textSecondary, marginTop: spacing.sm },
   reasonBlock: { marginTop: spacing.md + 4 },
   submit: { marginTop: spacing.lg },
 });

@@ -59,3 +59,41 @@ export async function getQuickPosition(): Promise<Location.LocationObject> {
   }
   return getCurrentPositionWithTimeout({ accuracy: Location.Accuracy.Balanced });
 }
+
+type PlacePoint = { latitude: number; longitude: number; radiusMeters: number };
+
+export interface HybridPlaceCheck {
+  /** The place they're inside — office checked first, same as the server. */
+  place: "OFFICE" | "HOME" | null;
+  officeDistance: number | null;
+  homeDistance: number | null;
+  /** The nearer configured place (for "X km from home"), when outside both. */
+  nearest: { place: "OFFICE" | "HOME"; distance: number } | null;
+}
+
+/**
+ * HYBRID check-in pre-check: is this position inside the office or the home
+ * geofence? Advisory only — /api/kiosk/scan re-checks it server-side.
+ */
+export function checkHybridPlace(
+  coords: { latitude: number; longitude: number },
+  office: PlacePoint | null,
+  home: PlacePoint | null,
+): HybridPlaceCheck {
+  const dist = (t: PlacePoint | null) =>
+    t ? haversineDistanceMeters(coords.latitude, coords.longitude, t.latitude, t.longitude) : null;
+  const officeDistance = dist(office);
+  const homeDistance = dist(home);
+  const place =
+    office && officeDistance !== null && officeDistance <= office.radiusMeters
+      ? "OFFICE"
+      : home && homeDistance !== null && homeDistance <= home.radiusMeters
+        ? "HOME"
+        : null;
+  let nearest: HybridPlaceCheck["nearest"] = null;
+  if (officeDistance !== null) nearest = { place: "OFFICE", distance: officeDistance };
+  if (homeDistance !== null && (nearest === null || homeDistance < nearest.distance)) {
+    nearest = { place: "HOME", distance: homeDistance };
+  }
+  return { place, officeDistance, homeDistance, nearest };
+}

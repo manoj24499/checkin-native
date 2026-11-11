@@ -17,7 +17,7 @@ export function LateNoticeCard({ leaveType, lateMinutes }: LateNoticeCardProps) 
   const tone = TONE[leaveType];
 
   return (
-    <Card tone={tone.card} style={styles.card}>
+    <Card tone={tone.card} size="sm" style={styles.card}>
       <IconTile glyph="!" tone={tone.card} />
       <View style={styles.textWrap}>
         <Text style={[styles.headline, { color: tone.tint }]}>
@@ -34,10 +34,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm + 4,
-    padding: spacing.sm + 6,
-    marginTop: spacing.sm + 4,
+    padding: 14,
   },
   textWrap: { flex: 1 },
-  headline: { ...typography.bodyStrong, fontSize: 14.5 },
-  subline: { ...typography.caption, color: colors.textSecondary, marginTop: 1 },
+  headline: { ...typography.bodyStrong, fontSize: 14 },
+  subline: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 });

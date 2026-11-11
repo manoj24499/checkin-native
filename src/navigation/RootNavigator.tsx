@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus, StyleSheet, Text, View } from "react-native";
-import { useAuth } from "@/hooks";
+import { useAuth, useHybridPushHandling } from "@/hooks";
 import { useSettingsStore } from "@/store/settingsStore";
 import { promptBiometricAuth, msSinceLastBiometricPrompt } from "@/services/biometrics";
 import { checkTrackingHealth, msSinceLocationTrackingStart } from "@/services/locationTracking";
@@ -9,6 +9,7 @@ import { LogoMark } from "@/components/branding/LogoMark";
 import { colors, spacing, typography } from "@/theme";
 import { AuthNavigator } from "./AuthNavigator";
 import { AppTabs } from "./AppTabs";
+import { BiometricLockScreen } from "@/screens/auth/BiometricLockScreen";
 import { FaceEnrollmentScreen } from "@/screens/auth/FaceEnrollmentScreen";
 
 // How often to verify the background location task is still actually
@@ -33,20 +34,6 @@ const REAUTH_GRACE_MS = 2000;
 // repeatedly right after checking in.
 const TRACKING_START_GRACE_MS = 5000;
 
-function BiometricLockScreen({ onRetry }: { onRetry: () => void }) {
-  return (
-    <Screen contentStyle={styles.lockContent}>
-      <LogoMark size={30} barColor={colors.ink} />
-      <View style={styles.lockBody}>
-        <IconTile icon="lock" tone="ink" size={76} radius={26} />
-        <Text style={styles.lockTitle}>Locked</Text>
-        <Text style={styles.lockMessage}>Unlock with Face ID / fingerprint to continue.</Text>
-      </View>
-      <Button label="Try again" onPress={onRetry} style={styles.retry} />
-    </Screen>
-  );
-}
-
 export function RootNavigator() {
   const { status, user } = useAuth();
   // Read reactively only for the final render decision below. The two
@@ -60,6 +47,8 @@ export function RootNavigator() {
   const [unlocked, setUnlocked] = useState(true);
   const appState = useRef(AppState.currentState);
   const isPrompting = useRef(false);
+  // Taps on the HYBRID "Heading home?" / "Are you home yet?" pushes open Home.
+  useHybridPushHandling(status === "authenticated");
 
   const requestUnlock = () => {
     if (isPrompting.current) return;

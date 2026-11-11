@@ -1,8 +1,11 @@
 import { useContext } from "react";
 import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 
-/** The floating glass tab bar hovers over the screens, so scrolling content needs this much bottom room. */
-export const TAB_BAR_CLEARANCE = 92;
+/**
+ * The floating tab bar (68 high, ~22 above the bottom edge) hovers over the screens, so scrolling content
+ * needs this much bottom room (bar + gap + a little breathing space).
+ */
+export const TAB_BAR_CLEARANCE = 96;
 
 /** Bottom padding to add under scrolling content: the bar's clearance inside the tabs, 0 elsewhere (auth, modals). */
 export function useTabBarClearance() {

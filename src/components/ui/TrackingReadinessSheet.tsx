@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { BottomSheet } from "./BottomSheet";
 import { Button } from "./Button";
-import { IconTile } from "./IconTile";
+import { Icon } from "./Icon";
 import { useTrackingFixStore } from "@/store/trackingFixStore";
 import {
   checkTrackingReadiness,
@@ -14,10 +14,28 @@ import { startLocationTracking } from "@/services/locationTracking";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { colors, radius, spacing, typography } from "@/theme";
 
-function Row({ ok, title, hint, action }: { ok: boolean; title: string; hint: string; action?: React.ReactNode }) {
+function Row({
+  n,
+  ok,
+  title,
+  hint,
+  action,
+}: {
+  n: number;
+  ok: boolean;
+  title: string;
+  hint: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <View style={styles.row}>
-      {ok ? <IconTile icon="check" tone="success" size={36} /> : <IconTile glyph="!" tone="danger" size={36} />}
+    <View style={[styles.row, ok && styles.rowDone]}>
+      <View style={[styles.badge, ok && styles.badgeDone]}>
+        {ok ? (
+          <Icon name="checkmark" size={18} color={colors.success} strokeWidth={3} />
+        ) : (
+          <Text style={styles.badgeText}>{n}</Text>
+        )}
+      </View>
       <View style={styles.rowBody}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowHint}>{hint}</Text>
@@ -58,6 +76,7 @@ export function TrackingReadinessSheet() {
   }, [open, recheck]);
 
   const ok = state?.ok ?? false;
+  const stepsLeft = (state && state.foreground && state.background ? 0 : 1) + (state && !state.batteryRestricted ? 0 : 1);
   const proceed = () => {
     const next = onContinue;
     close();
@@ -67,21 +86,22 @@ export function TrackingReadinessSheet() {
   return (
     <BottomSheet visible={open} onClose={close} kicker="LOCATION SHARING" title="Keep location sharing on">
       <Text style={styles.intro}>
-        Your route and distance are only recorded while your phone allows the app to use location in the background.
-        Two settings decide that.
+        Two phone settings keep your hours counting while the screen is off.
       </Text>
 
       <Row
+        n={1}
         ok={!!state?.foreground && !!state?.background}
         title="Location: Allow all the time"
         hint="Without this, Android stops sharing location as soon as the screen turns off."
-        action={<Button label="Allow all the time" onPress={() => void requestAlwaysLocation().then(recheck)} />}
+        action={<Button size="sm" label="Allow all the time" onPress={() => void requestAlwaysLocation().then(recheck)} />}
       />
       <Row
+        n={2}
         ok={state ? !state.batteryRestricted : false}
         title="Battery: don't restrict this app"
         hint="Battery saver is the most common reason tracking stops partway through the day."
-        action={<Button label="Turn off battery saving" onPress={() => void openBatterySettings()} />}
+        action={<Button size="sm" label="Turn off battery saving" onPress={() => void openBatterySettings()} />}
       />
 
       <Text style={styles.oem}>
@@ -93,7 +113,12 @@ export function TrackingReadinessSheet() {
         {ok ? (
           <Button label={onContinue ? "Continue check-in" : "Done"} onPress={proceed} />
         ) : onContinue ? (
-          <Button label="Check in anyway" variant="secondary" onPress={proceed} />
+          <>
+            <Button label={`${stepsLeft} ${stepsLeft === 1 ? "step" : "steps"} left`} onPress={() => {}} disabled />
+            <Pressable onPress={proceed} style={styles.anyway}>
+              <Text style={styles.anywayLabel}>Check in anyway</Text>
+            </Pressable>
+          </>
         ) : (
           <Button label="Close" variant="secondary" onPress={close} />
         )}
@@ -103,12 +128,33 @@ export function TrackingReadinessSheet() {
 }
 
 const styles = StyleSheet.create({
-  intro: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.md },
-  row: { flexDirection: "row", gap: spacing.sm + 4, marginBottom: spacing.md },
+  intro: { ...typography.body, lineHeight: 22, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.md },
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm + 4,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.background,
+  },
+  rowDone: { borderColor: "rgba(76,195,138,0.4)", backgroundColor: "rgba(76,195,138,0.06)" },
+  badge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryMuted,
+  },
+  badgeDone: { backgroundColor: colors.successMuted },
+  badgeText: { fontSize: 15, fontFamily: "Inter_700Bold", fontWeight: "700", color: colors.primaryDark },
   rowBody: { flex: 1 },
-  rowTitle: { ...typography.bodyStrong, fontSize: 14, color: colors.ink },
-  rowHint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  rowAction: { marginTop: spacing.sm, alignSelf: "flex-start" },
+  rowTitle: { ...typography.bodyStrong, color: colors.ink },
+  rowHint: { ...typography.caption, lineHeight: 18, color: colors.textSecondary, marginTop: 4 },
+  rowAction: { marginTop: spacing.sm + 4, alignSelf: "stretch" },
   oem: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -118,4 +164,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   footer: { marginTop: spacing.xs },
+  anyway: { alignSelf: "center", minHeight: 44, justifyContent: "center" },
+  anywayLabel: { fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: colors.textSecondary },
 });

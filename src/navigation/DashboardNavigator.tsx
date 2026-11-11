@@ -4,6 +4,7 @@ import { LiveMapScreen } from "@/screens/map/LiveMapScreen";
 import { TodaysPlacesScreen } from "@/screens/places/TodaysPlacesScreen";
 import { NavigationScreen } from "@/screens/navigation/NavigationScreen";
 import { ReimbursementScreen } from "@/screens/reimbursement/ReimbursementScreen";
+import { NotificationsScreen } from "@/screens/notifications/NotificationsScreen";
 import { colors } from "@/theme";
 import type { DashboardStackParamList } from "./types";
 
@@ -21,6 +22,7 @@ export function DashboardNavigator() {
         options={{ presentation: "fullScreenModal", gestureEnabled: false }}
       />
       <Stack.Screen name="Reimbursement" component={ReimbursementScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
