@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRoute, type RouteProp } from "@react-navigation/native";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useFocusEffect, useRoute, type RouteProp } from "@react-navigation/native";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -219,6 +219,25 @@ export function RequestsScreen() {
   const overtimeQuery = useOvertimeStatus(true);
   const lateArrivalsQuery = useLateArrivals(true);
 
+  // This tab stays mounted, so without this an admin's approval only shows up on the next 30 s poll
+  // (and pull-to-refresh used to reload leave only). Refresh everything whenever the tab is opened.
+  const refetchAll = () =>
+    Promise.all([
+      leaveQuery.refetch(),
+      permissionsQuery.refetch(),
+      overtimeQuery.refetch(),
+      lateArrivalsQuery.refetch(),
+    ]);
+  const refetchAllRef = useRef(refetchAll);
+  refetchAllRef.current = refetchAll;
+  useFocusEffect(
+    useCallback(() => {
+      void refetchAllRef.current();
+    }, []),
+  );
+  const refreshing =
+    leaveQuery.isRefetching || permissionsQuery.isRefetching || overtimeQuery.isRefetching || lateArrivalsQuery.isRefetching;
+
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
@@ -257,8 +276,8 @@ export function RequestsScreen() {
       scroll
       glow="topLeft"
       contentStyle={styles.content}
-      onRefresh={() => leaveQuery.refetch()}
-      refreshing={leaveQuery.isRefetching}
+      onRefresh={() => void refetchAll()}
+      refreshing={refreshing}
     >
       <Rise>
         <View accessibilityRole="header">

@@ -31,7 +31,11 @@ export const employeeService = {
   // mechanism), including this device's own previous pair, so the caller
   // must store these immediately or the very next request will 401.
   changePin(payload: ChangePinRequest) {
-    return apiClient.post<ChangePinResponse>(endpoints.changePin, payload).then((r) => r.data);
+    // PIN hashing + the "is this PIN taken" check can be slow on the server — wait longer than the
+    // default 15 s so a slow-but-successful change doesn't surface as a network error.
+    return apiClient
+      .post<ChangePinResponse>(endpoints.changePin, payload, { timeout: 60_000 })
+      .then((r) => r.data);
   },
 
   registerPushToken(token: string) {
