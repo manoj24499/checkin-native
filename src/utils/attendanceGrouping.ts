@@ -104,11 +104,28 @@ export function isHybridTimeline(segments: AttendanceSegment[] | undefined): boo
  * together.
  */
 export function groupAttendanceByDay(records: AttendanceRecord[]): DaySummary[] {
+  // Pair each check-out with the check-in it closes BEFORE grouping by day: an overnight shift (e.g. 3:30 PM –
+  // 12:30 AM) checks out on the next calendar date, and grouping by each record's own date would leave the
+  // check-in's day with no check-out (0 hours) and give the next day a check-out that came before its check-in.
+  // A check-out is moved to the check-in's day only when it comes after that check-in and before the next one.
+  const ordered = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   const byDay = new Map<string, AttendanceRecord[]>();
-  for (const r of records) {
-    const key = dateKey(r.timestamp);
+  const push = (key: string, r: AttendanceRecord) => {
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key)?.push(r);
+  };
+  let open: { key: string } | null = null;
+  for (const r of ordered) {
+    if (r.type === "CHECK_IN") {
+      const key = dateKey(r.timestamp);
+      push(key, r);
+      open = { key };
+    } else if (open) {
+      push(open.key, r);
+      open = null;
+    } else {
+      push(dateKey(r.timestamp), r);
+    }
   }
 
   const summaries: DaySummary[] = [];
