@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import NetInfo from "@react-native-community/netinfo";
 import { AxiosError } from "axios";
 import { attendanceService, employeeService } from "@/api/services";
+import { locationService } from "@/api/services/location.service";
 import { isWallClockTrusted, recoverSession } from "@/api/client";
 import {
   LOCAL_SESSION_PREFIX,
@@ -13,7 +14,7 @@ import {
   startLocationTracking,
   stopLocationTracking,
 } from "@/services/locationTracking";
-import { saveTrackingToken } from "@/services/trackingTokens";
+import { getTrackingToken, saveTrackingToken } from "@/services/trackingTokens";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -362,6 +363,11 @@ async function linkExistingCheckIn(item: OfflineQueueItem): Promise<void> {
     const day = localDateKey(new Date(item.capturedAt));
     const match = records.find((r) => r.type === "CHECK_IN" && localDateKey(new Date(r.timestamp)) === day);
     if (match) {
+      // The reply that carries the tracking token is the one that was lost, so there is none on the
+      // phone for this session. Ask the server for a fresh one before the buffered samples upload.
+      if (!(await getTrackingToken(match.id).catch(() => null))) {
+        await locationService.recoverTrackingToken(match.id);
+      }
       await linkRecordedCheckIn(item, match.id, match.timestamp);
       return;
     }
@@ -421,7 +427,15 @@ async function runSync(): Promise<void> {
 
   const sent: ScanResult[] = [];
   let failed = 0;
+  let alreadyRecorded = 0;
   let triedSessionRecovery = false;
+
+  // Items an older version left behind as "Already recorded": clear them and refresh the status.
+  const leftover = getItems().filter((i) => i.status === "already_recorded");
+  if (leftover.length > 0) {
+    await setItems(getItems().filter((i) => i.status !== "already_recorded"));
+    alreadyRecorded += leftover.length;
+  }
 
   // Too old for the server to accept: never sent, and not kept as pending — even while offline.
   for (const item of getItems()) {
@@ -510,9 +524,13 @@ async function runSync(): Promise<void> {
         break;
       }
       if (outcome.kind === "already") {
-        await updateItem(item.clientId, { status: "already_recorded", errorMessage: outcome.message });
+        // The server already has this (typically it got the first request and only the reply was lost).
+        // That is a success, not a problem: link to the server's record, drop the item so no "Pending sync"
+        // card lingers, and — below — refresh the dashboard so it shows the real checked-in state.
         await deleteSecrets(item.clientId);
         if (item.action === "CHECK_IN") await linkExistingCheckIn(item);
+        await setItems(getItems().filter((i) => i.clientId !== item.clientId));
+        alreadyRecorded++;
         continue;
       }
       if (outcome.code === "OFFLINE_DISABLED") {
@@ -535,8 +553,13 @@ async function runSync(): Promise<void> {
     sent.push(result);
   }
 
-  if (sent.length > 0 || failed > 0) {
-    useOfflineQueueStore.getState().setNotice(buildNotice(sent, failed));
+  if (sent.length > 0 || failed > 0 || alreadyRecorded > 0) {
+    if (sent.length > 0 || failed > 0) {
+      useOfflineQueueStore.getState().setNotice(buildNotice(sent, failed));
+    } else {
+      useOfflineQueueStore.getState().setNotice({ tone: "success", message: "Your check-in is recorded." });
+    }
+    // Also fires for "already recorded" so the dashboard refetches the server's status.
     listeners.forEach((listener) => listener({ sent, failed }));
   }
 }

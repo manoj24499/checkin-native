@@ -28,6 +28,7 @@ export const endpoints = {
   support: "/api/mobile/support",
   reimbursements: "/api/mobile/me/reimbursements",
   lateArrivals: "/api/mobile/me/late-arrivals",
+  trackingToken: "/api/mobile/me/tracking-token",
 
   kioskScan: "/api/kiosk/scan",
   kioskStatus: "/api/kiosk/status",

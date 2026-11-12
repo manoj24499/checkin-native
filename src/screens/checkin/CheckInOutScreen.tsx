@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigation } from "@react-navigation/native";
+import { useQueryClient } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import {
@@ -92,6 +94,7 @@ export function CheckInOutScreen() {
   const checkInOut = useCheckInOut();
   const saveOffline = useSaveOfflineAttempt();
   const navigation = useNavigation();
+  const queryClient = useQueryClient();
 
   // Offline check-in: only when the organization allows it (the last status
   // fetched for this employee said so — see services/offlineQueue.ts).
@@ -409,6 +412,21 @@ export function CheckInOutScreen() {
       // back "already checked in" and shows as Already recorded.
       if (offlineEnabled && isNetworkError(error)) {
         await saveAttemptOffline(payload);
+        return;
+      }
+      // The server says it already has today's check-in (or check-out): this screen was showing stale
+      // status. Refetch so the app shows the real state instead of a dead-end error.
+      const alreadyDone =
+        error instanceof AxiosError &&
+        error.response?.status === 409 &&
+        /already checked (in|out)/i.test(String((error.response.data as { error?: string } | undefined)?.error ?? ""));
+      if (alreadyDone) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["attendance-status"] }),
+          queryClient.invalidateQueries({ queryKey: ["attendance-history"] }),
+        ]);
+        resetForm();
+        navigation.navigate("Dashboard" as never);
         return;
       }
       // Surfaced via the IssueDialog below, driven by checkInOut.error.
