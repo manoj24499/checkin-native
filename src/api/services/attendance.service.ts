@@ -23,7 +23,14 @@ export const attendanceService = {
     // Check-in/out does PIN hashing, face verification and photo upload server-side. Giving up at the default
     // 15 s while the server is still working is how a check-in gets recorded yet looks "failed" on the phone
     // (and is then queued as an offline duplicate), so wait much longer.
-    return apiClient.post<ScanResult>(endpoints.kioskScan, payload, { timeout: 60_000 }).then((r) => r.data);
+    // `X-Client-Action` records HOW this was done for the admin's audit log: the slide-to-confirm button, or an
+    // earlier offline attempt being sent now.
+    return apiClient
+      .post<ScanResult>(endpoints.kioskScan, payload, {
+        timeout: 60_000,
+        headers: { "X-Client-Action": payload.offline ? "OFFLINE_SYNC" : "SLIDE_TO_CONFIRM" },
+      })
+      .then((r) => r.data);
   },
 
   /** Today's timed-permission requests for the caller's active check-in. */

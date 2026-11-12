@@ -1,5 +1,8 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
+import { Platform } from "react-native";
 import { env } from "@/config/env";
 import { isNetworkError } from "@/utils/errors";
 
@@ -39,11 +42,29 @@ export function setApiAuthContext(ctx: ApiAuthContext) {
   authContext = ctx;
 }
 
+// Which build and phone is calling — lets an admin tell, in the monitoring site, exactly what a person's app
+// did. Informational only (the server never trusts it for anything); every field is optional.
+function clientHeaders(): Record<string, string> {
+  try {
+    const version = Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? "";
+    const build = Constants.nativeBuildVersion ?? "";
+    const headers: Record<string, string> = { "X-App-Platform": Platform.OS };
+    if (version) headers["X-App-Version"] = build ? `${version} (${build})` : version;
+    if (Platform.Version != null) headers["X-App-OS-Version"] = String(Platform.Version);
+    const model = [Device.manufacturer, Device.modelName].filter(Boolean).join(" ");
+    if (model) headers["X-App-Device"] = model;
+    return headers;
+  } catch {
+    return {};
+  }
+}
+
 export const apiClient = axios.create({
   baseURL: env.apiUrl,
   timeout: 15_000,
   headers: {
     "Content-Type": "application/json",
+    ...clientHeaders(),
     // Free-tier ngrok serves an HTML interstitial (with a 200 status) instead
     // of forwarding to the local dev server unless this header is present.
     // Harmless against non-ngrok backends — they simply ignore it.
