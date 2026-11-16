@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import * as Location from "expo-location";
-import { haversineDistanceMeters, getCurrentPositionWithTimeout } from "@/utils/geo";
+import { haversineDistanceMeters, getCurrentPositionWithTimeout, nearestPlace } from "@/utils/geo";
 
 export interface GeofenceTarget {
   latitude: number;
   longitude: number;
   radiusMeters: number;
+  /** A second place that also counts (a second home) — the nearer of the two is used. */
+  alt?: GeofenceTarget | null;
 }
 
 interface GeofenceState {
@@ -83,18 +85,14 @@ export function useGeofence(target: GeofenceTarget | null | undefined) {
         return;
       }
 
-      const distanceMeters = haversineDistanceMeters(
-        coords.latitude,
-        coords.longitude,
-        target.latitude,
-        target.longitude,
-      );
+      const place = nearestPlace(coords, target);
+      const distanceMeters = haversineDistanceMeters(coords.latitude, coords.longitude, place.latitude, place.longitude);
       setState({
         isLoading: false,
         error: null,
         coords,
         distanceMeters,
-        withinRadius: distanceMeters <= target.radiusMeters,
+        withinRadius: distanceMeters <= place.radiusMeters,
         mocked: false,
       });
     } catch (error) {
@@ -108,7 +106,7 @@ export function useGeofence(target: GeofenceTarget | null | undefined) {
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target?.latitude, target?.longitude, target?.radiusMeters]);
+  }, [target?.latitude, target?.longitude, target?.radiusMeters, target?.alt?.latitude, target?.alt?.longitude]);
 
   useEffect(() => {
     // No target (FIELD workers, or WFH/OFFICE with nothing configured yet)

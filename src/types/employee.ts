@@ -35,6 +35,10 @@ export interface EmployeeProfile extends EmployeeSummary {
   homeLatitude: number | null;
   homeLongitude: number | null;
   homeRadiusMeters: number;
+  /** Optional second home (Work-from-home employees). */
+  home2Latitude?: number | null;
+  home2Longitude?: number | null;
+  home2RadiusMeters?: number;
 }
 
 /** Response shape of POST /api/mobile/me/face-enroll — see lib/faceVerify.ts

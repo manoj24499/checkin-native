@@ -97,3 +97,14 @@ export function checkHybridPlace(
   }
   return { place, officeDistance, homeDistance, nearest };
 }
+
+/** Of a place and its optional second place (a second home), the one the person is in, or else closest to. */
+export function nearestPlace<T extends { latitude: number; longitude: number; radiusMeters: number; alt?: T | null }>(
+  from: { latitude: number; longitude: number },
+  place: T,
+): T {
+  const alt = place.alt;
+  if (!alt) return place;
+  const gap = (t: T) => haversineDistanceMeters(from.latitude, from.longitude, t.latitude, t.longitude) - t.radiusMeters;
+  return gap(alt) < gap(place) ? alt : place;
+}

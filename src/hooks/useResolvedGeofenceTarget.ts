@@ -45,6 +45,11 @@ export function useResolvedGeofenceTarget(dayOverrideMode?: CheckInMode | null):
         latitude: user.homeLatitude,
         longitude: user.homeLongitude,
         radiusMeters: user.homeRadiusMeters,
+        // A second home, when the admin set one: the check uses whichever is nearer.
+        alt:
+          user.home2Latitude != null && user.home2Longitude != null
+            ? { latitude: user.home2Latitude, longitude: user.home2Longitude, radiusMeters: user.home2RadiusMeters ?? 50 }
+            : null,
       };
     }
 

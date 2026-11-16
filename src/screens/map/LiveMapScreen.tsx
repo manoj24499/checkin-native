@@ -38,7 +38,7 @@ import type { GeofenceTarget } from "@/hooks/useGeofence";
 import type { FieldVisit } from "@/types";
 import { useAttendanceSessionStore } from "@/store/attendanceSessionStore";
 import { useAuthStore } from "@/store/authStore";
-import { getCurrentPositionWithTimeout, formatDistance, haversineDistanceMeters } from "@/utils/geo";
+import { getCurrentPositionWithTimeout, formatDistance, haversineDistanceMeters, nearestPlace } from "@/utils/geo";
 import { getErrorMessage } from "@/utils/errors";
 import { endpoints } from "@/api/endpoints";
 import { env } from "@/config/env";
@@ -431,7 +431,10 @@ export function LiveMapScreen() {
   const tier = accuracyMeters != null ? accuracyTier(accuracyMeters) : null;
   const distanceToTarget =
     !isFieldDay && userCoords && target
-      ? haversineDistanceMeters(userCoords.latitude, userCoords.longitude, target.latitude, target.longitude)
+      ? (() => {
+          const place = nearestPlace(userCoords, target);
+          return haversineDistanceMeters(userCoords.latitude, userCoords.longitude, place.latitude, place.longitude);
+        })()
       : null;
   // Room under the white sheet: the floating tab bar inside the tabs, the home indicator in the modal.
   const sheetBottom = tabClearance ? tabClearance + 6 : insets.bottom + spacing.md;
