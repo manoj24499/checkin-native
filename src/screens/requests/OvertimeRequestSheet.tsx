@@ -6,13 +6,24 @@ import { useAuth, useAttendanceStatus, useRequestOvertime } from "@/hooks";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
 import { colors, fontFamilies, spacing, typography } from "@/theme";
 
-/** Combines an "HH:mm" slot with today's calendar date, in local time — same
- * convention as PermissionRequestSheet. */
-function combineTodayAndSlot(hhmm: string): Date {
+const toMin = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);
-  const d = new Date();
-  d.setHours(h, m, 0, 0);
+  return h * 60 + m;
+};
+const toSlot = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+/** The working day an overtime request belongs to. Before 6 AM the employee is still on the previous
+ * evening's day (an after-midnight session), so slots like "26:00" (= 2 AM) land on the right night. */
+function workdayStart(now = new Date()): Date {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  if (now.getHours() < 6) d.setDate(d.getDate() - 1);
   return d;
+}
+
+/** "HH:mm" slot (hours may run past 24 for after-midnight times) on that working day, in local time. */
+function slotToDate(hhmm: string, dayStart: Date): Date {
+  return new Date(dayStart.getTime() + toMin(hhmm) * 60_000);
 }
 
 /** Form body for the "Request overtime" sheet — adapted from the old
@@ -24,6 +35,15 @@ export function OvertimeRequestSheet({ onDone }: { onDone: () => void }) {
   const { user } = useAuth();
   const statusQuery = useAttendanceStatus(user?.employeeCode);
   const shiftEndTime = statusQuery.data?.exists ? statusQuery.data.shiftEndTime : null;
+  const shiftStartTime = statusQuery.data?.exists ? statusQuery.data.shiftStartTime : null;
+  // A night shift ends the next calendar day (end <= start, e.g. 18:00 -> 02:00), so its end counts as 24h+.
+  const overnightShift = !!shiftStartTime && !!shiftEndTime && toMin(shiftEndTime) <= toMin(shiftStartTime);
+  const dayStart = workdayStart();
+  // Slots at or before this are disabled: the shift end, or right now if that is later.
+  const earliestMin = Math.max(
+    shiftEndTime ? toMin(shiftEndTime) + (overnightShift ? 1440 : 0) : 0,
+    Math.floor((Date.now() - dayStart.getTime()) / 60_000),
+  );
   const { mutateAsync, isPending } = useRequestOvertime();
   const [endSlot, setEndSlot] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -36,7 +56,7 @@ export function OvertimeRequestSheet({ onDone }: { onDone: () => void }) {
     setSubmitError(null);
     try {
       await mutateAsync({
-        estimatedEndAt: combineTodayAndSlot(endSlot).toISOString(),
+        estimatedEndAt: slotToDate(endSlot, workdayStart()).toISOString(),
         reason: reason.trim(),
       });
       onDone();
@@ -56,7 +76,8 @@ export function OvertimeRequestSheet({ onDone }: { onDone: () => void }) {
           label="UNTIL ABOUT"
           value={endSlot}
           onChange={setEndSlot}
-          disabledAtOrBefore={shiftEndTime}
+          disabledAtOrBefore={toSlot(earliestMin)}
+          allowOvernight
         />
         {shiftEndTime ? (
           <Text style={styles.pickerHint}>

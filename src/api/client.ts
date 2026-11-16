@@ -23,6 +23,8 @@ const SESSION_PROTECTED_PREFIXES = [
   "/api/mobile/me",
   "/api/mobile/change-pin",
   "/api/mobile/field-visits",
+  // Today's status is read with the bearer token; an expired one gets a 401 here, which refreshes the token and retries.
+  "/api/kiosk/status",
 ];
 
 /**

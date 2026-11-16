@@ -207,8 +207,9 @@ export function DashboardScreen() {
   // Right after the app is reopened the status can still be loading (or the copy kept on the phone predates the
   // check-in), which used to leave the clock at 0 until a second refresh. While the status is being fetched, fall
   // back to the open check-in in today's history so the clock keeps running from the real check-in time.
-  const provisionalCheckInAt =
-    !sessionOpen && !checkedOut && statusQuery.isFetching ? (activeCheckIn?.timestamp ?? null) : null;
+  // Also covers the status briefly reading "not checked in" while today's history still shows the open
+  // check-in (a stale or odd poll): the clock keeps running instead of dropping to 0 until the next refresh.
+  const provisionalCheckInAt = !sessionOpen && !checkedOut ? (activeCheckIn?.timestamp ?? null) : null;
 
   // Whichever of today's timed-permission requests is currently relevant —
   // for display, that's the most recent non-resolved one (a rejected one is

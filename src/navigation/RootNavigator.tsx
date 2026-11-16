@@ -34,6 +34,13 @@ const REAUTH_GRACE_MS = 2000;
 // repeatedly right after checking in.
 const TRACKING_START_GRACE_MS = 5000;
 
+// The lock only comes back if the app was really away for at least this long. Android system dialogs and
+// services (the location permission prompt, the map screen starting the GPS, the tracking notification)
+// make the app report "inactive"/"background" and "active" again within a second or two — that is not the
+// employee leaving, and asking for the fingerprint each time they open the Map tab was a bug. Genuinely
+// leaving the app (switching apps, locking the phone) takes far longer than this.
+const MIN_AWAY_FOR_RELOCK_MS = 8000;
+
 export function RootNavigator() {
   const { status, user } = useAuth();
   // Read reactively only for the final render decision below. The two
@@ -47,6 +54,7 @@ export function RootNavigator() {
   const [unlocked, setUnlocked] = useState(true);
   const appState = useRef(AppState.currentState);
   const isPrompting = useRef(false);
+  const leftAppAt = useRef<number | null>(null);
   // Taps on the HYBRID "Heading home?" / "Are you home yet?" pushes open Home.
   useHybridPushHandling(status === "authenticated");
 
@@ -73,6 +81,12 @@ export function RootNavigator() {
     const subscription = AppState.addEventListener("change", (next: AppStateStatus) => {
       const wasBackground = appState.current.match(/inactive|background/);
       appState.current = next;
+      if (next !== "active") {
+        if (leftAppAt.current === null) leftAppAt.current = Date.now();
+        return;
+      }
+      const awayMs = leftAppAt.current === null ? Infinity : Date.now() - leftAppAt.current;
+      leftAppAt.current = null;
       // Covers a biometric prompt triggered from ANYWHERE (e.g. Profile's
       // own "enable" flow), not just this component's own requestUnlock —
       // the prompt's dialog can cause this exact foreground transition on
@@ -82,7 +96,7 @@ export function RootNavigator() {
       const enabled = useSettingsStore.getState().biometricUnlockEnabled;
       if (
         wasBackground &&
-        next === "active" &&
+        awayMs >= MIN_AWAY_FOR_RELOCK_MS &&
         status === "authenticated" &&
         enabled &&
         !recentBiometricPrompt &&

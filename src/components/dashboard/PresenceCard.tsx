@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Animated, AppState, Easing, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Defs, LinearGradient as SvgGradient, Path, Stop } from "react-native-svg";
 import {
   Button,
@@ -143,7 +143,15 @@ export function PresenceCard({
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    // Android can pause JS timers while the app is in the background; catch up the moment it returns
+    // instead of showing a stale reading until the next tick.
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") setNow(Date.now());
+    });
+    return () => {
+      clearInterval(id);
+      sub.remove();
+    };
   }, []);
 
   const checkInMs = checkInAt ? new Date(checkInAt).getTime() : null;
