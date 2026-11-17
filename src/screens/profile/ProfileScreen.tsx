@@ -30,6 +30,7 @@ import { discardOfflineQueue } from "@/services/offlineQueue";
 import { countWaitingVisits, discardVisitQueue } from "@/services/visitQueue";
 import { useVisitQueueStore } from "@/store/visitQueueStore";
 import { forgetVerifiedPin } from "@/services/pinVerifier";
+import { clearFingerprintPin } from "@/services/savedPin";
 import { promptBiometricAuth, getLastBiometricError } from "@/services/biometrics";
 import { registerPushTokenBestEffort } from "@/services/notifications";
 import { employeeService } from "@/api/services";
@@ -153,6 +154,8 @@ export function ProfileScreen() {
   const shiftRemindersEnabled = useSettingsStore((s) => s.shiftRemindersEnabled);
   const liveLocationEnabled = useSettingsStore((s) => s.liveLocationEnabled);
   const setBiometricUnlockEnabled = useSettingsStore((s) => s.setBiometricUnlockEnabled);
+  const fingerprintCheckinEnabled = useSettingsStore((s) => s.fingerprintCheckinEnabled);
+  const setFingerprintCheckinEnabled = useSettingsStore((s) => s.setFingerprintCheckinEnabled);
   const setShiftRemindersEnabled = useSettingsStore((s) => s.setShiftRemindersEnabled);
   const setLiveLocationEnabled = useSettingsStore((s) => s.setLiveLocationEnabled);
 
@@ -179,6 +182,7 @@ export function ProfileScreen() {
     await discardOfflineQueue();
     await discardVisitQueue();
     if (user) await forgetVerifiedPin(user.employeeCode);
+    if (user) await clearFingerprintPin(user.employeeCode);
     await logout();
   };
 
@@ -192,6 +196,20 @@ export function ProfileScreen() {
       }
     }
     setBiometricUnlockEnabled(next);
+  };
+
+  const handleFingerprintCheckinToggle = async (next: boolean) => {
+    setBiometricError(null);
+    if (next) {
+      const verified = await promptBiometricAuth("Enable fingerprint check-in");
+      if (!verified) {
+        setBiometricError(getLastBiometricError());
+        return;
+      }
+    } else if (user) {
+      await clearFingerprintPin(user.employeeCode);
+    }
+    setFingerprintCheckinEnabled(next);
   };
 
   const handleShiftRemindersToggle = async (next: boolean) => {
@@ -341,6 +359,13 @@ export function ProfileScreen() {
             value={biometricUnlockEnabled}
             disabled={!biometricAvailable}
             onValueChange={handleBiometricToggle}
+          />
+          <SettingsRow
+            label="Fingerprint check-in"
+            help={biometricAvailable ? "Confirm check-in and check-out with your fingerprint instead of typing your PIN. Your PIN is saved after your next check-in." : "Not available on this device"}
+            value={fingerprintCheckinEnabled}
+            disabled={!biometricAvailable}
+            onValueChange={handleFingerprintCheckinToggle}
           />
           {biometricError ? <Text style={styles.errorText}>Biometric error: {biometricError}</Text> : null}
           <SettingsRow

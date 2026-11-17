@@ -5,6 +5,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 interface SettingsState {
   /** Prompts Face ID/fingerprint on app foreground before showing content. */
   biometricUnlockEnabled: boolean;
+  /** Confirm check-in/out with a fingerprint instead of typing the PIN (see services/savedPin.ts). */
+  fingerprintCheckinEnabled: boolean;
   /** Requests notification permission and syncs the preference server-side
    * (see ProfileScreen's handleShiftRemindersToggle) — the server decides
    * whether to actually push a shift-end/overtime-end reminder based on
@@ -19,6 +21,7 @@ interface SettingsState {
    * PIN, which are never persisted anywhere on the device. */
   lastOrganizationCode: string;
   setBiometricUnlockEnabled: (value: boolean) => void;
+  setFingerprintCheckinEnabled: (value: boolean) => void;
   setShiftRemindersEnabled: (value: boolean) => void;
   setLiveLocationEnabled: (value: boolean) => void;
   setLastOrganizationCode: (value: string) => void;
@@ -28,10 +31,12 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       biometricUnlockEnabled: false,
+      fingerprintCheckinEnabled: false,
       shiftRemindersEnabled: true,
       liveLocationEnabled: true,
       lastOrganizationCode: "",
       setBiometricUnlockEnabled: (value) => set({ biometricUnlockEnabled: value }),
+      setFingerprintCheckinEnabled: (value) => set({ fingerprintCheckinEnabled: value }),
       setShiftRemindersEnabled: (value) => set({ shiftRemindersEnabled: value }),
       setLiveLocationEnabled: (value) => set({ liveLocationEnabled: value }),
       setLastOrganizationCode: (value) => set({ lastOrganizationCode: value }),

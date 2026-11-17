@@ -44,6 +44,9 @@ import { useCheckInDraftStore } from "@/store/checkInDraftStore";
 import { useTrackingFixStore } from "@/store/trackingFixStore";
 import { checkTrackingReadiness } from "@/services/trackingReadiness";
 import { checkPinLocally } from "@/services/pinVerifier";
+import { promptBiometricAuth } from "@/services/biometrics";
+import { saveFingerprintPin, readFingerprintPin, clearFingerprintPin, hasFingerprintPin } from "@/services/savedPin";
+import { useSettingsStore } from "@/store/settingsStore";
 import { syncOfflineQueue } from "@/services/offlineQueue";
 import { useOfflineQueueStore } from "@/store/offlineQueueStore";
 import { getErrorMessage, isNetworkError } from "@/utils/errors";
@@ -121,6 +124,23 @@ export function CheckInOutScreen() {
   const [offlineIssue, setOfflineIssue] = useState<{ title: string; body: string } | null>(null);
 
   const [pin, setPin] = useState("");
+  // Fingerprint check-in: a saved PIN is released by a fingerprint scan instead of typing it.
+  const fingerprintEnabled = useSettingsStore((s) => s.fingerprintCheckinEnabled);
+  const [savedPinReady, setSavedPinReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (!user || !fingerprintEnabled) {
+      setSavedPinReady(false);
+      return;
+    }
+    void hasFingerprintPin(user.employeeCode).then((ok) => {
+      if (alive) setSavedPinReady(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [user, fingerprintEnabled]);
+  const fingerprintReady = fingerprintEnabled && savedPinReady;
   // Vehicle odometer reading (km) — asked for on Field sessions only: start
   // reading at check-in, end reading at check-out.
   const [odometer, setOdometer] = useState("");
@@ -323,7 +343,7 @@ export function CheckInOutScreen() {
     : !requiresGeofence || withinRadius === true;
 
   const canSubmit =
-    pin.length >= 4 &&
+    (pin.length >= 4 || fingerprintReady) &&
     (!needsOdometer || odometerValid) &&
     (!requiresPhoto || !!photoDataUrl) &&
     locationOk;
@@ -334,14 +354,24 @@ export function CheckInOutScreen() {
   // first; the employee can still check in anyway from there.
   const handleSubmit = async () => {
     if (!user) return;
+    // No PIN typed but a fingerprint-saved one exists: a fingerprint scan releases it.
+    let usedPin = pin;
+    let fromFingerprint = false;
+    if (pin.length < 4 && fingerprintReady) {
+      const ok = await promptBiometricAuth(action === "CHECK_IN" ? "Confirm check-in" : "Confirm check-out");
+      const saved = ok ? await readFingerprintPin(user.employeeCode) : null;
+      if (!saved) return; // cancelled or failed — the PIN boxes are still there as a fallback
+      usedPin = saved;
+      fromFingerprint = true;
+    }
     if (action === "CHECK_IN" && (needsOdometer || isHybridEmployee)) {
       const readiness = await checkTrackingReadiness();
       if (!readiness.ok) {
-        useTrackingFixStore.getState().show(() => void submitCheckIn());
+        useTrackingFixStore.getState().show(() => void submitCheckIn(usedPin, fromFingerprint));
         return;
       }
     }
-    await submitCheckIn();
+    await submitCheckIn(usedPin, fromFingerprint);
   };
 
   const resetForm = () => {
@@ -378,11 +408,11 @@ export function CheckInOutScreen() {
     }
   };
 
-  const submitCheckIn = async () => {
+  const submitCheckIn = async (usedPin: string = pin, fromFingerprint = false) => {
     if (!user) return;
     const payload: ScanRequest = {
       employeeCode: user.employeeCode,
-      pin,
+      pin: usedPin,
       action,
       photo: photoDataUrl ?? undefined,
       latitude: geofence.coords?.latitude,
@@ -401,6 +431,11 @@ export function CheckInOutScreen() {
     }
     try {
       await checkInOut.mutateAsync(payload);
+      // The server accepted this PIN: keep it for fingerprint check-in (first time, or after a PIN change).
+      if (fingerprintEnabled && !fromFingerprint) {
+        await saveFingerprintPin(user.employeeCode, usedPin);
+        setSavedPinReady(true);
+      }
       resetForm();
       // After checking in, land on the Dashboard rather than leaving the
       // employee on the (now "check out") form.
@@ -428,6 +463,12 @@ export function CheckInOutScreen() {
         resetForm();
         navigation.navigate("Dashboard" as never);
         return;
+      }
+      // A saved PIN the server no longer accepts (changed by the employee or an admin): forget it so the
+      // employee types the new one, which is then saved again on the next success.
+      if (fromFingerprint && error instanceof AxiosError && /pin/i.test(String((error.response?.data as { error?: string } | undefined)?.error ?? ""))) {
+        await clearFingerprintPin(user.employeeCode);
+        setSavedPinReady(false);
       }
       // Surfaced via the IssueDialog below, driven by checkInOut.error.
       setIssueOpen(true);
@@ -502,7 +543,7 @@ export function CheckInOutScreen() {
       ? null
       : requiresPhoto && !photoDataUrl
         ? "Take your photo to unlock"
-        : pin.length < 4
+        : pin.length < 4 && !fingerprintReady
           ? "Enter your PIN to unlock"
           : needsOdometer && !odometerValid
             ? "Enter the km reading to unlock"
@@ -514,7 +555,9 @@ export function CheckInOutScreen() {
                   : "Location needed to unlock"
               : "Locked";
   const ringHelp = canSubmit
-    ? offlineMode
+    ? fingerprintReady && pin.length < 4
+      ? "Slide, then confirm with your fingerprint. The server still re-checks your PIN, photo and distance."
+      : offlineMode
       ? "You're offline — this is saved on the phone and sent automatically. The server checks it then."
       : SERVER_NOTE
     : offlineMode && !locationOk
@@ -525,7 +568,7 @@ export function CheckInOutScreen() {
             ? "You're outside both the office and your home."
             : "You're outside your work area."
           : "Your location is needed to unlock."
-    : isHybridEmployee && !locationOk && !geofence.isLoading && pin.length >= 4 && (!requiresPhoto || !!photoDataUrl)
+    : isHybridEmployee && !locationOk && !geofence.isLoading && (pin.length >= 4 || fingerprintReady) && (!requiresPhoto || !!photoDataUrl)
       ? "Check in from the office or from home."
     : needsOdometer && !odometerValid
       ? `Enter the ${action === "CHECK_IN" ? "start" : "end"} km reading to unlock.`
@@ -559,7 +602,7 @@ export function CheckInOutScreen() {
           ? `${modeWord} · geofence ${Math.round(target.radiusMeters)} m`
           : modeWord;
 
-  const pinDone = pin.length >= 4;
+  const pinDone = pin.length >= 4 || fingerprintReady;
   let rise = 0;
   const nextDelay = () => {
     const d = rise;
@@ -770,7 +813,7 @@ export function CheckInOutScreen() {
           <View style={styles.cardHeadRow}>
             <Kicker>PIN</Kicker>
             <View style={styles.pinStatus}>
-              <Text style={styles.pinHint}>{pinDone ? "Entered" : "Tap to enter 4–6 digits"}</Text>
+              <Text style={styles.pinHint}>{pin.length >= 4 ? "Entered" : fingerprintReady ? "Fingerprint ready — or type PIN" : "Tap to enter 4–6 digits"}</Text>
               <StepTick done={pinDone} />
             </View>
           </View>
