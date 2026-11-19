@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus, StyleSheet, Text, View } from "react-native";
 import { useAuth, useHybridPushHandling } from "@/hooks";
 import { useSettingsStore } from "@/store/settingsStore";
-import { promptBiometricAuth, msSinceLastBiometricPrompt } from "@/services/biometrics";
+import { promptBiometricAuthPatiently, msSinceLastBiometricPrompt, getLastBiometricError } from "@/services/biometrics";
 import { checkTrackingHealth, msSinceLocationTrackingStart } from "@/services/locationTracking";
 import { Screen, Button, IconTile, LoadingView, TrackingReadinessSheet } from "@/components/ui";
 import { LogoMark } from "@/components/branding/LogoMark";
@@ -58,22 +58,64 @@ export function RootNavigator() {
   // Taps on the HYBRID "Heading home?" / "Are you home yet?" pushes open Home.
   useHybridPushHandling(status === "authenticated");
 
+  // Why the last prompt closed without unlocking, shown small on the lock screen so a problem can be diagnosed.
+  const [unlockDetail, setUnlockDetail] = useState<string | null>(null);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const requestUnlock = () => {
     if (isPrompting.current) return;
     isPrompting.current = true;
     setUnlocked(false);
-    promptBiometricAuth("Unlock Check-In")
-      .then(setUnlocked)
+    setUnlockDetail(null);
+    promptBiometricAuthPatiently("Unlock Check-In")
+      .then((ok) => {
+        if (!ok) setUnlockDetail(getLastBiometricError());
+        setUnlocked(ok);
+      })
       .finally(() => {
         isPrompting.current = false;
       });
   };
 
-  // Gate once when the app finishes signing in (cold launch only).
+  // Coming back to the app: lock at once (so nothing is readable), but give Android a moment to bring the
+  // window back before the fingerprint dialog opens. Opening it the instant the app turns active made the
+  // system close it again after about two seconds.
+  const requestUnlockAfterResume = () => {
+    setUnlocked(false);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => {
+      resumeTimer.current = null;
+      if (AppState.currentState === "active") requestUnlock();
+    }, 900);
+  };
+
+  // Gate once when the app finishes signing in (cold launch only). Showing the prompt the instant the app
+  // starts made Android close it after about two seconds (the window had not taken focus yet), leaving the
+  // employee on the lock screen until they tapped "Try again". So: wait until the app is really in the
+  // foreground, give it a moment to settle, and the prompt itself retries if the system still cancels it.
   useEffect(() => {
-    if (status === "authenticated" && useSettingsStore.getState().biometricUnlockEnabled) {
-      requestUnlock();
+    if (status !== "authenticated" || !useSettingsStore.getState().biometricUnlockEnabled) return;
+    setUnlocked(false);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let sub: { remove: () => void } | undefined;
+    const start = () => {
+      timer = setTimeout(() => {
+        if (!cancelled) requestUnlock();
+      }, 600);
+    };
+    if (AppState.currentState === "active") {
+      start();
+    } else {
+      sub = AppState.addEventListener("change", (next) => {
+        if (next === "active" && !timer) start();
+      });
     }
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      sub?.remove();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
@@ -103,7 +145,7 @@ export function RootNavigator() {
         !recentTrackingStart &&
         !isPrompting.current
       ) {
-        requestUnlock();
+        requestUnlockAfterResume();
       }
     });
     return () => subscription.remove();
@@ -152,7 +194,7 @@ export function RootNavigator() {
       <TrackingReadinessSheet />
       {showLock ? (
         <View style={styles.lockOverlay}>
-          <BiometricLockScreen onRetry={requestUnlock} />
+          <BiometricLockScreen onRetry={requestUnlock} detail={unlockDetail} />
         </View>
       ) : null}
     </View>

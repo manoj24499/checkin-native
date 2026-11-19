@@ -23,7 +23,7 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
  * No dedicated mockup: built from the Login.dc.html language (light page, glows, brand lockup + glass chip,
  * Space Grotesk title, gradient CTA).
  */
-export function BiometricLockScreen({ onRetry }: { onRetry: () => void }) {
+export function BiometricLockScreen({ onRetry, detail }: { onRetry: () => void; detail?: string | null }) {
   const progress = useRef(new Animated.Value(0)).current;
   const anim = useRef<Animated.CompositeAnimation | null>(null);
   const [holding, setHolding] = useState(false);
@@ -65,6 +65,7 @@ export function BiometricLockScreen({ onRetry }: { onRetry: () => void }) {
           <Caps>App locked</Caps>
           <Text style={styles.title}>Locked</Text>
           <Text style={styles.message}>Unlock with Face ID / fingerprint to continue.</Text>
+          {detail ? <Text style={styles.detail}>Reason: {detail}</Text> : null}
         </Rise>
 
         <Rise delay={200} style={styles.sensorWrap}>
@@ -141,6 +142,7 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     marginTop: 6,
   },
+  detail: { fontSize: 11, fontFamily: fontFamilies.regular, color: colors.textSecondary, opacity: 0.7, textAlign: "center", marginTop: 6 },
   sensorWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 20 },
   sensorBox: { width: SIZE, height: SIZE },
   sensor: {

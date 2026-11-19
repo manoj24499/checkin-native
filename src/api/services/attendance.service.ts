@@ -2,6 +2,8 @@ import { apiClient } from "@/api/client";
 import { endpoints } from "@/api/endpoints";
 import type {
   KioskStatus,
+  Meeting,
+  MeetingInput,
   OvertimeRequest,
   OvertimeRequestInput,
   ScanRequest,
@@ -53,5 +55,19 @@ export const attendanceService = {
   /** Self-declared, takes effect immediately — see the type's own comment. */
   requestOvertime(payload: OvertimeRequestInput) {
     return apiClient.post<OvertimeRequest>(endpoints.overtime, payload).then((r) => r.data);
+  },
+
+  /** Meetings the caller added outside their shift: the last 7 days and everything ahead. */
+  getMeetings() {
+    return apiClient.get<{ meetings: Meeting[] }>(endpoints.meetings).then((r) => r.data.meetings);
+  },
+
+  /** Adds a meeting before or after the shift. No approval: the admin is only notified. */
+  addMeeting(payload: MeetingInput) {
+    return apiClient.post<Meeting>(endpoints.meetings, payload).then((r) => r.data);
+  },
+
+  cancelMeeting(id: string) {
+    return apiClient.delete(endpoints.meeting(id)).then(() => undefined);
   },
 };

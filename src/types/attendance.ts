@@ -207,6 +207,23 @@ export interface OvertimeRequestInput {
   reason: string;
 }
 
+/** A meeting the employee added outside their shift hours (see /api/mobile/me/meetings). Takes effect at once. */
+export interface Meeting {
+  id: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  createdAt: string;
+  /** Not finished yet, so it can still be cancelled. */
+  upcoming: boolean;
+}
+
+export interface MeetingInput {
+  title: string;
+  startAt: string;
+  endAt: string;
+}
+
 export interface ScanResult {
   id: string;
   name: string;

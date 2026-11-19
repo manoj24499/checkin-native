@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
+import * as Application from "expo-application";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { env } from "@/config/env";
@@ -55,6 +56,12 @@ function clientHeaders(): Record<string, string> {
     if (Platform.Version != null) headers["X-App-OS-Version"] = String(Platform.Version);
     const model = [Device.manufacturer, Device.modelName].filter(Boolean).join(" ");
     if (model) headers["X-App-Device"] = model;
+    // A stable id for this phone (the Android ID survives reinstalling the app). The server registers the
+    // first phone an employee signs in on and refuses any other until an admin approves it.
+    if (Platform.OS === "android") {
+      const deviceId = Application.getAndroidId();
+      if (deviceId) headers["X-App-Device-Id"] = deviceId;
+    }
     return headers;
   } catch {
     return {};

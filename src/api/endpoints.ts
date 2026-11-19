@@ -14,6 +14,8 @@ export const endpoints = {
   pushToken: "/api/mobile/me/push-token",
   timedPermission: "/api/mobile/me/timed-permission",
   overtime: "/api/mobile/me/overtime",
+  meetings: "/api/mobile/me/meetings",
+  meeting: (id: string) => `/api/mobile/me/meetings/${id}`,
   leaveRequests: "/api/mobile/me/leave-requests",
   leaveRequest: (id: string) => `/api/mobile/me/leave-requests/${id}`,
   holidays: "/api/mobile/holidays",

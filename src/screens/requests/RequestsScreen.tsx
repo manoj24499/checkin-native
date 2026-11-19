@@ -19,6 +19,7 @@ import {
 import { LeaveRequestSheet } from "./LeaveRequestSheet";
 import { PermissionRequestSheet } from "./PermissionRequestSheet";
 import { OvertimeRequestSheet } from "./OvertimeRequestSheet";
+import { MeetingSheet } from "./MeetingSheet";
 import {
   useLeaveRequests,
   useHolidays,
@@ -26,6 +27,8 @@ import {
   useTimedPermissions,
   useOvertimeStatus,
   useLateArrivals,
+  useMeetings,
+  useCancelMeeting,
 } from "@/hooks";
 import { getErrorMessage } from "@/utils/errors";
 import { colors, fontFamilies, gradientDirection, gradients, spacing, typography } from "@/theme";
@@ -37,12 +40,13 @@ import type {
   TimedPermissionStatus,
   OvertimeRequest,
   OvertimeRequestStatus,
+  Meeting,
   TimeOffType,
   PublicHoliday,
   LateArrival,
 } from "@/types";
 
-type ReqTab = "leave" | "permission" | "overtime";
+type ReqTab = "leave" | "permission" | "overtime" | "meeting";
 type Route = RouteProp<AppTabParamList, "Requests">;
 
 const TYPE_LABEL: Record<TimeOffType, string> = { CASUAL: "Casual", SICK: "Sick", EARNED: "Earned" };
@@ -218,6 +222,8 @@ export function RequestsScreen() {
   const permissionsQuery = useTimedPermissions(true);
   const overtimeQuery = useOvertimeStatus(true);
   const lateArrivalsQuery = useLateArrivals(true);
+  const meetingsQuery = useMeetings(true);
+  const cancelMeeting = useCancelMeeting();
 
   // This tab stays mounted, so without this an admin's approval only shows up on the next 30 s poll
   // (and pull-to-refresh used to reload leave only). Refresh everything whenever the tab is opened.
@@ -227,6 +233,7 @@ export function RequestsScreen() {
       permissionsQuery.refetch(),
       overtimeQuery.refetch(),
       lateArrivalsQuery.refetch(),
+      meetingsQuery.refetch(),
     ]);
   const refetchAllRef = useRef(refetchAll);
   refetchAllRef.current = refetchAll;
@@ -236,7 +243,7 @@ export function RequestsScreen() {
     }, []),
   );
   const refreshing =
-    leaveQuery.isRefetching || permissionsQuery.isRefetching || overtimeQuery.isRefetching || lateArrivalsQuery.isRefetching;
+    leaveQuery.isRefetching || permissionsQuery.isRefetching || overtimeQuery.isRefetching || lateArrivalsQuery.isRefetching || meetingsQuery.isRefetching;
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -250,6 +257,9 @@ export function RequestsScreen() {
   const permissions = permissionsQuery.data ?? [];
   const overtimeRequests = overtimeQuery.data ?? [];
   const lateArrivals = lateArrivalsQuery.data ?? [];
+  const meetings = meetingsQuery.data ?? [];
+  const [cancellingMeetingId, setCancellingMeetingId] = useState<string | null>(null);
+  const [meetingError, setMeetingError] = useState<string | null>(null);
 
   const handleCancelLeave = async (id: string) => {
     setCancellingId(id);
@@ -263,10 +273,23 @@ export function RequestsScreen() {
     }
   };
 
+  const handleCancelMeeting = async (id: string) => {
+    setCancellingMeetingId(id);
+    setMeetingError(null);
+    try {
+      await cancelMeeting.mutateAsync(id);
+    } catch (error) {
+      setMeetingError(getErrorMessage(error, "Couldn't cancel that meeting."));
+    } finally {
+      setCancellingMeetingId(null);
+    }
+  };
+
   const TABS: { id: ReqTab; label: string; badge?: number }[] = [
     { id: "leave", label: "Leave", badge: pendingLeaveCount || undefined },
     { id: "permission", label: "Permission" },
     { id: "overtime", label: "Overtime" },
+    { id: "meeting", label: "Meeting" },
   ];
 
   const holidayBase = stagger(280, leaveRequests.length) + 60;
@@ -477,6 +500,51 @@ export function RequestsScreen() {
         </>
       ) : null}
 
+      {tab === "meeting" ? (
+        <>
+          <ActionCard
+            kicker="Before or after your shift"
+            title="Have a meeting outside shift hours?"
+            body="Add it here. No approval needed: your admin is just told. Meetings during your shift don't need adding."
+            cta="Add a meeting"
+            onPress={() => setSheet("meeting")}
+          />
+
+          <ListKicker delay={220}>Your meetings</ListKicker>
+          {meetingError ? <Text style={styles.errorText}>{meetingError}</Text> : null}
+          {meetings.length === 0 ? (
+            <Rise delay={280}>
+              <EmptyState title="Nothing here yet" message="Meetings you add show up here." />
+            </Rise>
+          ) : (
+            meetings.map((m: Meeting, i) => (
+              <RequestCard key={m.id} delay={stagger(280, i)}>
+                <View style={styles.rqHead}>
+                  <Text style={styles.rqTitle}>
+                    {formatTime(m.startAt)} – {formatTime(m.endAt)}
+                  </Text>
+                  <StatusBadge label={m.upcoming ? "Added" : "Done"} tone={m.upcoming ? "success" : "neutral"} />
+                </View>
+                <Text style={styles.rqMeta}>
+                  {formatDateWithWeekday(m.startAt)} · {m.title}
+                </Text>
+                {m.upcoming ? (
+                  <Pressable
+                    onPress={() => handleCancelMeeting(m.id)}
+                    disabled={cancellingMeetingId === m.id}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10 }}
+                    style={styles.cancelBtn}
+                  >
+                    <Text style={styles.cancelLink}>{cancellingMeetingId === m.id ? "Cancelling…" : "Cancel meeting"}</Text>
+                  </Pressable>
+                ) : null}
+              </RequestCard>
+            ))
+          )}
+        </>
+      ) : null}
+
       <BottomSheet visible={sheet === "leave"} onClose={() => setSheet(null)} kicker="TIME OFF" title="Request leave">
         <LeaveRequestSheet onDone={() => setSheet(null)} />
       </BottomSheet>
@@ -487,6 +555,9 @@ export function RequestsScreen() {
         title="Pause my work time"
       >
         <PermissionRequestSheet onDone={() => setSheet(null)} />
+      </BottomSheet>
+      <BottomSheet visible={sheet === "meeting"} onClose={() => setSheet(null)} kicker="OUTSIDE SHIFT" title="Add a meeting">
+        <MeetingSheet onDone={() => setSheet(null)} />
       </BottomSheet>
       <BottomSheet visible={sheet === "overtime"} onClose={() => setSheet(null)} kicker="TODAY" title="Request overtime">
         <OvertimeRequestSheet onDone={() => setSheet(null)} />

@@ -44,7 +44,7 @@ import { useCheckInDraftStore } from "@/store/checkInDraftStore";
 import { useTrackingFixStore } from "@/store/trackingFixStore";
 import { checkTrackingReadiness } from "@/services/trackingReadiness";
 import { checkPinLocally } from "@/services/pinVerifier";
-import { promptBiometricAuth } from "@/services/biometrics";
+import { promptBiometricAuthPatiently } from "@/services/biometrics";
 import { saveFingerprintPin, readFingerprintPin, clearFingerprintPin, hasFingerprintPin } from "@/services/savedPin";
 import { useSettingsStore } from "@/store/settingsStore";
 import { syncOfflineQueue } from "@/services/offlineQueue";
@@ -358,7 +358,7 @@ export function CheckInOutScreen() {
     let usedPin = pin;
     let fromFingerprint = false;
     if (pin.length < 4 && fingerprintReady) {
-      const ok = await promptBiometricAuth(action === "CHECK_IN" ? "Confirm check-in" : "Confirm check-out");
+      const ok = await promptBiometricAuthPatiently(action === "CHECK_IN" ? "Confirm check-in" : "Confirm check-out");
       const saved = ok ? await readFingerprintPin(user.employeeCode) : null;
       if (!saved) return; // cancelled or failed — the PIN boxes are still there as a fallback
       usedPin = saved;

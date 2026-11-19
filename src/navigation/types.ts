@@ -41,6 +41,6 @@ export type AppTabParamList = {
   // consolidated into one tabbed screen (see RequestsScreen). `tab` lets a
   // caller (e.g. Dashboard's shortcut buttons) land directly on a specific
   // segment instead of always defaulting to Leave.
-  Requests: { tab?: "leave" | "permission" | "overtime" } | undefined;
+  Requests: { tab?: "leave" | "permission" | "overtime" | "meeting" } | undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList> | undefined;
 };

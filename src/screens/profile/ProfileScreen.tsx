@@ -186,22 +186,12 @@ export function ProfileScreen() {
     await logout();
   };
 
-  const handleBiometricToggle = async (next: boolean) => {
+  // One option for both: unlocking the app and confirming check-in/out with the fingerprint. Face
+  // verification still runs on every check-in either way.
+  const handleFingerprintToggle = async (next: boolean) => {
     setBiometricError(null);
     if (next) {
-      const verified = await promptBiometricAuth("Enable biometric unlock");
-      if (!verified) {
-        setBiometricError(getLastBiometricError());
-        return;
-      }
-    }
-    setBiometricUnlockEnabled(next);
-  };
-
-  const handleFingerprintCheckinToggle = async (next: boolean) => {
-    setBiometricError(null);
-    if (next) {
-      const verified = await promptBiometricAuth("Enable fingerprint check-in");
+      const verified = await promptBiometricAuth("Enable fingerprint");
       if (!verified) {
         setBiometricError(getLastBiometricError());
         return;
@@ -209,6 +199,7 @@ export function ProfileScreen() {
     } else if (user) {
       await clearFingerprintPin(user.employeeCode);
     }
+    setBiometricUnlockEnabled(next);
     setFingerprintCheckinEnabled(next);
   };
 
@@ -354,18 +345,15 @@ export function ProfileScreen() {
       <Rise delay={160}>
         <Card style={styles.groupCard}>
           <SettingsRow
-            label="Biometric unlock"
-            help={biometricAvailable ? "Face ID / fingerprint to unlock the app." : "Not available on this device"}
-            value={biometricUnlockEnabled}
+            label="Fingerprint"
+            help={
+              biometricAvailable
+                ? "Sign in and confirm check-in or check-out with your fingerprint instead of typing your PIN. Your face is still checked on every check-in."
+                : "Not available on this device"
+            }
+            value={biometricUnlockEnabled || fingerprintCheckinEnabled}
             disabled={!biometricAvailable}
-            onValueChange={handleBiometricToggle}
-          />
-          <SettingsRow
-            label="Fingerprint check-in"
-            help={biometricAvailable ? "Confirm check-in and check-out with your fingerprint instead of typing your PIN. Your PIN is saved after your next check-in." : "Not available on this device"}
-            value={fingerprintCheckinEnabled}
-            disabled={!biometricAvailable}
-            onValueChange={handleFingerprintCheckinToggle}
+            onValueChange={handleFingerprintToggle}
           />
           {biometricError ? <Text style={styles.errorText}>Biometric error: {biometricError}</Text> : null}
           <SettingsRow

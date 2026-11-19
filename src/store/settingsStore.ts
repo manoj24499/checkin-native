@@ -44,6 +44,17 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "checkin.settings",
       storage: createJSONStorage(() => AsyncStorage),
+      // v1: "Biometric unlock" and "Fingerprint check-in" became one Profile option that sets both flags.
+      // Anyone who had either one on keeps fingerprint for both.
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Partial<SettingsState>;
+        if (version < 1) {
+          const on = !!(state.biometricUnlockEnabled || state.fingerprintCheckinEnabled);
+          return { ...state, biometricUnlockEnabled: on, fingerprintCheckinEnabled: on } as SettingsState;
+        }
+        return state as SettingsState;
+      },
     },
   ),
 );
