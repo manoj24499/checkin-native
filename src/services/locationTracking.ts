@@ -21,18 +21,27 @@ export function msSinceLocationTrackingStart(): number {
 
 // The admin dashboard marks an employee "Offline" once their last ping is
 // older than LIVE_THRESHOLD_MS = 3 minutes (components/DashboardWorkspace.tsx
-// in the backend project). Pinging slower than that guarantees the employee
-// spends more time looking offline than live, so this must stay under 3
-// minutes. One minute gives faster recovery after a GPS dropout and quicker
-// range confirmation (the server needs 3 readings in a row).
-export const PING_INTERVAL_MS = 60 * 1000;
+// in the backend project), so every interval here must stay under 3 minutes.
+// Office and Field employees ping every 2 minutes.
+export const PING_INTERVAL_MS = 2 * 60 * 1000;
+// Work-from-home and Hybrid employees ping every minute: their auto-pause depends on short runs of
+// readings, and a phone that loses its GPS lock recovers (and clears a wrong warning) sooner.
+export const FAST_PING_INTERVAL_MS = 60 * 1000;
+
+export function pingIntervalMs(): number {
+  // Loaded lazily for the same circular-import reason as isFieldProfile below.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useAuthStore } = require("@/store/authStore") as typeof import("@/store/authStore");
+  const mode = useAuthStore.getState().user?.workMode;
+  return mode === "WFH" || mode === "HYBRID" ? FAST_PING_INTERVAL_MS : PING_INTERVAL_MS;
+}
 
 // Field workers are on the road, and distance is summed between recorded
 // points: with only one point every 2 minutes, a vehicle at 40 km/h covers
 // ~1.3 km between points and the straight line between them cuts every corner,
 // so the total came out 10-15 km short on a long day. Field profiles therefore
 // sample the GPS every FIELD_SAMPLE_INTERVAL_MS, keep the samples in memory,
-// and upload them in one batch along with the regular 1-minute ping (which
+// and upload them in one batch along with the regular 2-minute ping (which
 // still drives live status and auto-pause on its own). Office/WFH profiles are
 // unchanged — no extra battery or data use.
 export const FIELD_SAMPLE_INTERVAL_MS = 10 * 1000;
@@ -280,10 +289,10 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
   }
   if (field) {
     // Field profiles record every sample into the outbox as it arrives (so the route survives a
-    // crash or a dead zone), and upload them in batches along with the regular 1-minute ping.
+    // crash or a dead zone), and upload them in batches along with the regular 2-minute ping.
     for (const l of real) addToOutbox(attendanceId, sampleOf(l));
     saveOutbox();
-    // Samples arrive every ~15s but the server only needs a ping every ~1 min.
+    // Samples arrive every ~15s but the server only needs a ping every ~2 min.
     const due = Date.now() - lastPingSentAt >= PING_INTERVAL_MS - 5_000;
     const waiting = outbox.filter((s) => s.a === attendanceId).length;
     if (!due && waiting < MAX_TRAIL_PER_PING) return;
@@ -402,7 +411,7 @@ export async function startLocationTracking(attendanceId: string, checkedInAt: s
         // effectively never trigger. This is a deliberate battery-vs-accuracy
         // tradeoff in favor of the pause feature actually working.
         accuracy: Location.Accuracy.High,
-        timeInterval: isFieldProfile() ? FIELD_SAMPLE_INTERVAL_MS : PING_INTERVAL_MS,
+        timeInterval: isFieldProfile() ? FIELD_SAMPLE_INTERVAL_MS : pingIntervalMs(),
         distanceInterval: 0,
         showsBackgroundLocationIndicator: true,
         pausesUpdatesAutomatically: false,

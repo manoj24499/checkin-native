@@ -13,7 +13,7 @@ import {
   useReducedMotion,
   type ActionTileProps,
 } from "@/components/ui";
-import { PING_INTERVAL_MS } from "@/services/locationTracking";
+import { pingIntervalMs } from "@/services/locationTracking";
 import { useTrackingFixStore } from "@/store/trackingFixStore";
 import { formatElapsed, formatDuration, computeWorkedMs } from "@/utils/attendanceGrouping";
 import { formatDistance } from "@/utils/geo";
@@ -169,7 +169,7 @@ export function PresenceCard({
   const totalOutsideMs = checkInMs ? Math.max(0, now - checkInMs - pauseAdjustedMs) : 0;
   const nextPingSec =
     isTracking && checkInMs
-      ? Math.floor((PING_INTERVAL_MS - ((now - checkInMs) % PING_INTERVAL_MS)) / 1000)
+      ? Math.floor((pingIntervalMs() - ((now - checkInMs) % pingIntervalMs())) / 1000)
       : null;
 
   // ---- Gauge numbers ----
