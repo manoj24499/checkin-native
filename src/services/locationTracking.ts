@@ -23,15 +23,16 @@ export function msSinceLocationTrackingStart(): number {
 // older than LIVE_THRESHOLD_MS = 3 minutes (components/DashboardWorkspace.tsx
 // in the backend project). Pinging slower than that guarantees the employee
 // spends more time looking offline than live, so this must stay under 3
-// minutes — 2 minutes leaves headroom for network latency/retries.
-export const PING_INTERVAL_MS = 2 * 60 * 1000;
+// minutes. One minute gives faster recovery after a GPS dropout and quicker
+// range confirmation (the server needs 3 readings in a row).
+export const PING_INTERVAL_MS = 60 * 1000;
 
 // Field workers are on the road, and distance is summed between recorded
 // points: with only one point every 2 minutes, a vehicle at 40 km/h covers
 // ~1.3 km between points and the straight line between them cuts every corner,
 // so the total came out 10-15 km short on a long day. Field profiles therefore
 // sample the GPS every FIELD_SAMPLE_INTERVAL_MS, keep the samples in memory,
-// and upload them in one batch along with the regular 2-minute ping (which
+// and upload them in one batch along with the regular 1-minute ping (which
 // still drives live status and auto-pause on its own). Office/WFH profiles are
 // unchanged — no extra battery or data use.
 export const FIELD_SAMPLE_INTERVAL_MS = 10 * 1000;
@@ -279,10 +280,10 @@ TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }) => {
   }
   if (field) {
     // Field profiles record every sample into the outbox as it arrives (so the route survives a
-    // crash or a dead zone), and upload them in batches along with the regular 2-minute ping.
+    // crash or a dead zone), and upload them in batches along with the regular 1-minute ping.
     for (const l of real) addToOutbox(attendanceId, sampleOf(l));
     saveOutbox();
-    // Samples arrive every ~15s but the server only needs a ping every ~2 min.
+    // Samples arrive every ~15s but the server only needs a ping every ~1 min.
     const due = Date.now() - lastPingSentAt >= PING_INTERVAL_MS - 5_000;
     const waiting = outbox.filter((s) => s.a === attendanceId).length;
     if (!due && waiting < MAX_TRAIL_PER_PING) return;

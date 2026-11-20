@@ -48,7 +48,7 @@ import { useTabBarClearance } from "@/navigation/tabBarClearance";
 type Coords = { latitude: number; longitude: number };
 
 // Keeps the on-screen "You" marker live while this screen stays open —
-// distinct from PING_INTERVAL_MS (locationTracking.ts, 2 minutes), which is
+// distinct from PING_INTERVAL_MS (locationTracking.ts, 1 minute), which is
 // the background pipeline that actually drives attendance/geofence/auto-
 // pause decisions server-side. This one is purely cosmetic (what the
 // employee sees on this map), so it can refresh much faster without any of
